@@ -10,15 +10,15 @@ pacman::p_load(tidyverse,
 getwd()
 options(scipen = 999)
 rm(list = ls())
-## Explore intercropping ####
+# Explore intercropping ####
 # Explore field data to understand intercropping and identify intercrops 
-field <- read_dta("data/eth/ess3/sect3_pp_w4.dta") %>% 
+field <- read_dta("data/eth/ess4/sect3_pp_w4.dta") %>% 
   select("household_id", "parcel_id", "field_id", "saq08", "saq09", "s3q02a", "s3q02b", "s3q2b_os",
          "s3q03", "s3q03_os", "s3q03b", "s3q04", "s3q05", "s3q07", "s3q08") %>% 
   rename(mixedcrop=s3q04)
 look_for(field)
 table(field$mixedcrop) # 2692 mixed
-cropdata <- read_dta("data/eth/ess3/sect4_pp_w4.dta") %>% 
+cropdata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") %>% 
   select("household_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") %>% 
   rename(mixedcrop=s4q02)
 look_for(cropdata)
@@ -81,56 +81,140 @@ count(legumemix, s4q01b, legume)%>% print(n=15)
 # as expected, we are more likely to observe legume intercrops in maize and sorghum 
 remove(cropdata,legumemix)
 
-### Maize fields ####
+## Maize fields ###
 # Identify maize fields
-maizefield <- read_dta("data/eth/ess3/sect4_pp_w4.dta") %>% 
-  select("household_id", "parcel_id", "field_id","s4q01b") %>% 
-  filter(s4q01b==2) %>% 
-  select(-s4q01b) %>% 
-  distinct(household_id, parcel_id, field_id, .keep_all = TRUE) %>%   # Remove duplicates
-  mutate(maizefil=1)
-cropdata <- read_dta("data/eth/ess3/sect4_pp_w4.dta") %>% 
+cropdata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") %>% 
   select("household_id", "parcel_id", "field_id", "s4q01b", "s4q02", "s4q03")
-# identify all maize planted fields
-data <- left_join(cropdata, maizefield, by=c("household_id", "parcel_id", "field_id")) %>% 
-  filter(maizefil==1)
-data %>% count(s4q02) %>% print(n=25) #1592
-data %>% filter(s4q02==2) %>% count(s4q01b) %>% print(n=25) #712 maize
+# Identify fields where at least one parcel has maize
+fields_with_maize <- cropdata %>%
+  filter(s4q01b == 2) %>%
+  select(household_id, parcel_id, field_id) %>%
+  unique()
+# Keep all parcels in those fields
+maizefield <- cropdata %>%
+  semi_join(fields_with_maize, by = c("household_id", "parcel_id", "field_id"))
+
+# There are 2963 parcels in the fields with at least one parcel with maize. 
+
+
 # identify maize fields intercroped with legumes
-data <- data %>% 
+data <- maizefield %>% 
   mutate(legume = ifelse(s4q01b %in% c(9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 24), 1, 0))
 data %>% count(legume)
-intercrop <- data %>%
+data %>%
   filter(legume==1) %>% 
-  distinct(household_id, parcel_id, field_id, .keep_all = TRUE) # Remove duplicates
+  distinct(household_id, parcel_id, field_id, .keep_all = TRUE) %>% 
+  count(legume)# Remove duplicates
 # Only 132 parcels have intercropping of maize and legume
+rm(list = ls())
 
 
-## Explore cereal legume rotations. 
-field <- read_dta("data/eth/ess3/sect3_pp_w4.dta") %>% 
-  #select(household_id, parcel_id, field_id, s3q03, s3q34) %>% 
-  filter(s3q03==1)
-# Identify groups where s3q34 has different values
-field_with_diff_s3q34 <- field %>% 
+# Explore cereal legume rotations #### 
+## Cereals are: barley, maize, sorghum, millet, wheat and teff. 
+## There are few fields reported more than ones with different holders.
+## These are probably divided between hh members.
+## Let us first identify these fields
+## Identify groups where s3q34 has different values
+field_with_diff_s3q34 <- read_dta("data/eth/ess4/sect3_pp_w4.dta") %>% 
+  filter(s3q03==1) %>% 
   group_by(household_id, parcel_id, field_id) %>%  # Group by household, parcel, and field
   mutate(unique_s3q34 = n_distinct(s3q34)) %>%  # Count unique values of s3q34 in each group
   filter(unique_s3q34 > 1) %>%  # Keep only groups where s3q34 has more than one unique value
-  ungroup()  # Ungroup the dataa
-field_with_diff_s3q34 %>% count(unique_s3q34)
-# some fields have different holders, probably divided between hh members. HOW TO ADDRESS THIS WHEN IDENTIFYING IF ROTATION WAS DONE? 
-# MAYBE TAKE THE SMALLES VALUE OF 34 1 IS YES 2 IS NO 
-#  
-field <- read_dta("data/eth/ess3/sect3_pp_w4.dta") %>% 
+  ungroup()
+field_with_diff_s3q34 %>% count(unique_s3q34) # 12 observations 
+field_with_diff_s3q34 <- field_with_diff_s3q34
+
+
+# At this moment this data is to identify if rotation was done in the field.
+# just check the duplicates for rotation. Drop duplicates with no informative information. 
+field_with_diff_s3q34 %>% 
+  select(household_id, parcel_id, field_id, s3q34 ) %>% 
+  head(.,12)
+
+# obs to be dropped: 
+# household_id       parcel_id field_id s3q34 
+# 010103088800709032         1        2 2
+# 030606088800202059         1        1 2
+# 040606088801505048         2        1 2
+# 060103088806701051         4        1 2
+# 060206088800203045         1        1 2
+# and one with pasture
+
+field_with_diff_s3q34 <- field_with_diff_s3q34 %>% 
+  filter(s3q34==2) %>%
+  select(household_id, parcel_id, field_id, s3q34) %>%
+  distinct()
+head(field_with_diff_s3q34)
+
+# drop observation above from the field data  
+field <- read_dta("data/eth/ess4/sect3_pp_w4.dta") %>% 
   select(household_id, parcel_id, field_id, s3q03, s3q34) %>% 
   filter(s3q03==1) %>% 
-  distinct(household_id, parcel_id, field_id, s3q34, .keep_all = TRUE) %>% 
-  distinct(household_id, parcel_id, field_id, .keep_all = TRUE)# Remove duplicates
-
-cropdata <- read_dta("data/eth/ess3/sect4_pp_w4.dta") %>% 
+  anti_join(field_with_diff_s3q34, by = c("household_id", "parcel_id", "field_id", "s3q34")) %>% 
+  distinct(household_id, parcel_id, field_id, s3q34, .keep_all = TRUE)
+# Identify cereal grown fields 
+cropdata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") %>% 
   select("household_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") 
-cropdata %>%   count(s4q01b)
-# Cereals are: barley, maize, sorghum, millet, wheat and teff
+cropdata %>% count(s4q01b)
 cropdata <- cropdata %>% 
   filter(s4q01b %in% c(1,2,3,6,7,8)) %>% 
   distinct(household_id, parcel_id, field_id, .keep_all = TRUE) # Remove duplicates
 cropdata <- left_join(cropdata, field, by=c("household_id", "parcel_id", "field_id"))
+cropdata %>%
+  group_by(household_id, parcel_id, field_id) %>%
+  filter(n() > 1) %>%
+  ungroup() # 0 duplicates 
+remove(field, field_with_diff_s3q34)
+look_for(cropdata)
+cropdata <- cropdata %>% 
+  mutate(rotation=ifelse(s3q34 ==1, 1, 0))
+# Identify rotation at household level
+# If household rotated at least cereal field with legumes during the past three years.
+hhdata <- collap(cropdata, rotation~household_id, FUN=fmax)
+table(hhdata$rotation)  # 814 adopters 1131 non-adopters.
+table(cropdata$s4q01b)
+
+# 1. BARLEY  2. MAIZE  3. MILLET  6. SORGHUM  7. TEFF  8. WHEAT    
+
+# 1    2    3    6    7    8 
+# 666 1907  260 1412 1215  741
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Gender ####
+
+
+
+
+# Nutrition indicators ####

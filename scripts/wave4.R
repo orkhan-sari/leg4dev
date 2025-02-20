@@ -1,7 +1,6 @@
 # Wave 4 ####
 ## necessary libraries
 pacman::p_load(tidyverse,
-               dplyr,
                haven,
                tibble,
                expss,
@@ -109,7 +108,7 @@ data %>%
 rm(list = ls())
 
 
-# Explore cereal legume rotations #### 
+# Maize - legume rotations ####
 ## Cereals are: barley, maize, sorghum, millet, wheat and teff. 
 ## There are few fields reported more than ones with different holders.
 ## These are probably divided between hh members.
@@ -148,73 +147,61 @@ head(field_with_diff_s3q34)
 
 # drop observation above from the field data  
 field <- read_dta("data/eth/ess4/sect3_pp_w4.dta") %>% 
-  select(household_id, parcel_id, field_id, s3q03, s3q34) %>% 
+  select(household_id, holder_id, parcel_id, field_id, s3q03, s3q34) %>% 
   filter(s3q03==1) %>% 
   anti_join(field_with_diff_s3q34, by = c("household_id", "parcel_id", "field_id", "s3q34")) %>% 
   distinct(household_id, parcel_id, field_id, s3q34, .keep_all = TRUE)
-# Identify cereal grown fields 
-cropdata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") %>% 
-  select("household_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") 
-cropdata %>% count(s4q01b)
-cropdata <- cropdata %>% 
-  filter(s4q01b %in% c(1,2,3,6,7,8)) %>% 
+
+maizedata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") %>% 
+  select(household_id, parcel_id, field_id,crop_id, s4q01b, s4q02, s4q03) %>% 
+  filter(s4q01b==2)
+maizedata %>% 
+  group_by(household_id, parcel_id, field_id) %>%
+  filter(n() > 1) %>%
+  ungroup() # 4 observations # maize is mixed with maize for two hhs.
+maizedata <- maizedata %>% 
   distinct(household_id, parcel_id, field_id, .keep_all = TRUE) # Remove duplicates
-cropdata <- left_join(cropdata, field, by=c("household_id", "parcel_id", "field_id"))
+cropdata <- left_join(maizedata, field, by=c("household_id", "parcel_id", "field_id"))
 cropdata %>%
   group_by(household_id, parcel_id, field_id) %>%
   filter(n() > 1) %>%
   ungroup() # 0 duplicates 
 remove(field, field_with_diff_s3q34)
 look_for(cropdata)
+glimpse(cropdata)
 cropdata <- cropdata %>% 
   mutate(rotation=ifelse(s3q34 ==1, 1, 0))
+table(cropdata$rotation)
+# 0    1 
+# 1457  564 maize fields had legume rotation
 # Identify rotation at household level
 # If household rotated at least cereal field with legumes during the past three years.
 hhdata <- collap(cropdata, rotation~household_id, FUN=fmax)
-table(hhdata$rotation)  # 814 adopters 1131 non-adopters.
-table(cropdata$s4q01b)
+table(hhdata$rotation)  # 411 adopters 852 non-adopters.
+remove(maizedata)
 
-# 1. BARLEY  2. MAIZE  3. MILLET  6. SORGHUM  7. TEFF  8. WHEAT    
-
-# 1    2    3    6    7    8 
-# 666 1907  260 1412 1215  741
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# HP data ####
+hpdata <- read_dta("data/hp/Plot_dataset.dta") %>% 
+  filter(country=="Ethiopia", wave==4) 
+look_for(hpdata)
+table(hpdata$main_crop, hpdata$intercropped) # this again signals that maize legume intercropping is not so common. 
+table(hpdata$improved) # 1034 fields with improved seeds
+hpdata <- hpdata %>%
+  select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, farm_size,
+         improved,organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, plot_dist_household, 
+         ag_asset_index, plot_owned, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
+         used_pesticides, yield_value_LCU, yield_value_USD) %>% 
+  mutate(plot_id=plot_id_merge)
+cropdata <- cropdata %>% 
+  rename(parcel_id2=parcel_id) %>% 
+  mutate(plot_id = paste(holder_id, parcel_id2, field_id, sep = "-")) # field means plot in HP
+plotdata <- left_join(cropdata,hpdata, by=c("plot_id")) %>% 
+  mutate(mixedcrop=ifelse(s4q02==2,1,0)) %>% 
+  select(-s3q03, -s3q34, -s4q02)
+remove(hpdata)
 
 
 
 
 # Gender ####
-
-
-
-
 # Nutrition indicators ####

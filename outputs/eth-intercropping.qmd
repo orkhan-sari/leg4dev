@@ -1,0 +1,61 @@
+---
+title: "eth_intercropping"
+author: "Dr. Orkhan Sariyev"
+format: html
+editor: visual
+---
+
+## Intercropping in ETH LSMS - ISA
+
+Below I explore cereal legume intercropping in Ethiopia employing LSMS-ISA data. The employed data is from wave 4 which has been collected in 2018-2019.
+
+```{r load necessary libraries}
+#| echo: false
+pacman::p_load(tidyverse,
+               haven,
+               tibble,
+               expss,
+               labelled,
+               collapse)
+getwd()
+options(scipen = 999)
+```
+
+```{r}
+#| echo: true
+field <- read_dta("data/eth/ess4/sect3_pp_w4.dta") %>% 
+  select("household_id", "parcel_id", "field_id", "saq08", "saq09", "s3q02a", "s3q02b", "s3q2b_os",
+         "s3q03", "s3q03_os", "s3q03b", "s3q04", "s3q05", "s3q07", "s3q08") %>% 
+  rename(mixedcrop=s3q04)
+table(field$mixedcrop) # 2692 mixed
+cropdata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") %>% 
+  select("household_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") %>% 
+  rename(mixedcrop=s4q02)
+table(cropdata$mixedcrop) #6085 mixed crops
+count(cropdata, s4q01b)%>% print(n=20)
+```
+
+```{r}
+cropdata <- cropdata %>% 
+  dplyr::group_by(household_id, parcel_id, field_id) %>% 
+  mutate(legum = ifelse(s4q01b %in% c(9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 24), 1, 0),
+         legume = ifelse(any(mixedcrop == 2) & any(legum == 1), 1, 0)) %>% 
+  ungroup()
+cropdata %>% 
+  filter(s4q01b %in% c(6, 7, 8, 1, 2, 3, 72, 71)) %>% 
+  count(s4q01b, mixedcrop)
+```
+
+```{r}
+legumemix <- cropdata %>% 
+  filter(legume==1)
+count(legumemix, s4q01b, mixedcrop)%>% print(n=15)
+```
+
+We should not observe any pure stand in the above tibble. However, this happens because in some cases the same field of the parcel is listed for e.g. maize as a pure stand while there is also a mix of maize and legume on the same field. Thus, the total count below reflects the true distribution of intercropping.
+
+```{r}
+legumemix %>% count(s4q01b) %>% print(n=15)
+```
+
+As expected, we are more likely to observe legume intercrops in maize and sorghum.

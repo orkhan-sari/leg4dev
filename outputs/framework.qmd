@@ -1,5 +1,25 @@
+---
+title: "Framework in dag"
+author: "Dr. Orkhan Sariyev"
+format: 
+  html:
+    fig-width: 10
+    fig-height: 6
+editor: visual
+---
+
+## Concept
+
+The goal here is to visualize the realtionship between maize-legume intercropping and food security. We refer to this file during the analyses. 
+
+```{r}
+#| echo: false
 library(dagitty)
 library(ggdag)
+```
+
+
+```{r}
 # assumed DAG framework
 coords <- data.frame(matrix(c("intercrop",0,0,
                               "nutrition",4,0,
@@ -15,4 +35,6 @@ dag <- dagify(nutrition~intercrop+social+conservation+gender+plot,
               coords = coords)
 #plot
 ggdag_classic(dag, text_col = "blue") + theme_dag_blank()
+```
+
 

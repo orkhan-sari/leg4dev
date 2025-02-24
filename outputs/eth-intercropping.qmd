@@ -1,7 +1,10 @@
 ---
 title: "eth_intercropping"
 author: "Dr. Orkhan Sariyev"
-format: html
+format: 
+  html:
+    fig-width: 10
+    fig-height: 6
 editor: visual
 ---
 
@@ -23,15 +26,18 @@ options(scipen = 999)
 
 ```{r}
 #| echo: true
+setwd("C:/Users/490A/Nextcloud/Research/leg4dev")
 field <- read_dta("data/eth/ess4/sect3_pp_w4.dta") %>% 
   select("household_id", "parcel_id", "field_id", "saq08", "saq09", "s3q02a", "s3q02b", "s3q2b_os",
          "s3q03", "s3q03_os", "s3q03b", "s3q04", "s3q05", "s3q07", "s3q08") %>% 
   rename(mixedcrop=s3q04)
-table(field$mixedcrop) # 2692 mixed
+table(field$mixedcrop) 
+# 2692 mixed fields where mixed cropping was practiced.
 cropdata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") %>% 
   select("household_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") %>% 
   rename(mixedcrop=s4q02)
-table(cropdata$mixedcrop) #6085 mixed crops
+table(cropdata$mixedcrop) 
+# 6085 mixed crops in the above 2692 fields. 
 count(cropdata, s4q01b)%>% print(n=20)
 ```
 
@@ -52,7 +58,7 @@ legumemix <- cropdata %>%
 count(legumemix, s4q01b, mixedcrop)%>% print(n=15)
 ```
 
-We should not observe any pure stand in the above tibble. However, this happens because in some cases the same field of the parcel is listed for e.g. maize as a pure stand while there is also a mix of maize and legume on the same field. Thus, the total count below reflects the true distribution of intercropping.
+We should not observe any pure stand in the above tibble. However, this happens because in some cases the same field of the parcel is listed for e.g. maize as a pure stand while there is also a mix of maize and legume on the same field. Thus, the total count below reflects the true distribution of intercropping. This is likely an enumerator error. 
 
 ```{r}
 legumemix %>% count(s4q01b) %>% print(n=15)

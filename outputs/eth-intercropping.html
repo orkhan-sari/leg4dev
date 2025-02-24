@@ -108,30 +108,33 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Below I explore cereal legume intercropping in Ethiopia employing LSMS-ISA data. The employed data is from wave 4 which has been collected in 2018-2019.</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
-<pre><code>[1] "C:/Users/490A/Nextcloud/Research/leg4dev"</code></pre>
+<pre><code>[1] "C:/Users/490A/Nextcloud/Research/leg4dev/outputs"</code></pre>
 </div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>field <span class="ot">&lt;-</span> <span class="fu">read_dta</span>(<span class="st">"data/eth/ess4/sect3_pp_w4.dta"</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="st">"household_id"</span>, <span class="st">"parcel_id"</span>, <span class="st">"field_id"</span>, <span class="st">"saq08"</span>, <span class="st">"saq09"</span>, <span class="st">"s3q02a"</span>, <span class="st">"s3q02b"</span>, <span class="st">"s3q2b_os"</span>,</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>         <span class="st">"s3q03"</span>, <span class="st">"s3q03_os"</span>, <span class="st">"s3q03b"</span>, <span class="st">"s3q04"</span>, <span class="st">"s3q05"</span>, <span class="st">"s3q07"</span>, <span class="st">"s3q08"</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">mixedcrop=</span>s3q04)</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(field<span class="sc">$</span>mixedcrop) <span class="co"># 2692 mixed</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">setwd</span>(<span class="st">"C:/Users/490A/Nextcloud/Research/leg4dev"</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>field <span class="ot">&lt;-</span> <span class="fu">read_dta</span>(<span class="st">"data/eth/ess4/sect3_pp_w4.dta"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="st">"household_id"</span>, <span class="st">"parcel_id"</span>, <span class="st">"field_id"</span>, <span class="st">"saq08"</span>, <span class="st">"saq09"</span>, <span class="st">"s3q02a"</span>, <span class="st">"s3q02b"</span>, <span class="st">"s3q2b_os"</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>         <span class="st">"s3q03"</span>, <span class="st">"s3q03_os"</span>, <span class="st">"s3q03b"</span>, <span class="st">"s3q04"</span>, <span class="st">"s3q05"</span>, <span class="st">"s3q07"</span>, <span class="st">"s3q08"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">mixedcrop=</span>s3q04)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(field<span class="sc">$</span>mixedcrop) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
     1     2 
 10685  2692 </code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>cropdata <span class="ot">&lt;-</span> <span class="fu">read_dta</span>(<span class="st">"data/eth/ess4/sect4_pp_w4.dta"</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="st">"household_id"</span>, <span class="st">"parcel_id"</span>, <span class="st">"field_id"</span>,<span class="st">"crop_id"</span>, <span class="st">"s4q01b"</span>, <span class="st">"s4q02"</span>, <span class="st">"s4q03"</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">mixedcrop=</span>s4q02)</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(cropdata<span class="sc">$</span>mixedcrop) <span class="co">#6085 mixed crops</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 2692 mixed fields where mixed cropping was practiced.</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>cropdata <span class="ot">&lt;-</span> <span class="fu">read_dta</span>(<span class="st">"data/eth/ess4/sect4_pp_w4.dta"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="st">"household_id"</span>, <span class="st">"parcel_id"</span>, <span class="st">"field_id"</span>,<span class="st">"crop_id"</span>, <span class="st">"s4q01b"</span>, <span class="st">"s4q02"</span>, <span class="st">"s4q03"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">mixedcrop=</span>s4q02)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(cropdata<span class="sc">$</span>mixedcrop) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
     1     2 
 10828  6085 </code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">count</span>(cropdata, s4q01b)<span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">20</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 6085 mixed crops in the above 2692 fields. </span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">count</span>(cropdata, s4q01b)<span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">20</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 85 × 2
    s4q01b                        n
@@ -216,7 +219,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 # ℹ 46 more rows</code></pre>
 </div>
 </div>
-<p>We should not observe any pure stand in the above tibble. However, this happens because in some cases the same field of the parcel is listed for e.g.&nbsp;maize as a pure stand while there is also a mix of maize and legume on the same field. Thus, the total count below reflects the true distribution of intercropping.</p>
+<p>We should not observe any pure stand in the above tibble. However, this happens because in some cases the same field of the parcel is listed for e.g.&nbsp;maize as a pure stand while there is also a mix of maize and legume on the same field. Thus, the total count below reflects the true distribution of intercropping. This is likely an enumerator error.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>legumemix <span class="sc">%&gt;%</span> <span class="fu">count</span>(s4q01b) <span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">15</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">

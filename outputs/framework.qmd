@@ -10,14 +10,13 @@ editor: visual
 
 ## Concept
 
-The goal here is to visualize the realtionship between maize-legume intercropping and food security. We refer to this file during the analyses. 
+The goal here is to visualize the realtionship between maize-legume intercropping and food security. We refer to this file during the analyses.
 
 ```{r}
 #| echo: false
 library(dagitty)
 library(ggdag)
 ```
-
 
 ```{r}
 # assumed DAG framework
@@ -36,5 +35,3 @@ dag <- dagify(nutrition~intercrop+social+conservation+gender+plot,
 #plot
 ggdag_classic(dag, text_col = "blue") + theme_dag_blank()
 ```
-
-

@@ -103,8 +103,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<section id="intercropping-in-eth-lsms---isa" class="level2">
-<h2 class="anchored" data-anchor-id="intercropping-in-eth-lsms---isa">Intercropping in ETH LSMS - ISA</h2>
+<section id="intercropping-in-eth-lsms---isa-wave-4" class="level2">
+<h2 class="anchored" data-anchor-id="intercropping-in-eth-lsms---isa-wave-4">Intercropping in ETH LSMS - ISA wave 4</h2>
 <p>Below I explore cereal legume intercropping in Ethiopia employing LSMS-ISA data. The employed data is from wave 4 which has been collected in 2018-2019.</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
@@ -134,32 +134,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 10828  6085 </code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 6085 mixed crops in the above 2692 fields. </span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">count</span>(cropdata, s4q01b)<span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">20</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">count</span>(cropdata, s4q01b)<span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 85 × 2
-   s4q01b                        n
-   &lt;dbl+lbl&gt;                 &lt;int&gt;
- 1  1 [1. BARLEY]              691
- 2  2 [2. MAIZE]              2023
- 3  3 [3. MILLET]              263
- 4  4 [4. OATS]                 13
- 5  5 [5. RICE]                 76
- 6  6 [6. SORGHUM]            1495
- 7  7 [7. TEFF]               1223
- 8  8 [8. WHEAT]               770
- 9  9 [9. Mung Bean/ MASHO]     52
-10 10 [10. CASSAVA]             89
-11 11 [11. CHICK PEAS]         115
-12 12 [12. HARICOT BEANS]      128
-13 13 [13. HORSE BEANS]        432
-14 14 [14. LENTILS]            104
-15 15 [15. FIELD PEAS]         159
-16 16 [16. VETCH]               85
-17 17 [17. GIBTO]                3
-18 18 [18. SOYA BEANS]         110
-19 19 [19. RED KIDENY BEANS]   308
-20 20 [20. FENNEL]               1
-# ℹ 65 more rows</code></pre>
+   s4q01b                       n
+   &lt;dbl+lbl&gt;                &lt;int&gt;
+ 1  1 [1. BARLEY]             691
+ 2  2 [2. MAIZE]             2023
+ 3  3 [3. MILLET]             263
+ 4  4 [4. OATS]                13
+ 5  5 [5. RICE]                76
+ 6  6 [6. SORGHUM]           1495
+ 7  7 [7. TEFF]              1223
+ 8  8 [8. WHEAT]              770
+ 9  9 [9. Mung Bean/ MASHO]    52
+10 10 [10. CASSAVA]            89
+# ℹ 75 more rows</code></pre>
 </div>
 </div>
 <div class="cell">
@@ -170,33 +160,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
 <span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>cropdata <span class="sc">%&gt;%</span> </span>
 <span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(s4q01b <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">6</span>, <span class="dv">7</span>, <span class="dv">8</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">72</span>, <span class="dv">71</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(s4q01b, mixedcrop)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(s4q01b, mixedcrop) <span class="sc">%&gt;%</span>  <span class="fu">print</span>(<span class="at">n=</span><span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 16 × 3
-   s4q01b          mixedcrop             n
-   &lt;dbl+lbl&gt;       &lt;dbl+lbl&gt;         &lt;int&gt;
- 1  1 [1. BARLEY]  1 [1. Pure Stand]   626
- 2  1 [1. BARLEY]  2 [2. Mixed]         65
- 3  2 [2. MAIZE]   1 [1. Pure Stand]  1311
- 4  2 [2. MAIZE]   2 [2. Mixed]        712
- 5  3 [3. MILLET]  1 [1. Pure Stand]   244
- 6  3 [3. MILLET]  2 [2. Mixed]         19
- 7  6 [6. SORGHUM] 1 [1. Pure Stand]   871
- 8  6 [6. SORGHUM] 2 [2. Mixed]        624
- 9  7 [7. TEFF]    1 [1. Pure Stand]  1202
-10  7 [7. TEFF]    2 [2. Mixed]         21
-11  8 [8. WHEAT]   1 [1. Pure Stand]   710
-12  8 [8. WHEAT]   2 [2. Mixed]         60
-13 71 [71. CHAT]   1 [1. Pure Stand]   255
-14 71 [71. CHAT]   2 [2. Mixed]        577
-15 72 [72. COFFEE] 1 [1. Pure Stand]   466
-16 72 [72. COFFEE] 2 [2. Mixed]        550</code></pre>
+   s4q01b         mixedcrop             n
+   &lt;dbl+lbl&gt;      &lt;dbl+lbl&gt;         &lt;int&gt;
+ 1 1 [1. BARLEY]  1 [1. Pure Stand]   626
+ 2 1 [1. BARLEY]  2 [2. Mixed]         65
+ 3 2 [2. MAIZE]   1 [1. Pure Stand]  1311
+ 4 2 [2. MAIZE]   2 [2. Mixed]        712
+ 5 3 [3. MILLET]  1 [1. Pure Stand]   244
+ 6 3 [3. MILLET]  2 [2. Mixed]         19
+ 7 6 [6. SORGHUM] 1 [1. Pure Stand]   871
+ 8 6 [6. SORGHUM] 2 [2. Mixed]        624
+ 9 7 [7. TEFF]    1 [1. Pure Stand]  1202
+10 7 [7. TEFF]    2 [2. Mixed]         21
+# ℹ 6 more rows</code></pre>
 </div>
 </div>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>legumemix <span class="ot">&lt;-</span> cropdata <span class="sc">%&gt;%</span> </span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(legume<span class="sc">==</span><span class="dv">1</span>)</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="fu">count</span>(legumemix, s4q01b, mixedcrop)<span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">15</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="fu">count</span>(legumemix, s4q01b, mixedcrop)<span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 61 × 3
    s4q01b                   mixedcrop             n
@@ -211,40 +196,132 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  8  9 [9. Mung Bean/ MASHO] 2 [2. Mixed]         14
  9 10 [10. CASSAVA]         2 [2. Mixed]          2
 10 11 [11. CHICK PEAS]      2 [2. Mixed]         13
-11 12 [12. HARICOT BEANS]   1 [1. Pure Stand]     2
-12 12 [12. HARICOT BEANS]   2 [2. Mixed]         85
-13 13 [13. HORSE BEANS]     1 [1. Pure Stand]     1
-14 13 [13. HORSE BEANS]     2 [2. Mixed]         91
-15 14 [14. LENTILS]         2 [2. Mixed]         13
-# ℹ 46 more rows</code></pre>
+# ℹ 51 more rows</code></pre>
 </div>
 </div>
 <p>We should not observe any pure stand in the above tibble. However, this happens because in some cases the same field of the parcel is listed for e.g.&nbsp;maize as a pure stand while there is also a mix of maize and legume on the same field. Thus, the total count below reflects the true distribution of intercropping. This is likely an enumerator error.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>legumemix <span class="sc">%&gt;%</span> <span class="fu">count</span>(s4q01b) <span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">15</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>legumemix <span class="sc">%&gt;%</span> <span class="fu">count</span>(s4q01b) <span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 46 × 2
-   s4q01b                        n
-   &lt;dbl+lbl&gt;                 &lt;int&gt;
- 1  1 [1. BARLEY]                4
- 2  2 [2. MAIZE]               130
- 3  6 [6. SORGHUM]             181
- 4  8 [8. WHEAT]                 7
- 5  9 [9. Mung Bean/ MASHO]     14
- 6 10 [10. CASSAVA]              2
- 7 11 [11. CHICK PEAS]          13
- 8 12 [12. HARICOT BEANS]       87
- 9 13 [13. HORSE BEANS]         92
-10 14 [14. LENTILS]             13
-11 15 [15. FIELD PEAS]          26
-12 16 [16. VETCH]                6
-13 17 [17. GIBTO]                1
-14 18 [18. SOYA BEANS]           5
-15 19 [19. RED KIDENY BEANS]   152
-# ℹ 31 more rows</code></pre>
+   s4q01b                       n
+   &lt;dbl+lbl&gt;                &lt;int&gt;
+ 1  1 [1. BARLEY]               4
+ 2  2 [2. MAIZE]              130
+ 3  6 [6. SORGHUM]            181
+ 4  8 [8. WHEAT]                7
+ 5  9 [9. Mung Bean/ MASHO]    14
+ 6 10 [10. CASSAVA]             2
+ 7 11 [11. CHICK PEAS]         13
+ 8 12 [12. HARICOT BEANS]      87
+ 9 13 [13. HORSE BEANS]        92
+10 14 [14. LENTILS]            13
+# ℹ 36 more rows</code></pre>
 </div>
 </div>
-<p>As expected, we are more likely to observe legume intercrops in maize and sorghum.</p>
+<p>As expected, we are more likely to observe legume intercrops in maize and sorghum.130 fields with maize-legume intercropping.</p>
+</section>
+<section id="intercropping-in-wave-5" class="level2">
+<h2 class="anchored" data-anchor-id="intercropping-in-wave-5">Intercropping in wave 5</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">setwd</span>(<span class="st">"C:/Users/490A/Nextcloud/Research/leg4dev"</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>field <span class="ot">&lt;-</span> <span class="fu">read_dta</span>(<span class="st">"data/eth/ess5/sect3_pp_w5.dta"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="st">"household_id"</span>, <span class="st">"parcel_id"</span>, <span class="st">"field_id"</span>, <span class="st">"saq08"</span>, <span class="st">"saq09"</span>, <span class="st">"s3q02a"</span>, <span class="st">"s3q02b"</span>, <span class="st">"s3q2b_os"</span>,</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>         <span class="st">"s3q03"</span>, <span class="st">"s3q03_os"</span>, <span class="st">"s3q03b"</span>, <span class="st">"s3q04"</span>, <span class="st">"s3q05"</span>, <span class="st">"s3q07"</span>, <span class="st">"s3q08"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">mixedcrop=</span>s3q04)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>countmixed <span class="ot">&lt;-</span> <span class="fu">table</span>(field<span class="sc">$</span>mixedcrop) </span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>mixed_count <span class="ot">&lt;-</span> countmixed[<span class="dv">2</span>]</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 2711 mixed fields where mixed cropping was practiced.</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>cropdata <span class="ot">&lt;-</span> <span class="fu">read_dta</span>(<span class="st">"data/eth/ess5/sect4_pp_w5.dta"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="st">"household_id"</span>, <span class="st">"parcel_id"</span>, <span class="st">"field_id"</span>,<span class="st">"crop_id"</span>, <span class="st">"s4q01b"</span>, <span class="st">"s4q02"</span>, <span class="st">"s4q03"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">mixedcrop=</span>s4q02)</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a><span class="fu">count</span>(cropdata, s4q01b)<span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 85 × 2
+   s4q01b                       n
+   &lt;dbl+lbl&gt;                &lt;int&gt;
+ 1  1 [1. BARLEY]             328
+ 2  2 [2. MAIZE]             1943
+ 3  3 [3. MILLET]             105
+ 4  4 [4. OATS]                12
+ 5  5 [5. RICE]                64
+ 6  6 [6. SORGHUM]            918
+ 7  7 [7. TEFF]               835
+ 8  8 [8. WHEAT]              397
+ 9  9 [9. Mung Bean/ MASHO]    10
+10 10 [10. CASSAVA]            83
+# ℹ 75 more rows</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> cropdata <span class="sc">%&gt;%</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(s4q01b)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>maize_count <span class="ot">&lt;-</span> counts<span class="sc">$</span>n[counts<span class="sc">$</span>s4q01b <span class="sc">==</span> <span class="dv">2</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>There are 2711 fields with mixed crops, and in these fields, 1943 are with maize.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>cropdata <span class="ot">&lt;-</span> cropdata <span class="sc">%&gt;%</span> </span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(household_id, parcel_id, field_id) <span class="sc">%&gt;%</span> </span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">legum =</span> <span class="fu">ifelse</span>(s4q01b <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">9</span>, <span class="dv">11</span>, <span class="dv">12</span>, <span class="dv">13</span>, <span class="dv">14</span>, <span class="dv">15</span>, <span class="dv">16</span>, <span class="dv">17</span>, <span class="dv">18</span>, <span class="dv">19</span>, <span class="dv">24</span>), <span class="dv">1</span>, <span class="dv">0</span>),</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">legume =</span> <span class="fu">ifelse</span>(<span class="fu">any</span>(mixedcrop <span class="sc">==</span> <span class="dv">2</span>) <span class="sc">&amp;</span> <span class="fu">any</span>(legum <span class="sc">==</span> <span class="dv">1</span>), <span class="dv">1</span>, <span class="dv">0</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>cropdata <span class="sc">%&gt;%</span> </span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(s4q01b <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">6</span>, <span class="dv">7</span>, <span class="dv">8</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">72</span>, <span class="dv">71</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(s4q01b, mixedcrop) <span class="sc">%&gt;%</span>  <span class="fu">print</span>(<span class="at">n=</span><span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 17 × 3
+   s4q01b         mixedcrop             n
+   &lt;dbl+lbl&gt;      &lt;dbl+lbl&gt;         &lt;int&gt;
+ 1 1 [1. BARLEY]  1 [1. Pure Stand]   307
+ 2 1 [1. BARLEY]  2 [2. Mixed]         21
+ 3 2 [2. MAIZE]   1 [1. Pure Stand]  1089
+ 4 2 [2. MAIZE]   2 [2. Mixed]        854
+ 5 3 [3. MILLET]  1 [1. Pure Stand]    98
+ 6 3 [3. MILLET]  2 [2. Mixed]          7
+ 7 6 [6. SORGHUM] 1 [1. Pure Stand]   478
+ 8 6 [6. SORGHUM] 2 [2. Mixed]        440
+ 9 7 [7. TEFF]    1 [1. Pure Stand]   812
+10 7 [7. TEFF]    2 [2. Mixed]         23
+# ℹ 7 more rows</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>legumemix <span class="ot">&lt;-</span> cropdata <span class="sc">%&gt;%</span> </span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(legume<span class="sc">==</span><span class="dv">1</span>)</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="fu">count</span>(legumemix, s4q01b, mixedcrop)<span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 51 × 3
+   s4q01b              mixedcrop             n
+   &lt;dbl+lbl&gt;           &lt;dbl+lbl&gt;         &lt;int&gt;
+ 1  1 [1. BARLEY]      2 [2. Mixed]          4
+ 2  2 [2. MAIZE]       1 [1. Pure Stand]     1
+ 3  2 [2. MAIZE]       2 [2. Mixed]        185
+ 4  3 [3. MILLET]      2 [2. Mixed]          1
+ 5  6 [6. SORGHUM]     2 [2. Mixed]         77
+ 6  7 [7. TEFF]        2 [2. Mixed]          2
+ 7  8 [8. WHEAT]       2 [2. Mixed]          3
+ 8 10 [10. CASSAVA]    2 [2. Mixed]          7
+ 9 11 [11. CHICK PEAS] 1 [1. Pure Stand]     1
+10 11 [11. CHICK PEAS] 2 [2. Mixed]          3
+# ℹ 41 more rows</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>legumemix <span class="sc">%&gt;%</span> <span class="fu">count</span>(s4q01b) <span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n=</span><span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 46 × 2
+   s4q01b                     n
+   &lt;dbl+lbl&gt;              &lt;int&gt;
+ 1  1 [1. BARLEY]             4
+ 2  2 [2. MAIZE]            186
+ 3  3 [3. MILLET]             1
+ 4  6 [6. SORGHUM]           77
+ 5  7 [7. TEFF]               2
+ 6  8 [8. WHEAT]              3
+ 7 10 [10. CASSAVA]           7
+ 8 11 [11. CHICK PEAS]        4
+ 9 12 [12. HARICOT BEANS]    86
+10 13 [13. HORSE BEANS]      72
+# ℹ 36 more rows</code></pre>
+</div>
+</div>
+<p>186 fields with maize-legume intercropping.</p>
 </section>
 
 </main>

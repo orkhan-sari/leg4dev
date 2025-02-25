@@ -48,13 +48,13 @@ field_with_diff_s3q34 <- field_with_diff_s3q34 %>%
 head(field_with_diff_s3q34)
 
 # drop observation above from the field data  
-field <- read_dta("data/eth/ess4/sect3_pp_w4.dta") %>% 
+field <- read_dta("data/eth/ess4/sect3_pp_w4.dta") %>% #field roster
   select(household_id, holder_id, parcel_id, field_id, s3q03, s3q34) %>% 
   filter(s3q03==1) %>% 
   anti_join(field_with_diff_s3q34, by = c("household_id", "parcel_id", "field_id", "s3q34")) %>% 
   distinct(household_id, parcel_id, field_id, s3q34, .keep_all = TRUE)
 remove(field_with_diff_s3q34)
-maizedata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") %>% 
+maizedata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") %>%  #crop roster
   select(household_id, parcel_id, field_id,crop_id, s4q01b, s4q02, s4q03) %>% 
   filter(s4q01b==2)
 maizedata %>% 
@@ -63,7 +63,7 @@ maizedata %>%
   ungroup() # 4 observations # maize is mixed with maize for two hhs.
 maizedata <- maizedata %>% 
   distinct(household_id, parcel_id, field_id, .keep_all = TRUE) # Remove duplicates
-cropdata <- left_join(maizedata, field, by=c("household_id", "parcel_id", "field_id"))
+cropdata <- left_join(maizedata, field, by=c("household_id", "parcel_id", "field_id")) # maize fields with field data 
 cropdata %>%
   group_by(household_id, parcel_id, field_id) %>%
   filter(n() > 1) %>%
@@ -71,22 +71,22 @@ cropdata %>%
 remove(field)
 look_for(cropdata)
 glimpse(cropdata)
-cropdata <- cropdata %>% 
+cropdata4 <- cropdata %>% 
   mutate(rotation=ifelse(s3q34 ==1, 1, 0))
-table(cropdata$rotation)
+table(cropdata4$rotation)
 # 0    1 
 # 1457  564 maize fields had legume rotation
 # Identify rotation at household level
 # If household rotated at least one maize field with legumes during the past three years.
-hhdata <- collap(cropdata, rotation~household_id, FUN=fmax)
-table(hhdata$rotation)  # 411 adopters 852 non-adopters.
-remove(maizedata)
+hhdata4 <- collap(cropdata4, rotation~household_id, FUN=fmax)
+table(hhdata4$rotation)  # 411 adopters 852 non-adopters.
+remove(maizedata, cropdata)
 
 # HP data ####
 hpdata <- read_dta("data/hp/Plot_dataset.dta") %>% 
   filter(country=="Ethiopia", wave==4) 
 look_for(hpdata)
-table(hpdata$main_crop, hpdata$intercropped) # this again signals that maize legume intercropping is not so common. 
+table(hpdata$main_crop, hpdata$intercropped) # 1239  268 intercropped maize 
 table(hpdata$improved) # 1034 fields with improved seeds
 hpdata <- hpdata %>%
   select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, farm_size,
@@ -94,15 +94,19 @@ hpdata <- hpdata %>%
          ag_asset_index, plot_owned, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
          used_pesticides, yield_value_LCU, yield_value_USD) %>% 
   mutate(plot_id=plot_id_merge)
-cropdata <- cropdata %>% 
+cropdata4 <- cropdata4 %>% 
   rename(parcel_id2=parcel_id) %>% 
   mutate(plot_id = paste(holder_id, parcel_id2, field_id, sep = "-")) # field means plot in HP
-plotdata <- left_join(cropdata,hpdata, by=c("plot_id")) %>% 
+plotdata4 <- left_join(cropdata4,hpdata, by=c("plot_id")) %>% 
   mutate(mixedcrop=ifelse(s4q02==2,1,0)) %>% 
   select(-s3q03, -s3q34, -s4q02)
 remove(hpdata)
-
-
+# generate a variable for duplicates of household_id in plotdata 
+plotdata4 <- plotdata4 %>% 
+  group_by(household_id) %>%
+  mutate( dupl=n()) %>%
+  ungroup() # 0 duplicates 
+table(plotdata4$dupl)
 
 
 # Gender ####

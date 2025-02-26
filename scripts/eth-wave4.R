@@ -89,25 +89,35 @@ look_for(hpdata)
 table(hpdata$main_crop, hpdata$intercropped) # 1239  268 intercropped maize 
 table(hpdata$improved) # 1034 fields with improved seeds
 hpdata <- hpdata %>%
-  select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, farm_size,
-         improved,organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, plot_dist_household, 
-         ag_asset_index, plot_owned, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
+  select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, farm_size, manager_id_merge,
+         manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
+         respondent_id_merge, improved,organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, 
+         plot_dist_household, ag_asset_index, plot_owned, plot_certificate, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
          used_pesticides, yield_value_LCU, yield_value_USD) %>% 
   mutate(plot_id=plot_id_merge)
 cropdata4 <- cropdata4 %>% 
   rename(parcel_id2=parcel_id) %>% 
   mutate(plot_id = paste(holder_id, parcel_id2, field_id, sep = "-")) # field means plot in HP
 plotdata4 <- left_join(cropdata4,hpdata, by=c("plot_id")) %>% 
-  mutate(mixedcrop=ifelse(s4q02==2,1,0)) %>% 
   select(-s3q03, -s3q34, -s4q02)
 remove(hpdata)
 # generate a variable for duplicates of household_id in plotdata 
 plotdata4 <- plotdata4 %>% 
   group_by(household_id) %>%
   mutate( dupl=n()) %>%
-  ungroup() # 0 duplicates 
+  ungroup()
 table(plotdata4$dupl)
-
+# 1   2   3   4   5   6   8 
+# 767 638 333 208  55  12   8 
+plotdata4 %<>% select(-s4q01b, -dupl)
 
 # Gender ####
+
 # Nutrition indicators ####
+# HDDS
+# total consumption; alternative: Nominal annual expenditure on food per adult equivalent
+# consumption quantile
+hhhp <- read_dta("data/hp/Household_dataset.dta") %>% 
+  filter(country=="Ethiopia", wave==4) %>% 
+  select(hh_id_merge, hh_id_obs, hh_size, hh_shock, hh_dependency_ratio,totcons_USD, cons_quint, hh_asset_index, HDDS)
+look_for(hhhp)

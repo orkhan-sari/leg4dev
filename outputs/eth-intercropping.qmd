@@ -3,12 +3,14 @@ title: "eth_intercropping"
 author: "Dr. Orkhan Sariyev"
 format: 
   html:
+    toc: true
+    theme: simplex
     fig-width: 10
     fig-height: 6
 editor: visual
 ---
 
-## Intercropping in ETH LSMS - ISA wave 4 
+## Intercropping in ETH LSMS - ISA wave 4
 
 Below I explore cereal legume intercropping in Ethiopia employing LSMS-ISA data. The employed data is from wave 4 which has been collected in 2018-2019.
 
@@ -75,6 +77,7 @@ maize_count4 <- counts4$n[counts4$s4q01b == 2]
 As expected, we are more likely to observe legume intercrops in maize and sorghum.`r maize_count4` fields with maize-legume intercropping.
 
 ## Intercropping in wave 5
+
 ```{r}
 #| echo: true
 setwd("C:/Users/490A/Nextcloud/Research/leg4dev")
@@ -93,7 +96,9 @@ counts <- cropdata %>%
   count(s4q01b)
 maize_count <- counts$n[counts$s4q01b == 2]
 ```
-There are `r mixed_count` fields with mixed crops, and in these fields, `r maize_count` are with maize. 
+
+There are `r mixed_count` fields with mixed crops, and in these fields, `r maize_count` are with maize.
+
 ```{r}
 cropdata <- cropdata %>% 
   dplyr::group_by(household_id, parcel_id, field_id) %>% 
@@ -111,6 +116,7 @@ legumemix <- cropdata %>%
 count(legumemix, s4q01b, mixedcrop)%>% print(n=10)
 legumemix %>% count(s4q01b) %>% print(n=10)
 ```
+
 ```{r}
 #| echo: false
 counts5 <- legumemix %>%

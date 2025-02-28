@@ -111,3 +111,11 @@ plotdata5 <- plotdata5 %>%
 table(plotdata5$dupl)
 plotdata5 %<>% select(-s4q01b, -dupl)
 
+# Nutrition indicators ####
+# HDDS
+# total consumption; alternative: Nominal annual expenditure on food per adult equivalent
+# consumption quantile
+hhhp5 <- read_dta("data/hp/Household_dataset.dta") %>% 
+  filter(country=="Ethiopia", wave==5) %>% 
+  select(hh_id_merge, hh_id_obs, hh_size, hh_shock, hh_dependency_ratio,totcons_USD, cons_quint, hh_asset_index, HDDS,share_kg_sold)
+look_for(hhhp5)

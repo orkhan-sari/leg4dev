@@ -3,7 +3,6 @@
 pacman::p_load(tidyverse,
                haven,
                tibble,
-               expss,
                labelled,
                collapse)
 getwd()
@@ -62,7 +61,7 @@ maizedata %>%
   filter(n() > 1) %>%
   ungroup() # 4 observations # maize is mixed with maize for two hhs.
 maizedata <- maizedata %>% 
-  distinct(household_id, parcel_id, field_id, .keep_all = TRUE) # Remove duplicates
+  distinct(household_id, parcel_id, field_id, .keep_all = TRUE) # Remove duplicates to identify maize grown fields
 cropdata <- left_join(maizedata, field, by=c("household_id", "parcel_id", "field_id")) # maize fields with field data 
 cropdata %>%
   group_by(household_id, parcel_id, field_id) %>%
@@ -78,19 +77,23 @@ table(cropdata4$rotation)
 # 1457  564 maize fields had legume rotation
 # Identify rotation at household level
 # If household rotated at least one maize field with legumes during the past three years.
-hhdata4 <- collap(cropdata4, rotation~household_id, FUN=fmax)
-table(hhdata4$rotation)  # 411 adopters 852 non-adopters.
+rotation4 <- collap(cropdata4, rotation~household_id, FUN=fmax)
+table(rotation4$rotation)  # 411 adopters 852 non-adopters.
 remove(maizedata, cropdata)
 
 # HP data ####
 hpdata <- read_dta("data/hp/Plot_dataset.dta") %>% 
   filter(country=="Ethiopia", wave==4) 
 look_for(hpdata)
+hpdata %>%
+  group_by(hh_id_obs, parcel_id_obs, plot_id_obs) %>%
+  filter(n() > 1) %>%
+  ungroup() # 0 duplicates - plots are uniquely identified  
 table(hpdata$main_crop, hpdata$intercropped) # 1239  268 intercropped maize 
 table(hpdata$improved) # 1034 fields with improved seeds
 hpdata <- hpdata %>%
-  select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, farm_size, manager_id_merge,
-         manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
+  select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size,
+         manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
          respondent_id_merge, improved,organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, 
          plot_dist_household, ag_asset_index, plot_owned, plot_certificate, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
          used_pesticides, yield_value_LCU, yield_value_USD) %>% 
@@ -110,12 +113,23 @@ table(plotdata4$dupl)
 # 1   2   3   4   5   6   8 
 # 767 638 333 208  55  12   8 
 plotdata4 %<>% select(-s4q01b, -dupl)
+table(plotdata4$main_crop)
+# BARLEY    BEANS AND OTHER LEGUMES                   MAIZE                   OTHER 
+# 6                         35                    1503                      46 
+# PERENNIAL/FRUIT                 SORGHUM     TUBERS / ROOT CROPS 
+# 207                          109                      18 
 
+# From the above table we see that, main crop in some of the maize cultivated plots are different crops like beans and legumes or fruti trees.
+# There are many `other` crops which needs to be closely investigated in the dataset what these other crops are.
+plotdata4 %<>% mutate(main_legume=if_else(main_crop=="BEANS AND OTHER LEGUMES", 1,0)) 
+var_label(plotdata4$main_legume) <- "legume is main crop in this plot"
+look_for(plotdata4)
+remove(cropdata4)
 # Gender ####
 
 # Nutrition indicators ####
 # HDDS
-# total consumption; alternative: Nominal annual expenditure on food per adult equivalent
+# total consumption; LATER consider alternative: Nominal annual expenditure on food per adult equivalent
 # consumption quantile
 hhhp4 <- read_dta("data/hp/Household_dataset.dta") %>% 
   filter(country=="Ethiopia", wave==4) %>% 

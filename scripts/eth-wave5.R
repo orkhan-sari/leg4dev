@@ -3,7 +3,6 @@
 pacman::p_load(tidyverse,
                haven,
                tibble,
-               expss,
                labelled,
                collapse)
 getwd()
@@ -80,8 +79,8 @@ table(cropdata5$rotation)
 # 1305  633 maize fields had legume rotation
 # Identify rotation at household level
 # If household rotated at least one maize field with legumes during the past three years.
-hhdata5 <- collap(cropdata5, rotation~household_id, FUN=fmax)
-table(hhdata5$rotation)  # 392 adopters 612 non-adopters.
+rotation5 <- collap(cropdata5, rotation~household_id, FUN=fmax)
+table(rotation5$rotation)  # 392 adopters 612 non-adopters.
 remove(maizedata, cropdata)
 
 # HP data ####
@@ -91,8 +90,8 @@ look_for(hpdata)
 table(hpdata$main_crop, hpdata$intercropped) # 1048  431 intercropped maize 
 table(hpdata$improved) # 1049 fields with improved seeds
 hpdata <- hpdata %>%
-  select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, farm_size, manager_id_merge,
-         manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
+  select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size,
+         manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
          respondent_id_merge, improved,organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, 
          plot_dist_household, ag_asset_index, plot_owned, plot_certificate, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
          used_pesticides, yield_value_LCU, yield_value_USD) %>% 
@@ -110,6 +109,9 @@ plotdata5 <- plotdata5 %>%
   ungroup()
 table(plotdata5$dupl)
 plotdata5 %<>% select(-s4q01b, -dupl)
+plotdata5 %<>% mutate(main_legume=if_else(main_crop=="BEANS AND OTHER LEGUMES", 1,0)) 
+var_label(plotdata5$main_legume) <- "legume is main crop in this plot"
+look_for(plotdata5)
 
 # Nutrition indicators ####
 # HDDS

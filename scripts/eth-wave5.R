@@ -15,20 +15,20 @@ options(scipen = 999)
 ## These are probably divided between hh members.
 ## Let us first identify these fields
 ## Identify groups where s3q34 has different values
-field_with_diff_s3q34 <- read_dta("data/eth/ess5/sect3_pp_w5.dta") %>% 
-  filter(s3q03==1) %>% 
-  group_by(household_id, parcel_id, field_id) %>%  # Group by household, parcel, and field
-  mutate(unique_s3q34 = n_distinct(s3q34)) %>%  # Count unique values of s3q34 in each group
-  filter(unique_s3q34 > 1) %>%  # Keep only groups where s3q34 has more than one unique value
+field_with_diff_s3q34 <- read_dta("data/eth/ess5/sect3_pp_w5.dta") |> 
+  filter(s3q03==1) |> 
+  group_by(household_id, parcel_id, field_id) |>  # Group by household, parcel, and field
+  mutate(unique_s3q34 = n_distinct(s3q34)) |>  # Count unique values of s3q34 in each group
+  filter(unique_s3q34 > 1) |>  # Keep only groups where s3q34 has more than one unique value
   ungroup()
-field_with_diff_s3q34 %>% count(unique_s3q34) # 8 observations 
+field_with_diff_s3q34 |> count(unique_s3q34) # 8 observations 
 
 
 # At this moment this data is to identify if rotation was done in the field.
 # just check the duplicates for rotation. Drop duplicates with no informative information. 
-field_with_diff_s3q34 %>% 
-  select(household_id, parcel_id, field_id, s3q34 ) %>% 
-  head(.,8)
+field_with_diff_s3q34 |> 
+  select(household_id, parcel_id, field_id, s3q34 ) |> 
+  head(8)
 
 # # A tibble: 8 × 4
 # household_id       parcel_id field_id s3q34     
@@ -42,37 +42,36 @@ field_with_diff_s3q34 %>%
 # 7 060107088800402060         2        1 2 [2. NO] 
 # 8 060107088800402060         3        1 2 [2. NO]
 
-field_with_diff_s3q34 <- field_with_diff_s3q34 %>% 
-  filter(s3q34==2) %>%
-  select(household_id, parcel_id, field_id, s3q34) %>%
+field_with_diff_s3q34 <- field_with_diff_s3q34 |> 
+  filter(s3q34==2) |>
+  select(household_id, parcel_id, field_id, s3q34) |>
   distinct()
 head(field_with_diff_s3q34)
 
 # drop observation above from the field data  
-field <- read_dta("data/eth/ess5/sect3_pp_w5.dta") %>% #field roster
-  select(household_id, holder_id, parcel_id, field_id, s3q03, s3q34) %>% 
-  filter(s3q03==1) %>% 
-  anti_join(field_with_diff_s3q34, by = c("household_id", "parcel_id", "field_id", "s3q34")) %>% 
+field <- read_dta("data/eth/ess5/sect3_pp_w5.dta") |> #field roster
+  select(household_id, holder_id, parcel_id, field_id, s3q03, s3q13, s3q34) |> 
+  filter(s3q03==1) |> 
+  anti_join(field_with_diff_s3q34, by = c("household_id", "parcel_id", "field_id", "s3q34")) |> 
   distinct(household_id, parcel_id, field_id, s3q34, .keep_all = TRUE)
 remove(field_with_diff_s3q34)
-maizedata <- read_dta("data/eth/ess5/sect4_pp_w5.dta") %>%  #crop roster
-  select(household_id, parcel_id, field_id,crop_id, s4q01b, s4q02, s4q03) %>% 
+maizedata <- read_dta("data/eth/ess5/sect4_pp_w5.dta") |>  #crop roster
+  select(household_id, parcel_id, field_id,crop_id, s4q01b, s4q02, s4q03) |> 
   filter(s4q01b==2)
-maizedata %>% 
-  group_by(household_id, parcel_id, field_id) %>%
-  filter(n() > 1) %>%
+maizedata |> 
+  group_by(household_id, parcel_id, field_id) |>
+  filter(n() > 1) |>
   ungroup() # 10 observations # maize is mixed with maize for two hhs.
-maizedata <- maizedata %>% 
+maizedata <- maizedata |> 
   distinct(household_id, parcel_id, field_id, .keep_all = TRUE) # Remove duplicates
 cropdata <- left_join(maizedata, field, by=c("household_id", "parcel_id", "field_id")) # maize fields with field data 
-cropdata %>%
-  group_by(household_id, parcel_id, field_id) %>%
-  filter(n() > 1) %>%
+cropdata |>
+  group_by(household_id, parcel_id, field_id) |>
+  filter(n() > 1) |>
   ungroup() # 0 duplicates 
-remove(field)
 look_for(cropdata)
 glimpse(cropdata)
-cropdata5 <- cropdata %>% 
+cropdata5 <- cropdata |> 
   mutate(rotation=ifelse(s3q34 ==1, 1, 0))
 table(cropdata5$rotation)
 # 0    1 
@@ -84,40 +83,41 @@ table(rotation5$rotation)  # 392 adopters 612 non-adopters.
 remove(maizedata, cropdata)
 
 # HP data ####
-hpdata <- read_dta("data/hp/Plot_dataset.dta") %>% 
+hpdata <- read_dta("data/hp/Plot_dataset.dta") |> 
   filter(country=="Ethiopia", wave==5) 
 look_for(hpdata)
 table(hpdata$main_crop, hpdata$intercropped) # 1048  431 intercropped maize 
 table(hpdata$improved) # 1049 fields with improved seeds
-hpdata <- hpdata %>%
+hpdata <- hpdata |>
   select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size,
          manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
          respondent_id_merge, improved,organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, 
          plot_dist_household, ag_asset_index, plot_owned, plot_certificate, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
-         used_pesticides, yield_value_LCU, yield_value_USD) %>% 
+         used_pesticides, yield_value_LCU, yield_value_USD) |> 
   mutate(plot_id=plot_id_merge)
-cropdata5 <- cropdata5 %>% 
-  rename(parcel_id2=parcel_id) %>% 
+cropdata5 <- cropdata5 |> 
+  rename(parcel_id2=parcel_id) |> 
   mutate(plot_id = paste(holder_id, parcel_id2, field_id, sep = "-")) # field means plot in HP
-plotdata5 <- left_join(cropdata5,hpdata, by=c("plot_id")) %>% 
+plotdata5 <- left_join(cropdata5,hpdata, by=c("plot_id")) |> 
   select(-s3q03, -s3q34, -s4q02)
 remove(hpdata)
 # generate a variable for duplicates of household_id in plotdata 
-plotdata5 <- plotdata5 %>% 
-  group_by(household_id) %>%
-  mutate( dupl=n()) %>%
+plotdata5 <- plotdata5 |> 
+  group_by(household_id) |>
+  mutate(count_plot=n()) |>
   ungroup()
-table(plotdata5$dupl)
+table(plotdata5$count_plot)
 plotdata5 %<>% select(-s4q01b, -dupl)
 plotdata5 %<>% mutate(main_legume=if_else(main_crop=="BEANS AND OTHER LEGUMES", 1,0)) 
 var_label(plotdata5$main_legume) <- "legume is main crop in this plot"
+var_label(plotdata5$count_plot) <- "number of maize plots in HH"
 look_for(plotdata5)
 
 # Nutrition indicators ####
 # HDDS
 # total consumption; alternative: Nominal annual expenditure on food per adult equivalent
 # consumption quantile
-hhhp5 <- read_dta("data/hp/Household_dataset.dta") %>% 
-  filter(country=="Ethiopia", wave==5) %>% 
+hhhp5 <- read_dta("data/hp/Household_dataset.dta") |> 
+  filter(country=="Ethiopia", wave==5) |> 
   select(hh_id_merge, hh_id_obs, hh_size, hh_shock, hh_dependency_ratio,totcons_USD, cons_quint, hh_asset_index, HDDS,share_kg_sold)
 look_for(hhhp5)

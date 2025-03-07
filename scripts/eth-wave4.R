@@ -139,6 +139,16 @@ field4 <- left_join(field, individual, by=c("household_id", "s3q13"))
 remove(field)
 var_label(field4$female) <- "female primary decision-maker concern. activities on plot" # also on crops to be planted
 field4 <- field4 |>select(household_id, parcel_id, field_id, female)
+plotdata4 <- plotdata4 |> 
+  rename(parcel_id=parcel_id2) 
+plotdata4 <- left_join(plotdata4,field4, by=c("household_id", "parcel_id", "field_id"))
+look_for(plotdata4)
+remove(field4)
+table(plotdata4$female_manager, plotdata4$female) # comparing manager and decision-maker. 
+# 0    1
+# 0 1519    0
+# 1    0  330 # Perfect match, managers are decision-makers. 
+
 
 ## Agri asset ownership ----
 agriasset <- read_dta("data/eth/ess4/sect11_hh_w4.dta") |>
@@ -207,11 +217,9 @@ agriasset$dm_agriasset_order <- ordered(agriasset$agri_asset,
                                          levels = c(0, 1, 2), 
                                          labels = c("male", "joint", "female"))
 agriasset <- collap(agriasset, dm_agriasset_order ~ household_id, catFUN = fmode)
-plotdata4 <- left_join(plotdata4, agriasset, by=join_by("household_id"))
-var_label(plotdata4$dm_agriasset_order) <- "control over agricultural assets"
 look_for(plotdata4)
-remove(agriasset, individual)
------------------------------------
+remove(individual)
+
 # Nutrition indicators ---- 
 # HDDS
 # total consumption; LATER consider alternative: Nominal annual expenditure on food per adult equivalent
@@ -220,3 +228,51 @@ hhhp4 <- read_dta("data/hp/Household_dataset.dta") |>
   filter(country=="Ethiopia", wave==4) |>
   select(hh_id_merge, hh_id_obs, hh_size, hh_shock, hh_dependency_ratio,totcons_USD, cons_quint, hh_asset_index, HDDS, share_kg_sold)
 look_for(hhhp4)
+
+
+# Final data  ----
+## Collapse / aggregate ----
+plotdata4 <- plotdata4 |> 
+  select(-s3q13) |> 
+  rename(share_intercrop=s4q03)
+plotdata4 |> fgroup_by(rotation) |> fselect(intercropped, main_legume) |>  fsum()
+wave4 <- plotdata4 |> 
+  select(1,9, 15:46)
+look_for(wave4)  
+wave4mean <- collap(wave4,
+                farm_size + age_manager + dist_market + plot_dist_household + ag_asset_index + 
+                count_plot + soil_fertility_index  ~ household_id,
+                FUN = fmean,
+                na.rm = TRUE)
+wave4sum <- collap(wave4,
+                    plot_area_GPS +nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ household_id,
+                    FUN = fsum,
+                   na.rm = TRUE)
+aggregated_vars <- c("farm_size", "age_manager", "dist_market", "plot_dist_household", "soil_fertility_index",
+                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", 
+                     "yield_value_LCU", "yield_value_USD")
+wave4 <- wave4 %>% select(-all_of(aggregated_vars))
+look_for(wave4)
+wave4 <- wave4 |> 
+  select(1, 2, 6:8, 11:23)
+look_for(wave4)
+# For all remaining binary variables, I will select the max. Meaning, for example,
+# at least one plot is managed by female, at least one maize plot manager has primary education, 
+# at least one plot is being intercroped and etc. 
+wave4max <- collap(wave4,
+                  ~ household_id, 
+                   FUN = fmax,
+                  na.rm = TRUE)
+wave4 <- left_join(wave4mean, wave4sum, by=join_by("household_id"))
+wave4 <- left_join(wave4, wave4max, by=join_by("household_id"))
+wave4 <- left_join(wave4, agriasset, by=join_by("household_id"))
+wave4 <- left_join(wave4, hhhp4, by=c("household_id"="hh_id_merge"))
+wave4 <- left_join(wave4, rotation4, by=join_by("household_id"))
+var_label(wave4$dm_agriasset_order) <- "control over agricultural assets"
+remove(wave4max, wave4sum,wave4mean,rotation4, agriasset, aggregated_vars, hhhp4)
+look_for(wave4)
+missing <- wave4 |> 
+  filter(is.na(hh_size)) |> 
+  select(household_id, hh_size) # 60 OBSERVATIONS
+
+#Some households from hhhp4 (hp data) are not in the wave4 (raw data).

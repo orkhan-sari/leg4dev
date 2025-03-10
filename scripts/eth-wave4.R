@@ -11,7 +11,9 @@ rm(list = ls())
 
 # To explore inercropping refer to eth-intercropping.qmd file in the outputs. 
 
+### ### ### ### ### ### ### ###
 # Maize - legume rotations----
+### ### ### ### ### ### ### ###
 ## There are few fields reported more than 1 with different holders.
 ## These are probably divided between hh members.
 ## Let us first identify these fields
@@ -82,7 +84,9 @@ remove(maizedata, cropdata)
 comment(rotation4) <- "hh level rotation"
 var_label(rotation4$rotation) <- "If household rotated at least one maize field with legumes during the past 3y"
 
+### ### ### ### ### ### ### ###
 # HP data ----
+### ### ### ### ### ### ### ###
 hpdata <- read_dta("data/hp/Plot_dataset.dta") |>
   filter(country=="Ethiopia", wave==4) 
 look_for(hpdata)
@@ -96,7 +100,7 @@ hpdata <- hpdata|>
   select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size,
          manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
          respondent_id_merge, improved,organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, 
-         plot_dist_household, ag_asset_index, plot_owned, plot_certificate, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
+         plot_dist_household, ag_asset_index, plot_certificate, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
          used_pesticides, yield_value_LCU, yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
 cropdata4 <- cropdata4 |>
@@ -128,8 +132,10 @@ look_for(plotdata4)
 remove(cropdata4)
 comment(plotdata4) <- "maize plots and characteristics" 
 
-
+### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
+### ### ### ### ### ### ### ###
+
 ## DM at plot level ----
 individual <- read_dta("data/eth/ess4/sect1_hh_w4.dta") |>
   mutate(female=ifelse(s1q02==2,1,0)) |>
@@ -144,11 +150,11 @@ plotdata4 <- plotdata4 |>
 plotdata4 <- left_join(plotdata4,field4, by=c("household_id", "parcel_id", "field_id"))
 look_for(plotdata4)
 remove(field4)
-table(plotdata4$female_manager, plotdata4$female) # comparing manager and decision-maker. 
+table(plotdata4$female_manager, plotdata4$female) # comparing manager and decision-maker. !there are missing values in manager!
 # 0    1
 # 0 1519    0
 # 1    0  330 # Perfect match, managers are decision-makers. 
-
+plotdata4 <- plotdata4 |> select(-female_manager)
 
 ## Agri asset ownership ----
 agriasset <- read_dta("data/eth/ess4/sect11_hh_w4.dta") |>
@@ -220,24 +226,30 @@ agriasset <- collap(agriasset, dm_agriasset_order ~ household_id, catFUN = fmode
 look_for(plotdata4)
 remove(individual)
 
+### ### ### ### ### ### ### ###
 # Nutrition indicators ---- 
+### ### ### ### ### ### ### ###
+
 # HDDS
 # total consumption; LATER consider alternative: Nominal annual expenditure on food per adult equivalent
 # consumption quantile
 hhhp4 <- read_dta("data/hp/Household_dataset.dta") |>
   filter(country=="Ethiopia", wave==4) |>
-  select(hh_id_merge, hh_id_obs, hh_size, hh_shock, hh_dependency_ratio,totcons_USD, cons_quint, hh_asset_index, HDDS, share_kg_sold)
+  select(hh_id_merge, hh_size, hh_shock, hh_dependency_ratio,totcons_USD, cons_quint, hh_asset_index, HDDS, share_kg_sold)
 look_for(hhhp4)
 
-
+### ### ### ### ### ### ### ###
 # Final data  ----
+### ### ### ### ### ### ### ###
+
 ## Collapse / aggregate ----
 plotdata4 <- plotdata4 |> 
   select(-s3q13) |> 
   rename(share_intercrop=s4q03)
 plotdata4 |> fgroup_by(rotation) |> fselect(intercropped, main_legume) |>  fsum()
+look_for(plotdata4)
 wave4 <- plotdata4 |> 
-  select(1,9, 15:46)
+  select(1,10, 15:44)
 look_for(wave4)  
 wave4mean <- collap(wave4,
                 farm_size + age_manager + dist_market + plot_dist_household + ag_asset_index + 
@@ -254,11 +266,11 @@ aggregated_vars <- c("farm_size", "age_manager", "dist_market", "plot_dist_house
 wave4 <- wave4 %>% select(-all_of(aggregated_vars))
 look_for(wave4)
 wave4 <- wave4 |> 
-  select(1, 2, 6:8, 11:23)
+  select(1, 2, 4:7, 11:21)
 look_for(wave4)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
-# at least one plot is being intercroped and etc. 
+# at least one plot is being intercropped and etc. 
 wave4max <- collap(wave4,
                   ~ household_id, 
                    FUN = fmax,
@@ -270,9 +282,38 @@ wave4 <- left_join(wave4, hhhp4, by=c("household_id"="hh_id_merge"))
 wave4 <- left_join(wave4, rotation4, by=join_by("household_id"))
 var_label(wave4$dm_agriasset_order) <- "control over agricultural assets"
 remove(wave4max, wave4sum,wave4mean,rotation4, agriasset, aggregated_vars, hhhp4)
+
+## Cleaning missing data ----
+look_for(wave4)
+# Many missing values!!!
+# This is expected for some! In page 24 and 25 of Basic Information Document, Ethiopia Socioeconomic Survey 2018-19,
+# it is mentioned that in several EAs, for several households, household data is missing but agri data is included.
+# for some 7 EAs post-harvest is missing and etc.   
+wave4 <- wave4 |> 
+  filter(!is.na(hh_size)) # household level data from HP - some HHs have agri data but no household level data4
+# There are households which do not have any agricultural assets. For these asset variables will be missing. 
 look_for(wave4)
 missing <- wave4 |> 
-  filter(is.na(hh_size)) |> 
-  select(household_id, hh_size) # 60 OBSERVATIONS
-
-#Some households from hhhp4 (hp data) are not in the wave4 (raw data).
+  filter(is.na(dm_agriasset_order)) |> 
+  select(household_id)
+agriasset <- read_dta("data/eth/ess4/sect11_hh_w4.dta") |>
+  select(household_id, asset_cd,s11q00) |>
+  filter(asset_cd %in% c(15, 16, 30, 31, 32, 33, 34))
+agriasset <- semi_join(agriasset, missing, by=join_by("household_id"))
+table(agriasset$s11q00) # these hhs do not have agricultural assets. 
+wave4 <- wave4 |> 
+  filter(!is.na(dm_agriasset_order))
+look_for(wave4)
+missing <- wave4 |> 
+  filter(is.na(ag_asset_index)) |> 
+  select(household_id)
+agriasset <- semi_join(agriasset, missing, by=join_by("household_id"))
+agriasset <- agriasset |> 
+  group_by(household_id) |> 
+  mutate(test=if_else(s11q00==1, 1, 0)) |> 
+  ungroup()
+agriasset <- collap(agriasset, test~household_id, FUN = fmax)
+table(agriasset$test) # all 43 households indeed have at least one agricultural asset, but these HHs are not in HP plot data.  
+# There are 43 households for which we do have raw data but they do not appear in harmonized panel. I do not know why. 
+remove(missing, agriasset)
+look_for(wave4)

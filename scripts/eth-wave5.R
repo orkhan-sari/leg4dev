@@ -10,7 +10,9 @@ options(scipen = 999)
 
 # To explore inercropping refer to eth-intercropping.qmd file in the outputs. 
 
-# Maize - legume rotations ####
+### ### ### ### ### ### ### ###
+# Maize - legume rotations----
+### ### ### ### ### ### ### ###
 ## There are few fields reported more than 1 with different holders.
 ## These are probably divided between hh members.
 ## Let us first identify these fields
@@ -82,7 +84,9 @@ rotation5 <- collap(cropdata5, rotation~household_id, FUN=fmax)
 table(rotation5$rotation)  # 392 adopters 612 non-adopters.
 remove(maizedata, cropdata)
 
-# HP data ####
+### ### ### ### ### ### ### ###
+# HP data ----
+### ### ### ### ### ### ### ###
 hpdata <- read_dta("data/hp/Plot_dataset.dta") |> 
   filter(country=="Ethiopia", wave==5) 
 look_for(hpdata)
@@ -92,7 +96,7 @@ hpdata <- hpdata |>
   select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size,
          manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
          respondent_id_merge, improved,organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, 
-         plot_dist_household, ag_asset_index, plot_owned, plot_certificate, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
+         plot_dist_household, ag_asset_index, plot_certificate, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
          used_pesticides, yield_value_LCU, yield_value_USD) |> 
   mutate(plot_id=plot_id_merge)
 cropdata5 <- cropdata5 |> 
@@ -113,7 +117,9 @@ var_label(plotdata5$main_legume) <- "legume is main crop in this plot"
 var_label(plotdata5$count_plot) <- "number of maize plots in HH"
 look_for(plotdata5)
 
-# Nutrition indicators ####
+### ### ### ### ### ### ### ###
+# Nutrition indicators ---- 
+### ### ### ### ### ### ### ###
 # HDDS
 # total consumption; alternative: Nominal annual expenditure on food per adult equivalent
 # consumption quantile

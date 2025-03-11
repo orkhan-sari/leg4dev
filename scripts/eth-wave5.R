@@ -63,9 +63,13 @@ maizedata <- read_dta("data/eth/ess5/sect4_pp_w5.dta") |>  #crop roster
 maizedata |> 
   group_by(household_id, parcel_id, field_id) |>
   filter(n() > 1) |>
-  ungroup() # 10 observations # maize is mixed with maize for two hhs.
+  ungroup() # 10 observations; maize is mixed with maize for 5 hhs.
 maizedata <- maizedata |> 
   distinct(household_id, parcel_id, field_id, .keep_all = TRUE) # Remove duplicates
+maizehh <- maizedata |> 
+  distinct(household_id) # HHs that produce maize: 1004
+field <- field |> 
+  semi_join(maizehh, by=join_by(household_id))
 cropdata <- left_join(maizedata, field, by=c("household_id", "parcel_id", "field_id")) # maize fields with field data 
 cropdata |>
   group_by(household_id, parcel_id, field_id) |>
@@ -89,9 +93,11 @@ remove(maizedata, cropdata)
 ### ### ### ### ### ### ### ###
 hpdata <- read_dta("data/hp/Plot_dataset.dta") |> 
   filter(country=="Ethiopia", wave==5) 
-look_for(hpdata)
-table(hpdata$main_crop, hpdata$intercropped) # 1048  431 intercropped maize 
-table(hpdata$improved) # 1049 fields with improved seeds
+look_for(hpdata) # many missing
+hpdata <- hpdata |> 
+  semi_join(maizehh, by=c("hh_id_merge"="household_id"))
+table(hpdata$main_crop, hpdata$intercropped) # 1046  429 intercropped maize 
+table(hpdata$improved) # 992 fields with improved seeds
 hpdata <- hpdata |>
   select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size,
          manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
@@ -102,28 +108,140 @@ hpdata <- hpdata |>
 cropdata5 <- cropdata5 |> 
   rename(parcel_id2=parcel_id) |> 
   mutate(plot_id = paste(holder_id, parcel_id2, field_id, sep = "-")) # field means plot in HP
-plotdata5 <- left_join(cropdata5,hpdata, by=c("plot_id")) |> 
+plotdata5 <- left_join(cropdata5, hpdata, by=c("plot_id")) |> 
   select(-s3q03, -s3q34, -s4q02)
 remove(hpdata)
-# generate a variable for duplicates of household_id in plotdata 
 plotdata5 <- plotdata5 |> 
   group_by(household_id) |>
   mutate(count_plot=n()) |>
   ungroup()
 table(plotdata5$count_plot)
-plotdata5 %<>% select(-s4q01b, -dupl)
-plotdata5 %<>% mutate(main_legume=if_else(main_crop=="BEANS AND OTHER LEGUMES", 1,0)) 
-var_label(plotdata5$main_legume) <- "legume is main crop in this plot"
+# 1   2   3   4   5   6   7   8  10  11 
+# 504 518 426 200 130  72  35  32  10  11 
+plotdata5 <- plotdata5 |> select(-s4q01b)
+table(plotdata5$main_crop)
+plotdata5 <- plotdata5 |> mutate(main_legume=if_else(main_crop=="BEANS AND OTHER LEGUMES", 1,0)) 
+var_label(plotdata5$main_legume) <- "legume is main crop on this plot"
 var_label(plotdata5$count_plot) <- "number of maize plots in HH"
+look_for(plotdata5) # missing come from harmonized panel.
+remove(cropdata5)
+comment(plotdata5) <- "maize plots and characteristics" 
+
+
+### ### ### ### ### ### ### ###
+# Gender: measures of women's status ####
+### ### ### ### ### ### ### ###
+## DM at plot level ----
+individual <- read_dta("data/eth/ess5/sect1_hh_w5.dta") |> # Tigray is not present in this round 
+  mutate(female=ifelse(s1q02==2,1,0)) |>
+  select(household_id, individual_id, female) |>
+  rename(s3q13=individual_id)
+field5 <- left_join(field, individual, by=c("household_id", "s3q13"))
+remove(field)
+var_label(field5$female) <- "female primary dm concern. activities on plot" # also on crops to be planted
+field5 <- field5 |>select(household_id, parcel_id, field_id, female)
+plotdata5 <- plotdata5 |> 
+  rename(parcel_id=parcel_id2) 
+plotdata5 <- left_join(plotdata5,field5, by=c("household_id", "parcel_id", "field_id"))
 look_for(plotdata5)
+remove(field5)
+table(plotdata5$female_manager, plotdata5$female) # comparing manager and decision-maker. !there are missing values in manager!
+# 0    1
+# 0 1550    0
+# 1    0  328 # Perfect match, managers are decision-makers. 
+plotdata5 <- plotdata5 |> select(-female_manager)
+
+## Agri asset ownership ----
+agriasset <- read_dta("data/eth/ess5/sect11_hh_w5.dta") |> 
+  select(household_id, asset_cd,s11q00, s11q02_1, s11q02_2) |>
+  filter(asset_cd %in% c(15, 16, 30, 31, 32, 33, 34)) |># agricultural assets
+  filter(s11q00==1)  # keep assets owned
+agriasset <- agriasset |> 
+  semi_join(maizehh, by= join_by("household_id")) # keep maize producers. 
+agriasset <- left_join(agriasset, individual, by=c("household_id" = "household_id",
+                                                   "s11q02_1"= "s3q13"))
+agriasset <- left_join(agriasset, 
+                       individual |>rename(female2=female),
+                       by=c("household_id" = "household_id", "s11q02_2"= "s3q13"))
+agriasset <- agriasset |>
+  mutate(womens_asset=case_when(female==1~1,
+                                female2==1~1,
+                                .default = 0))
+agriasset <- agriasset |>
+  mutate(dm_agriasset=
+           case_when(womens_asset==1 & female==1 & is.na(female2) ~ 2,
+                     womens_asset==1 & female==1 & female2==1 ~ 2, 
+                     womens_asset==1 & female==0 & female2==1  ~ 1,
+                     womens_asset==1 & female==1 & female2==0  ~ 1,
+                     .default =0))
+agriasset <- agriasset |>
+  group_by(household_id)|>
+  mutate(dupl=n())|>
+  ungroup()
+table(agriasset$dupl)
+
+# 1   2   3   4   5 
+# 297 602 738 140  10 
+
+agriasset <- agriasset |>
+  select(household_id, dm_agriasset, dupl)
+# Function to calculate the most frequent value
+mode_function <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+agriasset <- agriasset |>
+  select(household_id, dm_agriasset, dupl) |>
+  group_by(household_id) |>
+  mutate(agri_asset=case_when(
+    dupl==2 ~ max(dm_agriasset, na.rm = TRUE), # two assets: if women had any say
+    dupl>2 ~ mode_function(dm_agriasset),     # many assets: more frequent dm pattern 
+    dupl==1 ~ dm_agriasset,
+    .default = NA_real_)) |>
+  ungroup()
+agriasset$dm_agriasset_order <- ordered(agriasset$agri_asset, 
+                                        levels = c(0, 1, 2), 
+                                        labels = c("male", "joint", "female"))
+agriasset %>%
+  group_by(household_id) %>%
+  filter(n() == 2) %>%  # Keep only household_ids that appear exactly twice
+  summarise(n_unique = n_distinct(dm_agriasset_order)) %>%
+  filter(n_unique > 1)  # Keep only those with different values
+# no hh with two type assets but differetn decision-maker.
+agriasset <- collap(agriasset, dm_agriasset_order ~ household_id, catFUN = fmode)
+look_for(plotdata4)
+remove(individual)
 
 ### ### ### ### ### ### ### ###
 # Nutrition indicators ---- 
 ### ### ### ### ### ### ### ###
 # HDDS
-# total consumption; alternative: Nominal annual expenditure on food per adult equivalent
+# total consumption; LATER consider alternative: Nominal annual expenditure on food per adult equivalent
 # consumption quantile
 hhhp5 <- read_dta("data/hp/Household_dataset.dta") |> 
   filter(country=="Ethiopia", wave==5) |> 
-  select(hh_id_merge, hh_id_obs, hh_size, hh_shock, hh_dependency_ratio,totcons_USD, cons_quint, hh_asset_index, HDDS,share_kg_sold)
+  select(hh_id_merge, hh_size, hh_shock, hh_dependency_ratio,totcons_USD, cons_quint, hh_asset_index, 
+         HDDS, share_kg_sold)
+hhhp5 <- hhhp5|> 
+  semi_join(maizehh, by=c("hh_id_merge"="household_id"))
 look_for(hhhp5)
+# 104 maize producing households are not in the harmonized panel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

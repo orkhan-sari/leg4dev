@@ -26,7 +26,6 @@ field_with_diff_s3q34 <- read_dta("data/eth/ess4/sect3_pp_w4.dta") |>
   ungroup()
 field_with_diff_s3q34 |>count(unique_s3q34) # 12 observations 
 
-
 # At this moment this data is to identify if rotation was done in the field.
 # just check the duplicates for rotation. Drop duplicates with no informative information. 
 field_with_diff_s3q34 |>
@@ -225,8 +224,8 @@ agriasset <- agriasset |>
   select(household_id, dm_agriasset, dupl) |>
   group_by(household_id) |>
   mutate(agri_asset=case_when(
-    dupl==2 ~ max(dm_agriasset, na.rm = TRUE), # two assets: if women had any say
-    dupl>2 ~ mode_function(dm_agriasset),     # many assets: more frequent dm pattern 
+    dupl==2 ~ max(dm_agriasset, na.rm = TRUE), # two assets: if women owned at least one asset.
+    dupl>2 ~ mode_function(dm_agriasset),     # many assets: more frequent ownership type observed 
     dupl==1 ~ dm_agriasset,
     .default = NA_real_)) |>
   ungroup()
@@ -238,7 +237,7 @@ agriasset %>%
   filter(n() == 2) %>%  # Keep only household_ids that appear exactly twice
   summarise(n_unique = n_distinct(dm_agriasset_order)) %>%
   filter(n_unique > 1)  # Keep only those with different values
-# no hh with two type assets but differetn decision-maker.
+# no hh with two type assets but different decision-maker.
 agriasset <- collap(agriasset, dm_agriasset_order ~ household_id, catFUN = fmode)
 look_for(plotdata4)
 remove(individual)
@@ -313,6 +312,8 @@ look_for(wave4)
 wave4 <- wave4 |> 
   filter(!is.na(hh_size)) # household level data from HP - some HHs have agri data but no household level data4
 # There are households which do not have any agricultural assets. For these asset variables will be missing. 
+# I drop households which do not have any agricultural asset, because of the control over agricultural
+# asset varaible that is relevant for our analyses. 
 look_for(wave4)
 missing <- wave4 |> 
   filter(is.na(dm_agriasset_order)) |> 
@@ -321,7 +322,7 @@ agriasset <- read_dta("data/eth/ess4/sect11_hh_w4.dta") |>
   select(household_id, asset_cd,s11q00) |>
   filter(asset_cd %in% c(15, 16, 30, 31, 32, 33, 34))
 agriasset <- semi_join(agriasset, missing, by=join_by("household_id"))
-table(agriasset$s11q00) # these hhs do not have agricultural assets. 
+table(agriasset$s11q00) # all=2; these hhs do not have agricultural assets. 
 wave4 <- wave4 |> 
   filter(!is.na(dm_agriasset_order))
 look_for(wave4)
@@ -341,3 +342,6 @@ table(agriasset$test) # all 43 households indeed have at least one agricultural 
 # There are 43 households for which we do have raw data but they do not appear in harmonized panel. I do not know why. 
 remove(missing, missing2, agriasset, maizehh)
 look_for(wave4)
+wave4 <- wave4 |> mutate(wave="wave4")
+wave4 <- wave4 |> 
+  relocate(hh_id_obs, .after = household_id)

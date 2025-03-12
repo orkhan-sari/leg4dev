@@ -4,7 +4,9 @@ author: "Dr. Orkhan Sariyev"
 format: 
   html:
     toc: true
-    theme: simplex
+    theme: 
+      dark: darkly
+    mainfont: sans-serif
     fig-width: 10
     fig-height: 6
 editor: visual
@@ -29,47 +31,47 @@ options(scipen = 999)
 ```{r}
 #| echo: true
 setwd("C:/Users/490A/Nextcloud/Research/leg4dev")
-field <- read_dta("data/eth/ess4/sect3_pp_w4.dta") %>% 
+field <- read_dta("data/eth/ess4/sect3_pp_w4.dta") |> 
   select("household_id", "parcel_id", "field_id", "saq08", "saq09", "s3q02a", "s3q02b", "s3q2b_os",
-         "s3q03", "s3q03_os", "s3q03b", "s3q04", "s3q05", "s3q07", "s3q08") %>% 
+         "s3q03", "s3q03_os", "s3q03b", "s3q04", "s3q05", "s3q07", "s3q08") |> 
   rename(mixedcrop=s3q04)
 table(field$mixedcrop) 
 
 # 2692 mixed fields where mixed cropping was practiced.
-cropdata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") %>% 
-  select("household_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") %>% 
+cropdata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") |> 
+  select("household_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") |> 
   rename(mixedcrop=s4q02)
 table(cropdata$mixedcrop) 
 # 6085 mixed crops in the above 2692 fields. 
-count(cropdata, s4q01b)%>% print(n=10)
+count(cropdata, s4q01b)|> print(n=10)
 ```
 
 ```{r}
-cropdata <- cropdata %>% 
-  dplyr::group_by(household_id, parcel_id, field_id) %>% 
+cropdata <- cropdata |> 
+  dplyr::group_by(household_id, parcel_id, field_id) |> 
   mutate(legum = ifelse(s4q01b %in% c(9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 24), 1, 0),
-         legume = ifelse(any(mixedcrop == 2) & any(legum == 1), 1, 0)) %>% 
+         legume = ifelse(any(mixedcrop == 2) & any(legum == 1), 1, 0)) |> 
   ungroup()
-cropdata %>% 
-  filter(s4q01b %in% c(6, 7, 8, 1, 2, 3, 72, 71)) %>% 
-  count(s4q01b, mixedcrop) %>%  print(n=10)
+cropdata |> 
+  filter(s4q01b %in% c(6, 7, 8, 1, 2, 3, 72, 71)) |> 
+  count(s4q01b, mixedcrop) |>  print(n=10)
 ```
 
 ```{r}
-legumemix <- cropdata %>% 
+legumemix <- cropdata |> 
   filter(legume==1)
-count(legumemix, s4q01b, mixedcrop)%>% print(n=10)
+count(legumemix, s4q01b, mixedcrop)|> print(n=10)
 ```
 
 We should not observe any pure stand in the above tibble. However, this happens because in some cases the same field of the parcel is listed for e.g. maize as a pure stand while there is also a mix of maize and legume on the same field. Thus, the total count below reflects the true distribution of intercropping. This is likely an enumerator error.
 
 ```{r}
-legumemix %>% count(s4q01b) %>% print(n=10)
+legumemix |> count(s4q01b) |> print(n=10)
 ```
 
 ```{r}
 #| echo: false
-counts4 <- legumemix %>%
+counts4 <- legumemix |>
   count(s4q01b)
 maize_count4 <- counts4$n[counts4$s4q01b == 2]
 ```
@@ -81,18 +83,18 @@ As expected, we are more likely to observe legume intercrops in maize and sorghu
 ```{r}
 #| echo: true
 setwd("C:/Users/490A/Nextcloud/Research/leg4dev")
-field <- read_dta("data/eth/ess5/sect3_pp_w5.dta") %>% 
+field <- read_dta("data/eth/ess5/sect3_pp_w5.dta") |> 
   select("household_id", "parcel_id", "field_id", "saq08", "saq09", "s3q02a", "s3q02b", "s3q2b_os",
-         "s3q03", "s3q03_os", "s3q03b", "s3q04", "s3q05", "s3q07", "s3q08") %>% 
+         "s3q03", "s3q03_os", "s3q03b", "s3q04", "s3q05", "s3q07", "s3q08") |> 
   rename(mixedcrop=s3q04)
 countmixed <- table(field$mixedcrop) 
 mixed_count <- countmixed[2]
 # 2711 mixed fields where mixed cropping was practiced.
-cropdata <- read_dta("data/eth/ess5/sect4_pp_w5.dta") %>% 
-  select("household_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") %>% 
+cropdata <- read_dta("data/eth/ess5/sect4_pp_w5.dta") |> 
+  select("household_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") |> 
   rename(mixedcrop=s4q02)
-count(cropdata, s4q01b)%>% print(n=10)
-counts <- cropdata %>%
+count(cropdata, s4q01b)|> print(n=10)
+counts <- cropdata |>
   count(s4q01b)
 maize_count <- counts$n[counts$s4q01b == 2]
 ```
@@ -100,28 +102,72 @@ maize_count <- counts$n[counts$s4q01b == 2]
 There are `r mixed_count` fields with mixed crops, and in these fields, `r maize_count` are with maize.
 
 ```{r}
-cropdata <- cropdata %>% 
-  dplyr::group_by(household_id, parcel_id, field_id) %>% 
+cropdata <- cropdata |> 
+  dplyr::group_by(household_id, parcel_id, field_id) |> 
   mutate(legum = ifelse(s4q01b %in% c(9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 24), 1, 0),
-         legume = ifelse(any(mixedcrop == 2) & any(legum == 1), 1, 0)) %>% 
+         legume = ifelse(any(mixedcrop == 2) & any(legum == 1), 1, 0)) |> 
   ungroup()
-cropdata %>% 
-  filter(s4q01b %in% c(6, 7, 8, 1, 2, 3, 72, 71)) %>% 
-  count(s4q01b, mixedcrop) %>%  print(n=10)
+cropdata |> 
+  filter(s4q01b %in% c(6, 7, 8, 1, 2, 3, 72, 71)) |> 
+  count(s4q01b, mixedcrop) |>  print(n=10)
 ```
 
 ```{r}
-legumemix <- cropdata %>% 
+legumemix <- cropdata |> 
   filter(legume==1)
-count(legumemix, s4q01b, mixedcrop)%>% print(n=10)
-legumemix %>% count(s4q01b) %>% print(n=10)
+count(legumemix, s4q01b, mixedcrop)|> print(n=10)
+legumemix |> count(s4q01b) |> print(n=10)
 ```
 
 ```{r}
 #| echo: false
-counts5 <- legumemix %>%
+counts5 <- legumemix |>
   count(s4q01b)
 maize_count5 <- counts5$n[counts5$s4q01b == 2]
 ```
 
 `r maize_count5` fields with maize-legume intercropping.
+
+## Data cleaning 
+
+This is how the process looks like
+
+```{mermaid}
+flowchart TD
+    A("Raw wave 4") --> B("Wave 4")
+    E("Harmonized panel") --> D & B
+    C("Raw wave 5") --> D("Wave 5")
+    D --> F("Ethiopia data frame (dfeth)")
+    B --> F
+
+```
+
+Below I list some more important facts, and summarize important decisions made during the data cleaning step:
+
+- There are 1263 and 1004  maize producers in wave 4 and 5, respectively.
+  - 60 of these are not in the harmonized panel in wave4. 
+- There are 2021 maize fields in wave 4 and in only 1503 of these maize is the main plot. 
+- Harmonized panel has many missing values, and of course, some are take to the final data
+  - [ ] reflect on missing data
+- Control over agricultural assets: male, joint, female
+  - two assets: if women owned at least one asset.
+  - |> many assets: more frequent ownership type observed
+  - male: only men own these assets
+  - female: only women own these assets 
+  - joint both men and women own these assets
+
+Collapsing/aggregating data at the household level
+
+
+
+
+
+
+
+
+
+
+
+
+
+

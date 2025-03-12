@@ -7,7 +7,7 @@ pacman::p_load(tidyverse,
                collapse)
 getwd()
 options(scipen = 999)
-
+# Note: Tigray (54 EAs), Benshangul-Gumuz (28 EAs), and Afar (8 EAs) are ot present in this round. 
 # To explore inercropping refer to eth-intercropping.qmd file in the outputs. 
 
 ### ### ### ### ### ### ### ###
@@ -87,6 +87,8 @@ table(cropdata5$rotation)
 rotation5 <- collap(cropdata5, rotation~household_id, FUN=fmax)
 table(rotation5$rotation)  # 392 adopters 612 non-adopters.
 remove(maizedata, cropdata)
+comment(rotation5) <- "hh level rotation"
+var_label(rotation5$rotation) <- "If household rotated at least one maize field with legumes during the past 3y"
 
 ### ### ### ### ### ### ### ###
 # HP data ----
@@ -132,7 +134,7 @@ comment(plotdata5) <- "maize plots and characteristics"
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
 ## DM at plot level ----
-individual <- read_dta("data/eth/ess5/sect1_hh_w5.dta") |> # Tigray is not present in this round 
+individual <- read_dta("data/eth/ess5/sect1_hh_w5.dta") |>  
   mutate(female=ifelse(s1q02==2,1,0)) |>
   select(household_id, individual_id, female) |>
   rename(s3q13=individual_id)
@@ -227,10 +229,121 @@ hhhp5 <- hhhp5|>
 look_for(hhhp5)
 # 104 maize producing households are not in the harmonized panel
 
+### ### ### ### ### ### ### ###
+# Final data  ----
+### ### ### ### ### ### ### ###
 
+## Collapse / aggregate ----
+plotdata5 <- plotdata5 |> 
+  select(-s3q13) |> 
+  rename(share_intercrop=s4q03)
+plotdata5 |> fgroup_by(rotation) |> fselect(intercropped, main_legume) |>  fsum()
+look_for(plotdata5)
+wave5 <- plotdata5 |> 
+  select(1,10, 15:44)
+look_for(wave5)  
+wave5mean <- collap(wave5,
+                    farm_size + age_manager + dist_market + plot_dist_household + ag_asset_index + 
+                      count_plot + soil_fertility_index  ~ household_id,
+                    FUN = fmean,
+                    na.rm = TRUE)
+wave5sum <- collap(wave5,
+                   plot_area_GPS +nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ household_id,
+                   FUN = fsum,
+                   na.rm = TRUE)
+aggregated_vars <- c("farm_size", "age_manager", "dist_market", "plot_dist_household", "soil_fertility_index",
+                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", 
+                     "yield_value_LCU", "yield_value_USD")
+wave5 <- wave5 %>% select(-all_of(aggregated_vars))
+look_for(wave5)
+wave5 <- wave5 |> 
+  select(1, 2, 4:7, 11:21)
+look_for(wave5)
+# For all remaining binary variables, I will select the max. Meaning, for example,
+# at least one plot is managed by female, at least one maize plot manager has primary education, 
+# at least one plot is being intercropped and etc. 
+wave5max <- collap(wave5,
+                   ~ household_id, 
+                   FUN = fmax,
+                   na.rm = TRUE)
+wave5 <- left_join(wave5mean, wave5sum, by=join_by("household_id"))
+wave5 <- left_join(wave5, wave5max, by=join_by("household_id"))
+wave5 <- left_join(wave5, agriasset, by=join_by("household_id"))
+wave5 <- left_join(wave5, hhhp5, by=c("household_id"="hh_id_merge"))
+wave5 <- left_join(wave5, rotation5, by=join_by("household_id"))
+var_label(wave5$dm_agriasset_order) <- "control over agricultural assets"
+remove(wave5max, wave5sum,wave5mean,rotation5, agriasset, aggregated_vars, hhhp5)
 
-
-
+## Cleaning missing data ----
+look_for(wave5)
+# Many missing values!!!
+# In page 22 of the Basic Information Document, Ethiopia Socioeconomic Survey 2021/22,
+# it is mentioned that 11 households left their locations after the PP visit and
+# 29 were in EAs that were not accessible during the second visit for a variety
+# of reasons. For these 40 households only PP and livestock data are available.
+# In addition, 248 rural households were not accessible during the PP visit
+# but were interviewed during the PH and HH visit. The agricultural information for these
+# households does not include all the details available in the PP module.  
+hhdata <- read_dta("data/eth/ess5/sect1_hh_w5.dta") |>  
+  distinct(household_id,.keep_all = TRUE) |> 
+  filter(saq14==1)
+ppdata <- read_dta("data/eth/ess5/sect1_pp_w5.dta") |> 
+  distinct(household_id,.keep_all = TRUE)
+# household size differs by 206 hhs, but HH  and PP may have some different additional HHs.
+# let's seee if these are the ones for which we have missing data in wave5
+hhdata <- anti_join(hhdata, ppdata, by=join_by("household_id")) #246 HHs
+hhdata <- hhdata |> 
+  select(household_id) |> mutate(missinghh=1)
+wave5 <- left_join(wave5, hhdata, by=join_by("household_id"))
+wave5 <- wave5 |> 
+  mutate(missinghh=ifelse(is.na(missinghh), 0, missinghh))
+table(wave5$missinghh) # none are present in our data. 
+wave5 <- wave5 |> select((-missinghh))
+# now let's check the 40 hhs for which only pp is available. 
+hhdata <- read_dta("data/eth/ess5/sect1_hh_w5.dta") |>  
+  distinct(household_id,.keep_all = TRUE) |> 
+  filter(saq14==1)
+ppdata <- anti_join(ppdata, hhdata, by=join_by("household_id")) # 40 observations
+ppdata <- ppdata |> 
+  select(household_id) |> mutate(missinghh=1)
+wave5 <- left_join(wave5, ppdata, by=join_by("household_id"))
+wave5 <- wave5 |> 
+  mutate(missinghh=ifelse(is.na(missinghh), 0, missinghh))
+table(wave5$missinghh) # 14 are present in our data. 
+wave5 <- wave5 |> 
+  filter(missinghh!=1) |> select(-missinghh)
+look_for(wave5)
+remove(hhdata, ppdata)
+# I drop households which do not have any agricultural asset, because of the control over agricultural
+# asset varaible that is relevant for our analyses. 
+missing <- wave5 |> 
+  filter(is.na(dm_agriasset_order)) |>   
+  select(household_id) #109 hhs.
+agriasset <- read_dta("data/eth/ess4/sect11_hh_w4.dta") |> filter(saq14==1) |> 
+  filter(s11q00==1) |> 
+  select(household_id, asset_cd,s11q00) |>
+  filter(asset_cd %in% c(15, 16, 30, 31, 32, 33, 34)) |> 
+  distinct(household_id,.keep_all = TRUE)
+agriassetnotmissing <- semi_join(agriasset, missing, by=join_by("household_id"))
+table(agriassetnotmissing$s11q00) # 69 of the 109 hhs do have some agri asset. 
+agriassetnotmissing <- agriassetnotmissing |> 
+  mutate(notmissing=1) |> 
+  select(household_id, notmissing)
+remove(agriasset)
+wave5 <- left_join(wave5, agriassetnotmissing, by=join_by("household_id"))
+wave5 <- wave5 |> 
+  mutate(drop=case_when(is.na(notmissing) &is.na(dm_agriasset_order) ~ 1,
+                        .default = 0))
+wave5 <- wave5 |> filter(drop!=1)
+wave5 <- wave5 |> 
+  filter(!is.na(dm_agriasset_order))
+wave5 <- wave5 |> select(-notmissing, -drop)
+look_for(wave5)
+remove(missing, agriassetnotmissing, maizehh)
+look_for(wave5)
+wave5 <- wave5 |> mutate(wave="wave5")
+wave5<- wave5 |> 
+  relocate(hh_id_obs, .after = household_id)
 
 
 

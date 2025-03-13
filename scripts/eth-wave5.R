@@ -289,8 +289,8 @@ hhdata <- read_dta("data/eth/ess5/sect1_hh_w5.dta") |>
   filter(saq14==1)
 ppdata <- read_dta("data/eth/ess5/sect1_pp_w5.dta") |> 
   distinct(household_id,.keep_all = TRUE)
-# household size differs by 206 hhs, but HH  and PP may have some different additional HHs.
-# let's seee if these are the ones for which we have missing data in wave5
+# household size differs by 206 HHs, but HH  and PP may have some different additional HHs.
+# let's see if these are the ones for which we have missing data in wave5
 hhdata <- anti_join(hhdata, ppdata, by=join_by("household_id")) #246 HHs
 hhdata <- hhdata |> 
   select(household_id) |> mutate(missinghh=1)
@@ -299,7 +299,7 @@ wave5 <- wave5 |>
   mutate(missinghh=ifelse(is.na(missinghh), 0, missinghh))
 table(wave5$missinghh) # none are present in our data. 
 wave5 <- wave5 |> select((-missinghh))
-# now let's check the 40 hhs for which only pp is available. 
+# now let's check the 40 HHs for which only pp is available. 
 hhdata <- read_dta("data/eth/ess5/sect1_hh_w5.dta") |>  
   distinct(household_id,.keep_all = TRUE) |> 
   filter(saq14==1)
@@ -314,8 +314,7 @@ wave5 <- wave5 |>
   filter(missinghh!=1) |> select(-missinghh)
 look_for(wave5)
 remove(hhdata, ppdata)
-# I drop households which do not have any agricultural asset, because of the control over agricultural
-# asset varaible that is relevant for our analyses. 
+# I drop households which do not have any agricultural asset, because of the control over agricultural asset variable that is relevant for our analyses. 
 missing <- wave5 |> 
   filter(is.na(dm_agriasset_order)) |>   
   select(household_id) #109 hhs.

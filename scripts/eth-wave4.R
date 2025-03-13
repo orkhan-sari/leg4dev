@@ -312,8 +312,8 @@ look_for(wave4)
 wave4 <- wave4 |> 
   filter(!is.na(hh_size)) # household level data from HP - some HHs have agri data but no household level data4
 # There are households which do not have any agricultural assets. For these asset variables will be missing. 
-# I drop households which do not have any agricultural asset, because of the control over agricultural
-# asset varaible that is relevant for our analyses. 
+# I drop households which do not have any agricultural asset, because control over agricultural
+# asset variable that is relevant for our analyses. 
 look_for(wave4)
 missing <- wave4 |> 
   filter(is.na(dm_agriasset_order)) |> 

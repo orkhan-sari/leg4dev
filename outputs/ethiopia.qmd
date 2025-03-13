@@ -1,15 +1,17 @@
 ---
-title: "eth_intercropping"
+title: "LSMS Ethiopia"
 author: "Dr. Orkhan Sariyev"
 format: 
   html:
     toc: true
+    mermaid: 
+      theme: forest
     theme: 
       dark: darkly
     mainfont: sans-serif
     fig-width: 10
     fig-height: 6
-editor: visual
+editor: source
 ---
 
 ## Intercropping in ETH LSMS - ISA wave 4
@@ -18,10 +20,11 @@ Below I explore cereal legume intercropping in Ethiopia employing LSMS-ISA data.
 
 ```{r load necessary libraries}
 #| echo: false
+#| output: false
+#| warning: false
 pacman::p_load(tidyverse,
                haven,
                tibble,
-               expss,
                labelled,
                collapse)
 getwd()
@@ -30,21 +33,21 @@ options(scipen = 999)
 
 ```{r}
 #| echo: true
+#| output: true
+#| warning: false
 setwd("C:/Users/490A/Nextcloud/Research/leg4dev")
 field <- read_dta("data/eth/ess4/sect3_pp_w4.dta") |> 
   select("household_id", "parcel_id", "field_id", "saq08", "saq09", "s3q02a", "s3q02b", "s3q2b_os",
          "s3q03", "s3q03_os", "s3q03b", "s3q04", "s3q05", "s3q07", "s3q08") |> 
   rename(mixedcrop=s3q04)
-table(field$mixedcrop) 
-
-# 2692 mixed fields where mixed cropping was practiced.
 cropdata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") |> 
   select("household_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") |> 
   rename(mixedcrop=s4q02)
+table(field$mixedcrop) 
 table(cropdata$mixedcrop) 
-# 6085 mixed crops in the above 2692 fields. 
 count(cropdata, s4q01b)|> print(n=10)
 ```
+There are 2692 plots with mixed cropping where 6085 crops are produced. Maize, sorghum, and teff are top three crops. 
 
 ```{r}
 cropdata <- cropdata |> 
@@ -52,9 +55,6 @@ cropdata <- cropdata |>
   mutate(legum = ifelse(s4q01b %in% c(9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 24), 1, 0),
          legume = ifelse(any(mixedcrop == 2) & any(legum == 1), 1, 0)) |> 
   ungroup()
-cropdata |> 
-  filter(s4q01b %in% c(6, 7, 8, 1, 2, 3, 72, 71)) |> 
-  count(s4q01b, mixedcrop) |>  print(n=10)
 ```
 
 ```{r}
@@ -82,6 +82,8 @@ As expected, we are more likely to observe legume intercrops in maize and sorghu
 
 ```{r}
 #| echo: true
+#| output: true
+#| warning: false
 setwd("C:/Users/490A/Nextcloud/Research/leg4dev")
 field <- read_dta("data/eth/ess5/sect3_pp_w5.dta") |> 
   select("household_id", "parcel_id", "field_id", "saq08", "saq09", "s3q02a", "s3q02b", "s3q2b_os",
@@ -89,7 +91,6 @@ field <- read_dta("data/eth/ess5/sect3_pp_w5.dta") |>
   rename(mixedcrop=s3q04)
 countmixed <- table(field$mixedcrop) 
 mixed_count <- countmixed[2]
-# 2711 mixed fields where mixed cropping was practiced.
 cropdata <- read_dta("data/eth/ess5/sect4_pp_w5.dta") |> 
   select("household_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") |> 
   rename(mixedcrop=s4q02)
@@ -107,9 +108,6 @@ cropdata <- cropdata |>
   mutate(legum = ifelse(s4q01b %in% c(9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 24), 1, 0),
          legume = ifelse(any(mixedcrop == 2) & any(legum == 1), 1, 0)) |> 
   ungroup()
-cropdata |> 
-  filter(s4q01b %in% c(6, 7, 8, 1, 2, 3, 72, 71)) |> 
-  count(s4q01b, mixedcrop) |>  print(n=10)
 ```
 
 ```{r}
@@ -129,7 +127,7 @@ maize_count5 <- counts5$n[counts5$s4q01b == 2]
 `r maize_count5` fields with maize-legume intercropping.
 
 ## Data cleaning 
-
+### Raw data and harmonzied panel
 This is how the process looks like
 
 ```{mermaid}
@@ -142,24 +140,33 @@ flowchart TD
 
 ```
 
-Below I list some more important facts, and summarize important decisions made during the data cleaning step:
+***Below I list some more important facts, and summarize important decisions made during the data cleaning step:***
 
 - There are 1263 and 1004  maize producers in wave 4 and 5, respectively.
   - 60 of these are not in the harmonized panel in wave4. 
-- There are 2021 maize fields in wave 4 and in only 1503 of these maize is the main plot. 
-- Harmonized panel has many missing values, and of course, some are take to the final data
-  - [ ] reflect on missing data
+- There are 2021 maize fields in wave 4 and in only 1503 of these, maize is the main plot. 
+- Harmonized panel has many missing values, and of course, some appear in the final data.
+  - [ ] still to reflect on missing data...
 - Control over agricultural assets: male, joint, female
   - two assets: if women owned at least one asset.
-  - |> many assets: more frequent ownership type observed
+  - many assets: more frequent ownership type observed
   - male: only men own these assets
   - female: only women own these assets 
   - joint both men and women own these assets
 
-Collapsing/aggregating data at the household level
+### HH level data
+***Collapsing/aggregating data at the household level:***
 
+* The final data should be at the household level. Thus, plot level data is aggregated to household level where below decisions are taken:
+  + **Mean**: for some variables, I aggregated at mean. For example, distance to the market, soil fertility adn etc. 
+  + **Sum**: summarized for some; E.g., number of crops on plots, area of plots, and etc. 
+  + **Max**: for remaining variables maximum is taken. E.g, at least one plot is managed by female, at least one maize plot manager has primary education
 
+* Wave 4: In page 24 and 25 of Basic Information Document, Ethiopia Socioeconomic Survey 2018-19, it is mentioned that in several EAs, for several households, household data is missing but agricultural data is included.For some 7 EAs post-harvest is missing and etc.
 
+* Wave 4 and 5: There are households which do not have any agricultural assets. For these asset variables will be missing. I drop households which do not have any agricultural asset, because control over agricultural asset variable that is relevant for our analyses. 
+
+* Wave 5: In page 22 of the Basic Information Document, Ethiopia Socioeconomic Survey 2021/22, it is mentioned that 11 households left their locations after the PP visit and 29 were in EAs that were not accessible during the second visit for a variety of reasons. For these 40 households only PP and livestock data are available. In addition, 248 rural households were not accessible during the PP visit but were interviewed during the PH and HH visit. The agricultural information for these households does not include all the details available in the PP module.
 
 
 

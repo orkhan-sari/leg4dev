@@ -3,17 +3,37 @@ title: "Framework in dag"
 author: "Dr. Orkhan Sariyev"
 format: 
   html:
+    mermaid: 
+      theme: forest
+    toc: true
+    theme: 
+      dark: darkly
+    mainfont: sans-serif
     fig-width: 10
     fig-height: 6
-editor: visual
+editor: source
 ---
+```{r load necessary libraries}
+#| echo: false
+#| output: false
+#| warning: false
+pacman::p_load(tidyverse,
+               haven,
+               tibble,
+               labelled,
+               collapse)
+getwd()
+options(scipen = 999)
+```
 
 ## Concept
 
-The goal here is to visualize the realtionship between maize-legume intercropping and food security. We refer to this file during the analyses.
+The goal here is to visualize the relationship between maize-legume intercropping and food security. We refer to this framework during the cleaning and analyses. This is an iterative process... 
 
 ```{r}
 #| echo: false
+#| output: false
+#| warning: false
 library(dagitty)
 library(ggdag)
 ```
@@ -34,4 +54,23 @@ dag <- dagify(nutrition~intercrop+social+conservation+gender+plot,
               coords = coords)
 #plot
 ggdag_classic(dag, text_col = "blue") + theme_dag_blank()
+```
+
+## Data 
+
+
+```{mermaid}
+flowchart TD
+    A("eth4") --> B("dfeth")
+    C("eth5") --> B
+    D("mlw1") --> E("dfmlw")
+    F("mlw2") --> E
+    G("mlw3") --> E
+    H("mlw4") --> E
+    J("tnz4") --> T("dftnz")
+    K("tnz5") --> T
+    B -->|append| S("df_final")
+    E --> |append|S
+    T --> |append|S
+
 ```

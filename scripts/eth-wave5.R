@@ -211,7 +211,7 @@ agriasset %>%
   filter(n_unique > 1)  # Keep only those with different values
 # no hh with two type assets but differetn decision-maker.
 agriasset <- collap(agriasset, dm_agriasset_order ~ household_id, catFUN = fmode)
-look_for(plotdata4)
+look_for(plotdata5)
 remove(individual)
 
 ### ### ### ### ### ### ### ###
@@ -338,7 +338,7 @@ wave5 <- wave5 |>
   filter(!is.na(dm_agriasset_order))
 wave5 <- wave5 |> select(-notmissing, -drop)
 look_for(wave5)
-remove(missing, agriassetnotmissing, maizehh)
+remove(missing, agriassetnotmissing, maizehh, plotdata5)
 look_for(wave5)
 wave5 <- wave5 |> mutate(wave="wave5")
 wave5<- wave5 |> 

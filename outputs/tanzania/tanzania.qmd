@@ -1,0 +1,309 @@
+---
+title: "LSMS Tanzania"
+author: "Drisya Kuriyedath"
+format: html
+editor: visual
+---
+
+```{r load necessary libraries}
+#| echo: false
+#| output: false
+#| warning: false
+pacman::p_load(tidyverse,
+               haven,
+               tibble,
+               labelled,
+               collapse)
+getwd()
+options(scipen = 999)
+```
+
+## Intercropping in TZA LSMS - ISA wave 4
+
+Starting by exploring the Maize legume intercropping in Tanzania employing LSMS-ISA data. The employed data is from wave 4 which has been collected in 2014-2015.
+
+**a) Wave 4: Long Rainy Season**
+
+```{r}
+#| echo: true
+#| output: true
+#| warning: false
+setwd("D:/WORK/LEG4DEV/leg4dev")
+
+cropdata <- read_dta("data/tza/tza_wave4/ag_sec_4a.dta") |> 
+  select("y4_hhid", "plotnum", "zaocode", "zaoname", "ag4a_01", "ag4a_02", "ag4a_03", "ag4a_04", "ag4a_05", "ag4a_06") |> 
+  rename(intercrop = ag4a_04) %>%
+  filter(!is.na(zaocode))  # Remove rows with missing zaocode
+```
+
+```{r}
+# Filter for plots where maize (zaocode == 11) was grown
+maize_data <- cropdata |> 
+  filter(zaocode == 11)
+
+# Count of unique households cultivating maize
+length(unique(maize_data$y4_hhid))
+
+# Count of unique households with at least one intercropped maize plot
+length(unique(maize_data$y4_hhid[maize_data$intercrop == 1]))
+
+# Total number of maize plots that were intercropped
+sum(maize_data$intercrop == 1, na.rm = TRUE)
+
+```
+
+```{r}
+# Define the legume zaocodes
+legume_codes <- c(31, 32, 33, 34, 35, 36, 37, 43, 47)
+
+# Get all maize intercropped plots
+maize_intercropped_plots <- maize_data |> 
+  filter(intercrop == 1) |> 
+  select(y4_hhid, plotnum) |> 
+  distinct()
+
+# From the full cropdata, find all crops that were planted on the same plots as intercropped maize
+maize_anyintercrop_plots <- cropdata |> 
+  semi_join(maize_intercropped_plots, by = c("y4_hhid", "plotnum"))
+
+```
+
+Let's check if legumes were planted alongside maize on those same plots:
+
+```{r}
+
+# Filter for plots with either maize (zaocode == 11) or legumes
+maize_legume_plots <- maize_anyintercrop_plots |> 
+  filter(zaocode %in% c(11, legume_codes)) |> 
+  group_by(y4_hhid, plotnum) |> 
+  summarise(
+    has_maize = any(zaocode == 11),  
+    has_legume = any(zaocode %in% legume_codes),  
+    .groups = "drop"
+  ) |> 
+  filter(has_maize & has_legume)  # Only keep rows where both maize and legumes are present
+
+# Get the unique households who intercropped maize with legumes
+n_distinct(maize_legume_plots$y4_hhid)
+
+```
+
+Summary: During the Long Rainy Season of Wave 4, a total of 1,430 households cultivated maize. Among them, 1,056 households practiced intercropping on at least one of their plots, resulting in 1,432 intercropped plots. The remaining 374 maize-cultivating households did not practice intercropping. Of the intercropped plots, 736 households intercropped maize specifically with a legume crop.
+
+**b) Wave 4: Short Rainy Season**
+
+```{r}
+#| echo: true
+#| output: true
+#| warning: false
+setwd("D:/WORK/LEG4DEV/leg4dev")
+
+cropdata <- read_dta("data/tza/tza_wave4/ag_sec_4b.dta") |> 
+  select("y4_hhid", "plotnum", "zaocode", "zaoname", "ag4b_01", "ag4b_02", "ag4b_03", "ag4b_04", "ag4b_05", "ag4b_06") |> 
+  rename(intercrop = ag4b_04) %>%
+  filter(!is.na(zaocode))  # Remove rows with missing zaocode
+```
+
+```{r}
+# Filter for plots where maize (zaocode == 11) was grown
+maize_data <- cropdata |> 
+  filter(zaocode == 11)
+
+# Count of unique households cultivating maize
+length(unique(maize_data$y4_hhid))
+
+# Count of unique households with at least one intercropped maize plot
+length(unique(maize_data$y4_hhid[maize_data$intercrop == 1]))
+
+# Total number of maize plots that were intercropped
+sum(maize_data$intercrop == 1, na.rm = TRUE)
+
+```
+
+```{r}
+# Define the legume zaocodes
+legume_codes <- c(31, 32, 33, 34, 35, 36, 37, 43, 47)
+
+# Get all maize intercropped plots
+maize_intercropped_plots <- maize_data |> 
+  filter(intercrop == 1) |> 
+  select(y4_hhid, plotnum) |> 
+  distinct()
+
+# From the full cropdata, find all crops that were planted on the same plots as intercropped maize
+maize_anyintercrop_plots <- cropdata |> 
+  semi_join(maize_intercropped_plots, by = c("y4_hhid", "plotnum"))
+
+```
+
+Let's check if legumes were planted alongside maize on those same plots:
+
+```{r}
+
+# Filter for plots with either maize (zaocode == 11) or legumes
+maize_legume_plots <- maize_anyintercrop_plots |> 
+  filter(zaocode %in% c(11, legume_codes)) |> 
+  group_by(y4_hhid, plotnum) |> 
+  summarise(
+    has_maize = any(zaocode == 11),  
+    has_legume = any(zaocode %in% legume_codes),  
+    .groups = "drop"
+  ) |> 
+  filter(has_maize & has_legume)  # Only keep rows where both maize and legumes are present
+
+# Get the unique households who intercropped maize with legumes
+n_distinct(maize_legume_plots$y4_hhid)
+
+```
+
+Summary: During the Short Rainy Season of Wave 4, a total of 395 households cultivated maize. Among them, 301 households practiced intercropping on at least one of their plots, resulting in 433 intercropped plots. The remaining 94 maize-cultivating households did not practice intercropping. Of the intercropped plots, 209 households intercropped maize specifically with a legume crop.
+
+## Intercropping in wave5
+
+The employed data is from wave 5 which has been collected in 2020-2021.
+
+**a) Wave 5: Long Rainy Season**
+
+```{r}
+#| echo: true
+#| output: true
+#| warning: false
+setwd("D:/WORK/LEG4DEV/leg4dev")
+
+cropdata <- read_dta("data/tza/tza_wave5/ag_sec_4a.dta") |> 
+  select("y5_hhid", "plot_id", "cropid", "ag4a_01", "ag4a_02", "ag4a_03", "ag4a_04", "ag4a_05", "ag4a_06") |> rename(intercrop= ag4a_04) %>%
+  filter(!is.na(cropid))  # Remove rows with missing zaocode
+```
+
+```{r}
+# Filter for plots where maize (cropid == 11) was grown
+maize_data <- cropdata |> 
+  filter(cropid == 11)
+
+# Count of unique households cultivating maize
+length(unique(maize_data$y5_hhid))
+
+# Count of unique households with at least one intercropped maize plot
+length(unique(maize_data$y5_hhid[maize_data$intercrop == 1]))
+
+# Total number of maize plots that were intercropped
+sum(maize_data$intercrop == 1, na.rm = TRUE)
+
+```
+
+```{r}
+# Define the legume zaocodes
+legume_codes <- c(31, 32, 33, 34, 35, 36, 37, 43, 47)
+
+# Get all maize intercropped plots
+maize_intercropped_plots <- maize_data |> 
+  filter(intercrop == 1) |> 
+  select(y5_hhid, plot_id) |> 
+  distinct()
+
+# From the full cropdata, find all crops that were planted on the same plots as intercropped maize
+maize_anyintercrop_plots <- cropdata |> 
+  semi_join(maize_intercropped_plots, by = c("y5_hhid", "plot_id"))
+
+```
+
+Let's check if legumes were planted alongside maize on those same plots:
+
+```{r}
+
+# Filter for plots with either maize (cropid == 11) or legumes
+maize_legume_plots <- maize_anyintercrop_plots |> 
+  filter(cropid %in% c(11, legume_codes)) |> 
+  group_by(y5_hhid, plot_id) |> 
+  summarise(
+    has_maize = any(cropid == 11),  
+    has_legume = any(cropid %in% legume_codes),  
+    .groups = "drop"
+  ) |> 
+  filter(has_maize & has_legume)  # Only keep rows where both maize and legumes are present
+
+# Get the unique households who intercropped maize with legumes
+n_distinct(maize_legume_plots$y5_hhid)
+
+```
+
+Summary: During the Long Rainy Season of Wave 5, a total of 1701 households cultivated maize. Among them, 966 households practiced intercropping on at least one of their plots, resulting in 1198 intercropped plots. The remaining 735 maize-cultivating households did not practice intercropping. Of the intercropped plots, 642 households intercropped maize specifically with a legume crop.
+
+**b) Wave 5: Short rainy season**
+
+```{r}
+#| echo: true
+#| output: true
+#| warning: false
+setwd("D:/WORK/LEG4DEV/leg4dev")
+
+cropdata <- read_dta("data/tza/tza_wave5/ag_sec_4b.dta") |> 
+  select("y5_hhid", "plot_id", "cropid", "ag4b_01", "ag4b_02", "ag4b_03", "ag4b_04", "ag4b_05", "ag4b_06") |> rename(intercrop= ag4b_04) %>%
+  filter(!is.na(cropid))  # Remove rows with missing zaocode
+```
+
+```{r}
+# Filter for plots where maize (cropid == 11) was grown
+maize_data <- cropdata |> 
+  filter(cropid == 11)
+
+# Count of unique households cultivating maize
+length(unique(maize_data$y5_hhid))
+
+# Count of unique households with at least one intercropped maize plot
+length(unique(maize_data$y5_hhid[maize_data$intercrop == 1]))
+
+# Total number of maize plots that were intercropped
+sum(maize_data$intercrop == 1, na.rm = TRUE)
+
+```
+
+```{r}
+# Define the legume zaocodes
+legume_codes <- c(31, 32, 33, 34, 35, 36, 37, 43, 47)
+
+# Get all maize intercropped plots
+maize_intercropped_plots <- maize_data |> 
+  filter(intercrop == 1) |> 
+  select(y5_hhid, plot_id) |> 
+  distinct()
+
+# From the full cropdata, find all crops that were planted on the same plots as intercropped maize
+maize_anyintercrop_plots <- cropdata |> 
+  semi_join(maize_intercropped_plots, by = c("y5_hhid", "plot_id"))
+
+```
+
+Let's check if legumes were planted alongside maize on those same plots:
+
+```{r}
+
+# Filter for plots with either maize (cropid == 11) or legumes
+maize_legume_plots <- maize_anyintercrop_plots |> 
+  filter(cropid %in% c(11, legume_codes)) |> 
+  group_by(y5_hhid, plot_id) |> 
+  summarise(
+    has_maize = any(cropid == 11),  
+    has_legume = any(cropid %in% legume_codes),  
+    .groups = "drop"
+  ) |> 
+  filter(has_maize & has_legume)  # Only keep rows where both maize and legumes are present
+
+# Get the unique households who intercropped maize with legumes
+n_distinct(maize_legume_plots$y5_hhid)
+
+```
+
+Summary: During the Short Rainy Season of Wave 5, a total of 425 households cultivated maize. Among them, 248 households practiced intercropping on at least one of their plots, resulting in 314 intercropped plots. The remaining 177 maize-cultivating households did not practice intercropping. Of the intercropped plots, 172 households intercropped maize specifically with a legume crop.
+
+##Results
+
+
+| Season             | Wave   | Total HHs Cultivating Maize | Maize cultivating HHs Practicing Intercropping | Maize intercropped Plots | HHs Intercropping Maize with Legume |
+|--------------------|--------|------------------------------------|-------------------------------------|---------------------|---------------------------------------------|
+| Long Rainy Season  | Wave 4 | 1,430                              | 1,056                               | 1,432               | 736                                         |
+| Short Rainy Season | Wave 4 | 395                                | 301                                 | 433                 | 209                                         |
+| Long Rainy Season  | Wave 5 | 1,701                              | 966                                 | 1,198               | 642                                         |
+| Short Rainy Season | Wave 5 | 425                                | 248                                 | 314                 | 172                                         |
+
+

@@ -338,7 +338,7 @@ wave5 <- wave5 |>
   filter(!is.na(dm_agriasset_order))
 wave5 <- wave5 |> select(-notmissing, -drop)
 look_for(wave5)
-remove(missing, agriassetnotmissing, maizehh, plotdata5)
+remove(missing, agriassetnotmissing, maizehh, plotdata5,mode_function)
 look_for(wave5)
 wave5 <- wave5 |> mutate(wave="wave5")
 wave5<- wave5 |> 

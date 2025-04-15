@@ -19,7 +19,7 @@ hh16 <- read_dta("data/mlw/hh_mod_a_filt_16.dta") |>
 ### ### ### ### ### ### ### ###
 hpdata <- read_dta("data/hp/Plot_dataset.dta") |>
   filter(country=="Malawi", wave==3) 
-# We concentrate on the plots where maize is the main crop 
+# We concentrate on the plots where maize is the main crop. 
 maizeplots <- hpdata |> 
   filter(main_crop=="MAIZE") |> 
   select(hh_id_merge, parcel_id_merge, plot_id_merge) |> 
@@ -86,11 +86,13 @@ modd <- modd |>
   mutate(rotation=as.integer(
     if_any(c(ag_d69, ag_d69_oth, ag_d70, ag_d70_oth), ~ . %in% c(11, 12, 27, 34, 35, 36, 46, "COWPEAS"))
   ))
-look_for(garden) # first crop is missing for 91 observations. Delete these later? 
+look_for(garden)
 plot3 <- left_join(garden, modd, by="plot_id") |> 
   select(-ag_d20a, -ag_d20b, -ag_d20c, -ag_d20d, -ag_d20e, -ag_d20_oth, -ag_d69, -ag_d69_oth, -ag_d70, -ag_d70_oth)
 remove(garden,modd)
-
+var_label(plot3$intercrop) <- "legume intercropped maize plot"
+var_label(plot3$rotation) <- "legume is cultivated before or after"
+var_label(plot3$count_plot) <- "number of main maize plots"
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
@@ -109,10 +111,10 @@ modd <- modd |> select(plot_id, female,hh_b05a )
 plot3 <- left_join(plot3, modd, by="plot_id")
 plot3 <- plot3 |> rename(age_manager_row=hh_b05a)
 remove(modd)
+
 ### ### ### ### ### ### ### ###
 # Nutrition indicators ---- 
 ### ### ### ### ### ### ### ###
-
 # HDDS
 # total consumption is absent if MLW
 hdds3 <- read_dta("data/hp/Household_dataset.dta") |>
@@ -120,7 +122,7 @@ hdds3 <- read_dta("data/hp/Household_dataset.dta") |>
   select(hh_id_merge, hh_size, hh_shock, hh_dependency_ratio, hh_asset_index, HDDS, share_kg_sold)
 hdds3 <- hdds3|> 
   semi_join(maizehh, by="hh_id_merge")
-look_for(hdds3) # 308 missing for share_kg_sold
+look_for(hdds3) # 297 missing for share_kg_sold
 remove(maizehh)
 
 ### ### ### ### ### ### ### ###
@@ -137,7 +139,7 @@ community <- community |>
 community %>%
   count(ea_id) %>%
   filter(n > 1) # one copy 
-community <- community |> distinct(ea_id)
+community <- community |> distinct(ea_id,.keep_all = TRUE)
 
 ### ### ### ### ### ### ### ###
 # Final data  ----
@@ -149,11 +151,68 @@ plot3 <- plot3 |> rename(hhid=y3_hhid)
 plot3 <- left_join(plot3, hh16, by="hhid")
 plot3 <- plot3 |> relocate(ea_id,.after = hhid)
 plot3 <- left_join(plot3, community, by="ea_id")
-plot3 <- left_join(plot3, hdds3, by="hh_id_merge")
-remove(community, hdds3, maizeplots)
-table(plot3$female_manager, plot3$female) # same information. 
+remove(community, maizeplots)
+table(plot3$female_manager, plot3$female) # same information.
+plot3 <- plot3 |> select(-female)
 # manager age is missing for 102 plots.
-# market_distance still missing for 924 observations. No data on market distance can be used. 
+# market_distance still missing for 892 observations. No data on market distance can be used. 
+plot3 <- plot3 |> select(-market_distance)
+
+## Collapse / aggregate ----
+mlw3 <- plot3 |> 
+  select(-ag_d14, -hh_id_merge,-plot_id_merge, -plot_id_obs, -parcel_id_merge, -parcel_id_obs,
+         -respondent_id_obs, -respondent_id_merge,-age_manager_row)
+look_for(mlw3)
+wave3mean <- collap(mlw3,
+                    farm_size + age_manager + plot_dist_household + ag_asset_index + count_plot + 
+                    soil_fertility_index  ~ hhid,
+                    FUN = fmean,
+                    na.rm = TRUE)
+wave3sum <- collap(mlw3,
+                   plot_area_GPS +nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
+                   FUN = fsum,
+                   na.rm = TRUE)
+aggregated_vars <- c("farm_size", "age_manager", "plot_dist_household", "soil_fertility_index",
+                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", 
+                     "yield_value_LCU", "yield_value_USD")
+mlw3 <- mlw3 %>% select(-all_of(aggregated_vars))
+look_for(mlw3)
+mlw3 <- mlw3 |> 
+  select(1, 2, 6:8, 11:22)
+look_for(mlw3)
+# For all remaining binary variables, I will select the max. Meaning, for example,
+# at least one plot is managed by female, at least one maize plot manager has primary education, 
+# at least one plot is being intercropped and etc. 
+wave3max <- collap(mlw3,
+                   ~ hhid, 
+                   FUN = fmax,
+                   na.rm = TRUE)
+mlw3 <- left_join(wave3mean, wave3sum, by=join_by("hhid"))
+mlw3 <- left_join(mlw3, wave3max, by=join_by("hhid"))
+mlw3 <- left_join(mlw3, hdds3, by=c("hhid"="hh_id_merge"))
+remove(wave3max, wave3sum,wave3mean,aggregated_vars, hdds3, plot3)
+mlw3 <- mlw3 |> mutate(wave="wave3")
+mlw3 <- mlw3 |> 
+  relocate(hh_id_obs, .after = hhid) |> 
+  relocate(ea_id, .after = hh_id_obs)
+
+## Cleaning missing data ----
+look_for(mlw3)
+# age is missing for many observations in the raw data. 83 missing for manager age. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

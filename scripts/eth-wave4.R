@@ -340,7 +340,7 @@ agriasset <- agriasset |>
 agriasset <- collap(agriasset, test~household_id, FUN = fmax)
 table(agriasset$test) # all 43 households indeed have at least one agricultural asset, but these HHs are not in HP plot data.  
 # There are 43 households for which we do have raw data but they do not appear in harmonized panel. I do not know why. 
-remove(missing, missing2, agriasset, maizehh, plotdata4)
+remove(missing, missing2, agriasset, maizehh, plotdata4, mode_function)
 look_for(wave4)
 wave4 <- wave4 |> mutate(wave="wave4")
 wave4 <- wave4 |> 

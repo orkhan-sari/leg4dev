@@ -314,7 +314,8 @@ wave5 <- wave5 |>
   filter(missinghh!=1) |> select(-missinghh)
 look_for(wave5)
 remove(hhdata, ppdata)
-# I drop households which do not have any agricultural asset, because of the control over agricultural asset variable that is relevant for our analyses. 
+# I drop households which do not have any agricultural asset, because  the control over agricultural asset variable
+# is higlighy important for our analyses. 
 missing <- wave5 |> 
   filter(is.na(dm_agriasset_order)) |>   
   select(household_id) #109 hhs.
@@ -343,7 +344,9 @@ look_for(wave5)
 wave5 <- wave5 |> mutate(wave="wave5")
 wave5<- wave5 |> 
   relocate(hh_id_obs, .after = household_id)
-
+##  age is missing for many observations in the raw data. 29 missing for manager age.
+missing <- is.na(wave5$age_manager)
+wave5 <- subset(wave5, subset= !missing)
 
 
 

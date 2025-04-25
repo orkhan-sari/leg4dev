@@ -198,10 +198,14 @@ mlw3 <- mlw3 |>
 
 ## Cleaning missing data ----
 look_for(mlw3)
-# age is missing for many observations in the raw data. 83 missing for manager age. 
-
-
-
+## share_kg_sold in HP data has many missing; reason: set to missing if reported share above 100% percent or
+##  if household does not harvest any crops.
+##  age is missing for many observations in the raw data. 83 missing for manager age. 
+missing <- is.na(mlw3$share_kg_sold)|
+  is.na(mlw3$age_manager)
+mlw3 <- subset(mlw3, subset= !missing)
+var_label(mlw3$plot_area_GPS) <- "Area (ha) of maize plots"
+var_label(mlw3$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
 
 
 

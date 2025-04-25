@@ -342,6 +342,15 @@ table(agriasset$test) # all 43 households indeed have at least one agricultural 
 # There are 43 households for which we do have raw data but they do not appear in harmonized panel. I do not know why. 
 remove(missing, missing2, agriasset, maizehh, plotdata4, mode_function)
 look_for(wave4)
+##  age is missing for many observations in the raw data. 83 missing for manager age.
+missing <- is.na(wave4$age_manager)
+wave4 <- subset(wave4, subset= !missing)
+### share_kg_sold----
+### has many missing (336); the reason is because of many have reported share above 100% percent. 
+### Also, some did not harvest any crops.
+### We will capture susbsistent orientation, by lookign at the question 22 in section 4 that asks: Do you intend to sell any 
+### of [CROP] to be harvested during the rainy season?
+
 wave4 <- wave4 |> mutate(wave="wave4")
 wave4 <- wave4 |> 
   relocate(hh_id_obs, .after = household_id)

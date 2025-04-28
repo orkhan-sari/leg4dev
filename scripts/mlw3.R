@@ -206,8 +206,16 @@ missing <- is.na(mlw3$share_kg_sold)|
 mlw3 <- subset(mlw3, subset= !missing)
 var_label(mlw3$plot_area_GPS) <- "Area (ha) of maize plots"
 var_label(mlw3$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
+remove(missing)
 
 
+
+## Notes on missing data ----
+## 1023 hhs before any cleaning of missing data
+## 83 missing for manager age
+## 41 missing household size, dependency ratio, consumption and some other hh level variables
+## 95 hhs do not have agricultural assets but still have asset index. This is becuase, pca (factor) analysis still includes those with 
+## no asset and gives them a lower score. 
 
 
 

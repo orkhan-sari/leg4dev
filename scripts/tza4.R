@@ -55,35 +55,27 @@ look_for(plot)
 plot <- semi_join(plot, maizeplots, by="plot_id")
 table(plot$ag3a_03) # many plots are rented out or fallow
 # 1204 Cultivated maize plots. We only keep those plots that are cultivated, even if these plots have been listed as maize fields in HP data.   
-plot <- plot |> filter(ag3a_03==1)
-plot <- plot |> 
-  group_by(y4_hhid)|>
-  mutate(count_plot=n())|>
-  ungroup()
+plot <- plot |> filter(ag3a_03==1) # 425 plots left. This is not enough. We must refer to the bigger dataset. 
 table(plot$ag3a_07_2)
 
 # but the kept obs are those with maize as the highest value crop
 
-intercropdata <- read_dta("data/tza/tza_wave4/ag_sec_4a.dta") |> 
-  select("y4_hhid", "plotnum", "zaocode", "zaoname", "ag4a_04") |> 
-  rename(intercrop = ag4a_04) %>%
+crops <- read_dta("data/tza/tza_wave4/ag_sec_4a.dta") |> 
+  select("y4_hhid", "plotnum", "zaocode", "zaoname") |> 
   filter(!is.na(zaocode))
-
-
-# Get all maize intercropped plots
-maize_intercrop_plots <- plot %>%
-  left_join(intercropdata, by = c("y4_hhid", "plotnum")) %>%
-  filter(!is.na(intercrop) & intercrop == 1)
-
-table(maize_intercrop_plots$ag3a_07_2)
-
+crops <- crops |> 
+  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-"))
+crops <- semi_join(crops, maizeplots, by="plot_id" )
+crops <- crops |> 
+  group_by(y4_hhid)|>
+  mutate(count_plot=n())|>
+  ungroup()
 legume_codes <- c(31, 32, 33, 34, 35, 36, 37, 43, 47)
-
-# Filter maize-legume intercropped plots based on legume codes
-maize_legume_intercrop <- maize_intercrop_plots |>
-  filter(zaocode %in% legume_codes)
-
-
+crops <- crops %>%
+  group_by(y4_hhid, plotnum) %>%
+  mutate(legume_intercrop = as.integer(any(zaocode %in% legume_codes))) %>%
+  ungroup()
+remove(legume_codes)
 # Also in HP data, keep only plots that have been cultivated. 
 plots <- plot |> select(plot_id)
 maizeplots <- semi_join(maizeplots, plots, by="plot_id")

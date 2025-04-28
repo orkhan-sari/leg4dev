@@ -276,11 +276,73 @@ wave4 <- left_join(wave4mean, wave4sum, by=join_by("household_id"))
 wave4 <- left_join(wave4, wave4max, by=join_by("household_id"))
 wave4 <- left_join(wave4, agriasset, by=join_by("household_id"))
 wave4 <- left_join(wave4, hhhp4, by=c("household_id"="hh_id_merge"))
-wave4 <- left_join(wave4, rotation4, by=join_by("household_id"))
 var_label(wave4$dm_agriasset_order) <- "control over agricultural assets"
 remove(wave4max, wave4sum,wave4mean,rotation4, agriasset, aggregated_vars, hhhp4)
 
+## Cleaning missing data ----
+look_for(wave4)
+# Many missing values!!!
+# This is expected for some! In page 24 and 25 of Basic Information Document, Ethiopia Socioeconomic Survey 2018-19,
+# it is mentioned that in several EAs, for several households, household data is missing but agri data is included.
+# for some 7 EAs post-harvest is missing and etc.   
+wave4 <- wave4 |> 
+  filter(!is.na(hh_size)) # household level data from HP - some HHs have agri data but no household level data4
+# There are households which do not have any agricultural assets. For these asset variables will be missing. 
+# I drop households which do not have any agricultural asset, because control over agricultural
+# asset variable that is relevant for our analyses. 
+look_for(wave4)
+missing <- wave4 |> 
+  filter(is.na(dm_agriasset_order)) |> 
+  select(household_id)
+agriasset <- read_dta("data/eth/ess4/sect11_hh_w4.dta") |>
+  select(household_id, asset_cd,s11q00) |>
+  filter(asset_cd %in% c(15, 16, 30, 31, 32, 33, 34))
+agriasset <- semi_join(agriasset, missing, by=join_by("household_id"))
+table(agriasset$s11q00) # all=2; these hhs do not have agricultural assets. 
+wave4 <- wave4 |> 
+  filter(!is.na(dm_agriasset_order))
+look_for(wave4)
+remove(missing, agriasset, maizehh, hpdata, plotdata4)
+look_for(wave4)
+##  age is missing for many observations in the raw data. 83 missing for manager age.
+missing <- is.na(wave4$age_manager)
+wave4 <- subset(wave4, subset= !missing)
+wave4 <- wave4 |> mutate(wave="wave4")
+
+### share_kg_sold----
+### has many missing (276); the reason is because of many have reported share above 100% percent. 
+### Also, some did not harvest any crops.
+### We will capture subsistence orientation, by looking at the question 22 in section 4 that asks: Do you intend to sell any 
+### of [CROP] to be harvested during the rainy season?
+sec4 <- read_dta("data/eth/ess4/sect4_pp_w4.dta") |> 
+  select( household_id,holder_id, parcel_id, field_id, s4q22) |> 
+  mutate(plot_id = paste(holder_id, parcel_id, field_id, sep = "-"))
+val_labels(sec4$s4q22) # 1 yes 2 no
+sec4 <- semi_join(sec4, maizeplots, by="plot_id")
+sec4 |> fgroup_by(household_id) |> fselect(s4q22) |>  fsum()
+sec4 <- sec4 |> 
+  mutate(subsistence_ag=if_else(s4q22==2,1,0))
+sec4 %>%
+  group_by(household_id) %>%
+  summarise(n_unique = n_distinct(subsistence_ag, na.rm = TRUE)) %>%
+  filter(n_unique > 1) # many cases where answer to the question differs. 
+sec4 <- collap(sec4, subsistence_ag~household_id, FUN = fmin) # if some consider for sale then not a subsistence. 
+wave4 <- left_join(wave4, sec4, by="household_id")
+table(wave4$subsistence_ag)
+var_label(wave4$subsistence_ag) <- "HH does not intend to sell any crop"
+remove(maizeplots, missing, sec4)
+look_for(wave4)
+rural <- read_dta("data/eth/ess4/sect_cover_hh_w4.dta") |> 
+  filter(saq14==1) # keep rural hhs.
+wave4 <- semi_join(wave4, rural, by="household_id") # indeed all are rural farmers. 
+remove(rural)
 
 
 
+## Notes on missing data ----
+## 1023 hhs before any cleaning of missing data
+## 83 missing for manager age
+## 41 missing household size, dependency ratio, consumption and some other hh level variables
+## 95 hhs do not have agricultural assets but still have asset index. This is becuase, pca (factor) analysis still includes those with 
+## no asset and gives them a lower score. 
 

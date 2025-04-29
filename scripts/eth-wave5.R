@@ -4,7 +4,8 @@ pacman::p_load(tidyverse,
                haven,
                tibble,
                labelled,
-               collapse)
+               collapse,
+               sjmisc)
 getwd()
 options(scipen = 999)
 # Note: Tigray (54 EAs), Benshangul-Gumuz (28 EAs), and Afar (8 EAs) are ot present in this round. 
@@ -262,6 +263,13 @@ look_for(wave5)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
 # at least one plot is being intercropped and etc. 
+# # fmax() fsum(), fmean(), etc. expects pure numeric vectors. 
+# If we feed it a labelled or factor column (even if it looks numeric), we may get nonsense max value, 
+# only one value being returned or etc. Thus:  
+wave5 <- wave5 |> 
+  mutate(across(c(female_manager, formal_education_manager, primary_education_manager,
+                  inorganic_fertilizer, intercropped, plot_certificate, irrigated),
+                as.numeric))
 wave5max <- collap(wave5,
                    ~ household_id, 
                    FUN = fmax,

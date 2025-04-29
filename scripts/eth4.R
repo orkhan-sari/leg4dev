@@ -4,7 +4,8 @@ pacman::p_load(tidyverse,
                haven,
                tibble,
                labelled,
-               collapse)
+               collapse,
+               sjmisc)
 getwd()
 options(scipen = 999)
 rm(list = ls())
@@ -268,6 +269,13 @@ look_for(wave4)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
 # at least one plot is being intercropped and etc. 
+# fmax() fsum(), fmean(), etc. expects pure numeric vectors. 
+# If we feed it a labelled or factor column (even if it looks numeric), we may get nonsense max value, 
+# only one value being returned or etc. Thus:  
+wave4 <- wave4 |> 
+  mutate(across(c(female_manager, formal_education_manager, primary_education_manager,
+                  inorganic_fertilizer, intercropped, plot_certificate, irrigated),
+                as.numeric))
 wave4max <- collap(wave4,
                    ~ household_id, 
                    FUN = fmax,
@@ -337,12 +345,36 @@ rural <- read_dta("data/eth/ess4/sect_cover_hh_w4.dta") |>
 wave4 <- semi_join(wave4, rural, by="household_id") # indeed all are rural farmers. 
 remove(rural)
 
-
-
-## Notes on missing data ----
+### ### ### ### ### ### ### ###
+# Other variables   ----
+### ### ### ### ### ### ### ###
+wage <- read_dta("data/eth/ess4/sect4_hh_w4.dta") |> 
+  filter(saq14==1) |> 
+  select(household_id, s4q33, s4q33b, s4q37, s4q38, s4q39, s4q40, s4q41, s4q33, s4q33b, s4q47, s4q50) |> 
+  filter(s4q33==1) |>  #keep only those who had some main job during past 12 months
+  select(-s4q33)
+frq(wage$s4q41)
+# some mismatch. some has worked 2 months or less,
+#  but reported that the money received is for half a year or quarter.
+# 7 and 8 can be assumed as they are from the inspection of the data. error is possible. 
+wage <- wage |> 
+  mutate(income=case_when(s4q41==5 ~ s4q37 * s4q40,
+                        s4q41==4 ~ s4q37/2 * s4q40,
+                        s4q41==3 ~ s4q37 * s4q38 * s4q40,
+                        s4q41==2 ~ s4q37 * s4q38* s4q39/8 * s4q40,
+                        .default = s4q40)) |>  # very rough calculation 
+  mutate(income=as.numeric(income))
+look_for(wage)
+wage <- wage |> 
+  tidyr::replace_na(list(s4q47 = 0)) |>
+  tidyr::replace_na(list(s4q50 = 0)) |> 
+  mutate(total_income=income+s4q47+s4q50)
+wage <- collap(wage,total_income~household_id, FUN = fsum)
+var_label(wage$total_income) <- "income from main and temporary off-farm work"
+# Notes on missing data ----
 ## 1023 hhs before any cleaning of missing data
 ## 83 missing for manager age
 ## 41 missing household size, dependency ratio, consumption and some other hh level variables
-## 95 hhs do not have agricultural assets but still have asset index. This is becuase, pca (factor) analysis still includes those with 
-## no asset and gives them a lower score. 
+## 95 hhs do not have agricultural assets but still have asset index. This is because, 
+## pca (factor) analysis still includes those with no asset and gives them a lower score. 
 

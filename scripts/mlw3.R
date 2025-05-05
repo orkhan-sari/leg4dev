@@ -123,7 +123,6 @@ hdds3 <- read_dta("data/hp/Household_dataset.dta") |>
 hdds3 <- hdds3|> 
   semi_join(maizehh, by="hh_id_merge")
 look_for(hdds3) # 297 missing for share_kg_sold
-remove(maizehh)
 
 ### ### ### ### ### ### ### ###
 # Other variables---- 
@@ -183,6 +182,10 @@ look_for(mlw3)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
 # at least one plot is being intercropped and etc. 
+mlw3 <- mlw3 |> 
+  mutate(across(c(female_manager, formal_education_manager, primary_education_manager,
+                  inorganic_fertilizer, plot_certificate, irrigated),
+                as.numeric))
 wave3max <- collap(mlw3,
                    ~ hhid, 
                    FUN = fmax,
@@ -198,16 +201,90 @@ mlw3 <- mlw3 |>
 
 ## Cleaning missing data ----
 look_for(mlw3)
-## share_kg_sold in HP data has many missing; reason: set to missing if reported share above 100% percent or
+
+### share_kg_sold----
+### ## share_kg_sold in HP data has many missing; reason: set to missing if reported share above 100% percent or
 ##  if household does not harvest any crops.
-##  age is missing for many observations in the raw data. 83 missing for manager age. 
-missing <- is.na(mlw3$share_kg_sold)|
-  is.na(mlw3$age_manager)
-mlw3 <- subset(mlw3, subset= !missing)
+##  We will capture subsistence orientation: HHs do not sell any crops. 
+sales <- read_dta("data/mlw/ag_mod_i_16.dta") |> 
+  select(y3_hhid, crop_code, ag_i01)
+sales <- semi_join(sales, maizehh, by=c("y3_hhid"="hh_id_merge"))
+look_for(sales)
+frq(sales$ag_i01)
+sales <- sales |> mutate(subsistence_ag=if_else(ag_i01==2,1,0))
+sales <- collap(sales, subsistence_ag~y3_hhid, FUN = fmin) # if some consider for sale then not a subsistence. 
+sales <- sales |> rename(hhid=y3_hhid)
+mlw3 <- left_join(mlw3, sales, by="hhid")
+frq(mlw3$subsistence_ag) # 15 still missing. no harvest? 
+remove(sales)
+
+### ### ### ### ### ### ### ###
+# Other variables   ----
+### ### ### ### ### ### ### ###
+
+## Non-farm income
+wage <- read_dta("data/mlw/hh_mod_e_16.dta")
+look_for(wage, details = c("none"))
+wage <- wage[,c(1, 56:60, 66:72, 94:100,103:110, 123:126)]
+wage <- semi_join(wage, maizehh, by=c("y3_hhid"="hh_id_merge"))
+look_for(wage, details = c("none"))
+mainwage <- wage[,1:13]
+mainwage <- mainwage |> filter(!is.na(hh_e19b))
+frq(mainwage$hh_e26b)
+mainwage <- mainwage %>%
+  mutate(hh_e26a = replace(hh_e26a, hh_e26a > 12 & hh_e26b == 5, 1)) |>  # some wrote 30 (probably  meant days)
+  mutate(hh_e26a = replace(hh_e26a, hh_e26a > 31, 1)) # there is one with 4500. error repeated from salary 
+mainwage <- mainwage |> 
+  mutate(income=case_when(hh_e26b==5 ~ hh_e25 * hh_e22/hh_e26a,
+                          hh_e26b==4 ~ hh_e25 * hh_e22 * hh_e23 /hh_e26a,
+                          hh_e26b==3 ~ hh_e25 * (hh_e22 * hh_e23 * hh_e24/8) / hh_e26a,
+                          .default = NA_real_)) |>  # very rough calculation 
+  mutate(income=as.numeric(income))
+# two cases with inf. One is waiter , the other is driver. probably indicated total income generated. 
+mainwage <- mainwage |>
+  filter(!is.na(income)) |> 
+  mutate(income=case_when(hh_e26a==0 ~ hh_e25,
+                          .default = income))
+look_for(mainwage)
+mainwage <- mainwage |> select(y3_hhid, income)
+look_for(wage, details = c("none"))
+secondwage <- wage[,c(1,14:28)]
+look_for(secondwage)
+secondwage <- secondwage |> filter(!is.na(hh_e36))
+frq(secondwage$hh_e40b)
+secondwage <- secondwage |> 
+  mutate(main_income=case_when(hh_e40b==5 ~ hh_e39 * hh_e36/hh_e40a,
+                          hh_e40b==4 ~ hh_e39 * hh_e36 * hh_e37/hh_e40a,
+                          hh_e40b==3 ~ hh_e39 * (hh_e36 * hh_e37 * hh_e38/8) / hh_e40a,
+                          .default = NA_real_)) |>  # very rough calculation 
+  mutate(main_income=as.numeric(main_income))
+secondwage <- secondwage |> 
+  mutate(allowance=case_when(hh_e42b==5 ~ hh_e41 * hh_e36/hh_e42a,
+                          .default = NA_real_)) |>  # very rough calculation 
+  mutate(allowance=as.numeric(allowance))
+secondwage <- secondwage |>  mutate(income=rowSums(across(c(main_income,allowance)), na.rm=TRUE))
+secondwage <- secondwage |> select(y3_hhid, income)
+look_for(wage, details = c("none"))
+ganyu <- wage[,c(1,29:32)]
+look_for(ganyu)
+ganyu <- ganyu |> filter(!is.na(hh_e56))
+# Ganyu typically involves agricultural tasks such as weeding, planting, harvesting, and etc.It can also
+# include non-agricultural work like making bricks, digging wells, or repairing fences
+ganyu <- ganyu |> 
+  mutate(income=hh_e56*hh_e57*hh_e58*hh_e59)
+ganyu <- collap(ganyu,income~y3_hhid, FUN=fsum)
+wage <- rbind(ganyu, mainwage, secondwage)
+remove(ganyu, mainwage, secondwage)
+wage <- collap(wage,income~y3_hhid, FUN=fsum)
+mlw3 <- left_join(mlw3, wage, by=c("hhid"="y3_hhid"))
+mlw3 <- mlw3 |> 
+  tidyr::replace_na(list(income = 0)) |> 
+  rename(wage_income=income)
+var_label(mlw3$wage_income) <- "income from main and temporary off-farm work"
+var_label(mlw3$subsistence_ag) <- "HH did not sell any crop harvest"
 var_label(mlw3$plot_area_GPS) <- "Area (ha) of maize plots"
 var_label(mlw3$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
-remove(missing)
-
+remove(wage)
 
 
 ## Notes on missing data ----

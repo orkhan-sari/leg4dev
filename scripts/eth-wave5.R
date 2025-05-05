@@ -323,7 +323,7 @@ wave5 <- wave5 |>
 look_for(wave5)
 remove(hhdata, ppdata)
 # I drop households which do not have any agricultural asset, because  the control over agricultural asset variable
-# is higlighy important for our analyses. 
+# is highly important for our analyses. 
 missing <- wave5 |> 
   filter(is.na(dm_agriasset_order)) |>   
   select(household_id) #109 hhs.

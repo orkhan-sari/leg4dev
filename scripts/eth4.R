@@ -88,7 +88,9 @@ maizedata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") |>   #crop roster
   filter(s4q01b==2) # keep only maize
 maizedata <- maizedata |> 
   mutate(plot_id = paste(holder_id, parcel_id, field_id, sep = "-")) # field means plot in HP
-maizedata <- semi_join(maizedata, maizeplots, by="plot_id")
+maizedata <- semi_join(maizedata, maizeplots, by="plot_id") 
+# We have more maize plots in HP than in row data. The reason is not clear, but we will trust the row data in this case.
+# maize crop in hp comes from harvest section. 
 maizedata <- maizedata |> 
   group_by(household_id)|>
   mutate(count_plot=n())|>
@@ -247,11 +249,11 @@ plotdata4 <- plotdata4 |>
   select(-s3q13, -s4q03,-s4q01b)
 look_for(plotdata4)
 wave4 <- plotdata4 |> 
-  select(1,6:11,15:42)
+  select(1,6, 15:42)
 look_for(wave4)  
 wave4mean <- collap(wave4,
                     farm_size + age_manager + dist_market + plot_dist_household + ag_asset_index + 
-                      count_plot + soil_fertility_index  ~ household_id,
+                    soil_fertility_index  ~ household_id,
                     FUN = fmean,
                     na.rm = TRUE)
 wave4sum <- collap(wave4,
@@ -259,12 +261,12 @@ wave4sum <- collap(wave4,
                    FUN = fsum,
                    na.rm = TRUE)
 aggregated_vars <- c("farm_size", "age_manager", "dist_market", "plot_dist_household", "soil_fertility_index",
-                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", 
+                     "ag_asset_index", "plot_area_GPS", "nb_seasonal_crop", 
                      "yield_value_LCU", "yield_value_USD")
 wave4 <- wave4 %>% select(-all_of(aggregated_vars))
 look_for(wave4)
 wave4 <- wave4 |> 
-  select(1, 3, 10:12, 15:24)
+  select(1, 6:8, 11:20)
 look_for(wave4)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -284,6 +286,7 @@ wave4 <- left_join(wave4mean, wave4sum, by=join_by("household_id"))
 wave4 <- left_join(wave4, wave4max, by=join_by("household_id"))
 wave4 <- left_join(wave4, agriasset, by=join_by("household_id"))
 wave4 <- left_join(wave4, hhhp4, by=c("household_id"="hh_id_merge"))
+wave4 <- left_join(wave4, rotation4, by=join_by("household_id"))
 var_label(wave4$dm_agriasset_order) <- "control over agricultural assets"
 remove(wave4max, wave4sum,wave4mean,rotation4, agriasset, aggregated_vars, hhhp4)
 
@@ -312,8 +315,7 @@ wave4 <- wave4 |>
 look_for(wave4)
 remove(missing, agriasset, maizehh, hpdata, plotdata4)
 look_for(wave4)
-##  age is missing for many observations in the raw data. 83 missing for manager age.
-missing <- is.na(wave4$age_manager)
+missing <- is.na(wave4$age_manager) # 1 missing
 wave4 <- subset(wave4, subset= !missing)
 wave4 <- wave4 |> mutate(wave="wave4")
 
@@ -348,11 +350,11 @@ remove(rural)
 ### ### ### ### ### ### ### ###
 # Other variables   ----
 ### ### ### ### ### ### ### ###
+
+## Non-farm income
 wage <- read_dta("data/eth/ess4/sect4_hh_w4.dta") |> 
   filter(saq14==1) |> 
-  select(household_id, s4q33, s4q33b, s4q37, s4q38, s4q39, s4q40, s4q41, s4q33, s4q33b, s4q47, s4q50) |> 
-  filter(s4q33==1) |>  #keep only those who had some main job during past 12 months
-  select(-s4q33)
+  select(household_id, s4q33, s4q33b, s4q37, s4q38, s4q39, s4q40, s4q41, s4q33, s4q33b, s4q47, s4q50) 
 frq(wage$s4q41)
 # some mismatch. some has worked 2 months or less,
 #  but reported that the money received is for half a year or quarter.
@@ -368,9 +370,38 @@ look_for(wage)
 wage <- wage |> 
   tidyr::replace_na(list(s4q47 = 0)) |>
   tidyr::replace_na(list(s4q50 = 0)) |> 
-  mutate(total_income=income+s4q47+s4q50)
-wage <- collap(wage,total_income~household_id, FUN = fsum)
-var_label(wage$total_income) <- "income from main and temporary off-farm work"
+  tidyr::replace_na(list(income=0)) |> 
+  mutate(wage_income=income+s4q47+s4q50)
+wage <- collap(wage,wage_income~household_id, FUN = fsum)
+var_label(wage$wage_income) <- "income from main and temporary off-farm work"
+enterprise <- read_dta("data/eth/ess4/sect12b1_hh_w4.dta") |> 
+  filter(saq14==1) |> 
+  select(household_id, s12bq12, s12bq16, s12bq17a, s12bq17b, s12bq17c, s12bq17d, s12bq17e, s12bq17f) 
+enterprise <- enterprise |> 
+  mutate(enterprise_income=s12bq12*s12bq16-s12bq12* (s12bq17a+s12bq17b+ s12bq17c+ s12bq17d+ s12bq17e+ s12bq17f))
+enterprise <- collap(enterprise,enterprise_income~household_id, FUN = fsum)
+other_income <- read_dta("data/eth/ess4/sect13_hh_w4_v2.dta") |> 
+  filter(saq14==1) |> 
+  select(household_id, source_cd, s13q01, s13q02) |> 
+  filter(!is.na(s13q02))
+table(other_income$source_cd, other_income$s13q01)
+other_income <- collap(other_income,s13q02~household_id, FUN = fsum)
+other_income <- other_income |> rename(other_income=s13q02)
+wave4 <- left_join(wave4,wage,by="household_id")
+table(is.na(wave4$wage_income)) # only 18 maize producers
+wave4 <- wave4 |> 
+  tidyr::replace_na(list(wage_income = 0))
+wave4 <- left_join(wave4,other_income,by="household_id")
+table(is.na(wave4$other_income)) # 221 maize producers
+wave4 <- wave4 |> 
+  tidyr::replace_na(list(other_income = 0))
+wave4 <- left_join(wave4,enterprise,by="household_id")
+table(is.na(wave4$enterprise_income)) # 104 maize producers
+wave4 <- wave4 |> 
+  tidyr::replace_na(list(enterprise_income = 0))
+wave4 <- wave4 |> 
+  mutate(tot_other_income=wage_income+other_income+enterprise_income)
+remove(wage,enterprise,other_income)
 # Notes on missing data ----
 ## 1023 hhs before any cleaning of missing data
 ## 83 missing for manager age

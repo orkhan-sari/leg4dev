@@ -249,8 +249,11 @@ plotdata4 <- plotdata4 |>
   select(-s3q13, -s4q03,-s4q01b)
 look_for(plotdata4)
 wave4 <- plotdata4 |> 
-  select(1,6, 15:42)
+  select(1, 10, 15:42)
 look_for(wave4)  
+wave4basics <- wave4 |> 
+  select(household_id, hh_id_obs) |> 
+  distinct()
 wave4mean <- collap(wave4,
                     farm_size + age_manager + dist_market + plot_dist_household + ag_asset_index + 
                     soil_fertility_index  ~ household_id,
@@ -282,13 +285,14 @@ wave4max <- collap(wave4,
                    ~ household_id, 
                    FUN = fmax,
                    na.rm = TRUE)
-wave4 <- left_join(wave4mean, wave4sum, by=join_by("household_id"))
+wave4 <- left_join(wave4basics, wave4mean, by=join_by("household_id"))
+wave4 <- left_join(wave4, wave4sum, by=join_by("household_id"))
 wave4 <- left_join(wave4, wave4max, by=join_by("household_id"))
 wave4 <- left_join(wave4, agriasset, by=join_by("household_id"))
 wave4 <- left_join(wave4, hhhp4, by=c("household_id"="hh_id_merge"))
 wave4 <- left_join(wave4, rotation4, by=join_by("household_id"))
 var_label(wave4$dm_agriasset_order) <- "control over agricultural assets"
-remove(wave4max, wave4sum,wave4mean,rotation4, agriasset, aggregated_vars, hhhp4)
+remove(wave4basics, wave4max, wave4sum,wave4mean,rotation4, agriasset, aggregated_vars, hhhp4)
 
 ## Cleaning missing data ----
 look_for(wave4)
@@ -401,6 +405,7 @@ wave4 <- wave4 |>
   tidyr::replace_na(list(enterprise_income = 0))
 wave4 <- wave4 |> 
   mutate(tot_other_income=wage_income+other_income+enterprise_income)
+var_label(wave4$tot_other_income) <- "Yearly total other income"
 remove(wage,enterprise,other_income)
 # Notes on missing data ----
 ## 1023 hhs before any cleaning of missing data

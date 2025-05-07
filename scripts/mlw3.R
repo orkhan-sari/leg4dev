@@ -4,7 +4,8 @@ pacman::p_load(tidyverse,
                haven,
                tibble,
                labelled,
-               collapse)
+               collapse,
+               sjmisc)
 getwd()
 options(scipen = 999)
 
@@ -93,6 +94,7 @@ remove(garden,modd)
 var_label(plot3$intercrop) <- "legume intercropped maize plot"
 var_label(plot3$rotation) <- "legume is cultivated before or after"
 var_label(plot3$count_plot) <- "number of main maize plots"
+
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
@@ -125,22 +127,6 @@ hdds3 <- hdds3|>
 look_for(hdds3) # 297 missing for share_kg_sold
 
 ### ### ### ### ### ### ### ###
-# Other variables---- 
-### ### ### ### ### ### ### ###
-community <- read_dta("data/mlw/com_cd_16.dta") |> 
-  select(ea_id, com_cd18a , com_cd18b)
-table(community$com_cd18b)
-val_labels(community$com_cd18b) # 1 meter 2 km
-community <- community |> 
-  mutate(market_distance=case_when(com_cd18b==1 ~ com_cd18a/1000,
-                                   .default = com_cd18a)) |> 
-  select(ea_id, market_distance)
-community %>%
-  count(ea_id) %>%
-  filter(n > 1) # one copy 
-community <- community |> distinct(ea_id,.keep_all = TRUE)
-
-### ### ### ### ### ### ### ###
 # Final data  ----
 ### ### ### ### ### ### ### ###
 plot3 <- left_join(plot3, hpdata, by="plot_id")
@@ -149,19 +135,20 @@ look_for(plot3)
 plot3 <- plot3 |> rename(hhid=y3_hhid)
 plot3 <- left_join(plot3, hh16, by="hhid")
 plot3 <- plot3 |> relocate(ea_id,.after = hhid)
-plot3 <- left_join(plot3, community, by="ea_id")
-remove(community, maizeplots)
+remove(maizeplots)
 table(plot3$female_manager, plot3$female) # same information.
 plot3 <- plot3 |> select(-female)
 # manager age is missing for 102 plots.
-# market_distance still missing for 892 observations. No data on market distance can be used. 
-plot3 <- plot3 |> select(-market_distance)
+
 
 ## Collapse / aggregate ----
 mlw3 <- plot3 |> 
   select(-ag_d14, -hh_id_merge,-plot_id_merge, -plot_id_obs, -parcel_id_merge, -parcel_id_obs,
          -respondent_id_obs, -respondent_id_merge,-age_manager_row)
 look_for(mlw3)
+mlw3basics <- mlw3 |> 
+  select(hhid, hh_id_obs, ea_id, y2_hhid) |> 
+  distinct()
 wave3mean <- collap(mlw3,
                     farm_size + age_manager + plot_dist_household + ag_asset_index + count_plot + 
                     soil_fertility_index  ~ hhid,
@@ -177,7 +164,7 @@ aggregated_vars <- c("farm_size", "age_manager", "plot_dist_household", "soil_fe
 mlw3 <- mlw3 %>% select(-all_of(aggregated_vars))
 look_for(mlw3)
 mlw3 <- mlw3 |> 
-  select(1, 2, 6:8, 11:22)
+  select(1, 6:7, 12:23)
 look_for(mlw3)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -190,14 +177,12 @@ wave3max <- collap(mlw3,
                    ~ hhid, 
                    FUN = fmax,
                    na.rm = TRUE)
-mlw3 <- left_join(wave3mean, wave3sum, by=join_by("hhid"))
+mlw3 <- left_join(mlw3basics, wave3mean, by=join_by("hhid"))
+mlw3 <- left_join(mlw3, wave3sum, by=join_by("hhid"))
 mlw3 <- left_join(mlw3, wave3max, by=join_by("hhid"))
 mlw3 <- left_join(mlw3, hdds3, by=c("hhid"="hh_id_merge"))
-remove(wave3max, wave3sum,wave3mean,aggregated_vars, hdds3, plot3)
+remove(mlw3basics, wave3max, wave3sum,wave3mean,aggregated_vars, hdds3, plot3)
 mlw3 <- mlw3 |> mutate(wave="wave3")
-mlw3 <- mlw3 |> 
-  relocate(hh_id_obs, .after = hhid) |> 
-  relocate(ea_id, .after = hh_id_obs)
 
 ## Cleaning missing data ----
 look_for(mlw3)
@@ -221,8 +206,21 @@ remove(sales)
 ### ### ### ### ### ### ### ###
 # Other variables   ----
 ### ### ### ### ### ### ### ###
+## Distance ----
+community <- read_dta("data/mlw/com_cd_16.dta") |> 
+  select(ea_id, com_cd18a , com_cd18b)
+table(community$com_cd18b)
+val_labels(community$com_cd18b) # 1 meter 2 km
+community <- community |> 
+  mutate(market_distance=case_when(com_cd18b==1 ~ com_cd18a/1000,
+                                   .default = com_cd18a)) |> 
+  select(ea_id, market_distance)
+community %>%
+  count(ea_id) %>%
+  filter(n > 1) # one copy 
+community <- community |> distinct(ea_id,.keep_all = TRUE)
 
-## Non-farm income
+## Non-farm income ----
 wage <- read_dta("data/mlw/hh_mod_e_16.dta")
 look_for(wage, details = c("none"))
 wage <- wage[,c(1, 56:60, 66:72, 94:100,103:110, 123:126)]
@@ -285,6 +283,61 @@ var_label(mlw3$subsistence_ag) <- "HH did not sell any crop harvest"
 var_label(mlw3$plot_area_GPS) <- "Area (ha) of maize plots"
 var_label(mlw3$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
 remove(wage)
+enterprise <- read_dta("data/mlw/hh_mod_n2_16.dta")
+enterprise <- enterprise[,c(1,35:59, 107:123)]
+look_for(enterprise, details = c("none"))
+enterprise <- semi_join(enterprise,  maizehh, by=c("y3_hhid"="hh_id_merge"))
+# It is not possible to calculate monthly profits from the enterprise.
+# We will take the last month's profit. 
+# Enterprise data is better calculated for the last month's profit. An annual income cannot be precisely calculated.
+# Thus, to sum all other income, we must consider average monthly income for the wage income as well 
+# (unlike in ETH where yearly is calculated). 
+enterprise <- enterprise |> 
+  filter(!is.na(hh_n40)) |> 
+  rename(enterprise_income=hh_n40)
+enterprise <- collap(enterprise, enterprise_income ~ y3_hhid, FUN=fsum)  
+other_income <- read_dta("data/mlw/hh_mod_p_16.dta") |> 
+  filter(hh_p01==1)
+other_income <- semi_join(other_income,  maizehh, by=c("y3_hhid"="hh_id_merge"))
+look_for(other_income, details = c("none"))
+frq(other_income$hh_p03_2) # dollar and etc
+table(other_income$hh_p03_2oth) # malawian kwacha 
+other_income <- other_income |>
+  mutate(int_transfer=case_when(hh_p03_2==1 ~ hh_p03c* 710.1497, # Average exchange rate in 2016: 710.1497 MW
+                                hh_p03_2==4 ~ hh_p03c* 48.48, # Average exchange rate in 2016: 48.48 MWK.
+                                hh_p03_2==6 ~ hh_p03c,
+                                .default = 0)) |>  
+  mutate(other_income=case_when(hh_p0a==101 ~ (int_transfer + hh_p03a + hh_p03b),
+                                hh_p0a %in% c(102, 103) ~ (hh_p03a + hh_p03b+ hh_p03c), # assumed other country local currency
+                                hh_p0a>103 ~ hh_p02,
+                                .default = 0))
+other_income <- collap(other_income, other_income ~ y3_hhid, FUN=fsum)
+# other income is yearly,
+# wage_income is yearly,
+# enterprise is but last month. 
+mlw3 <- left_join(mlw3, other_income, by=c("hhid"="y3_hhid"))
+mlw3 <- mlw3 |> 
+  tidyr::replace_na(list(other_income = 0))
+mlw3 <- left_join(mlw3, enterprise, by=c("hhid"="y3_hhid"))
+mlw3 <- mlw3 |> 
+  tidyr::replace_na(list(enterprise_income = 0))
+mlw3 <- mlw3 |> 
+  mutate(other_income=other_income / 12,
+         wage_income=wage_income / 12,
+         tot_other_income=wage_income+other_income+enterprise_income)
+var_label(mlw3$tot_other_income) <- "Average monthly total other income"
+mlw3 <- left_join(mlw3, community, by="ea_id")
+remove(enterprise,other_income, community)
+look_for(mlw3)
+# market_distance still missing for 605 observations. No data on market distance can be used. 
+mlw3 <- mlw3 |> select(-market_distance)
+
+
+
+
+
+
+
 
 
 ## Notes on missing data ----

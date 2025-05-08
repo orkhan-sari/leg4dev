@@ -10,8 +10,9 @@ dfeth <- dfeth |>
 table(dfeth$dupl) # 725 HHs only present in one wave
 dfeth <- dfeth |> filter(dupl==2) |> select(-dupl)
 look_for(dfeth)
-# 898 observations, 449 maize producing households HHs 
+# 898 observations, 449 maize producing households obs 
 remove(wave4, wave5)
 dfeth$wave <- as.factor(dfeth$wave)
 look_for(dfeth)
 source("scripts/mlw3.R")
+source("scripts/mlw4.R")

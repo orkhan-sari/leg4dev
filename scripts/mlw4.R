@@ -9,8 +9,10 @@ pacman::p_load(tidyverse,
 getwd()
 options(scipen = 999)
 
-# In 2019, 3,178 households stemmed from 2,368 of the 2016 households representing a household-level attrition rate of 5.6 percent.
-# Individuals split from a household were followed. Who gest the hhid? - Check page 4 in HP https://hdl.handle.net/10986/42446 
+# In 2019, 3,178 households stemmed from 2,368 of the 2016 households representing 
+# a household-level attrition rate of 5.6 percent.
+# Individuals split from a household were followed. Who gest the hhid? - 
+# Check page 4 in HP https://hdl.handle.net/10986/42446 
 # hh_id_obs from the HP data is the key for panel identifier later. 
 
 ### ### ### ### ### ### ### ###
@@ -180,16 +182,156 @@ mlw4 <- left_join(mlw4, hdds4, by=c("hhid"="hh_id_merge"))
 remove(mlw4basics, wave4max, wave4sum, wave4mean,aggregated_vars, hdds4, plot4)
 mlw4 <- mlw4 |> mutate(wave="wave4")
 
+## Cleaning missing data ----
+look_for(mlw4)
+mlw4 <- mlw4 |> rename(ea_id=ea_id_merge)
+### share_kg_sold----
+### ## share_kg_sold in HP data has many missing; reason: set to missing if reported share above 100% percent or
+##  if household does not harvest any crops.
+##  We will capture subsistence orientation: HHs do not sell any crops. 
+sales <- read_dta("data/mlw/ag_mod_i_19.dta") |> 
+  select(y4_hhid, crop_code, ag_i01)
+sales <- semi_join(sales, maizehh, by=c("y4_hhid"="hh_id_merge"))
+look_for(sales)
+frq(sales$ag_i01)
+sales <- sales |> mutate(subsistence_ag=if_else(ag_i01==2,1,0))
+sales <- collap(sales, subsistence_ag~y4_hhid, FUN = fmin) # if some consider for sale then not a subsistence. 
+sales <- sales |> rename(hhid=y4_hhid)
+mlw4 <- left_join(mlw4, sales, by="hhid")
+frq(mlw4$subsistence_ag) # 22 still missing. 
+remove(sales)
 
+### ### ### ### ### ### ### ###
+# Other variables   ----
+### ### ### ### ### ### ### ###
+## Distance ----
+community <- read_dta("data/mlw/com_cd_19.dta") |> 
+  select(ea_id, com_cd18a , com_cd18b)
+table(community$com_cd18b)
+val_labels(community$com_cd18b) # 1 meter 2 km
+community <- community |> 
+  mutate(market_distance=case_when(com_cd18b==1 ~ com_cd18a/1000, # in km
+                                   .default = com_cd18a)) |> 
+  select(ea_id, market_distance)
+community %>%
+  count(ea_id) %>%
+  filter(n > 1) # all unique copy 
 
-
-
-
-
-
-
-
-
+## Non-farm income ----
+wage <- read_dta("data/mlw/hh_mod_e_19.dta")
+look_for(wage, details = c("none"))
+wage <- wage[,c(1, 50:53, 73:79, 82:84, 114:120, 123:125, 143:146)]
+wage <- semi_join(wage, maizehh, by=c("y4_hhid"="hh_id_merge"))
+look_for(wage, details = c("none"))
+mainwage <- wage[,1:15]
+mainwage <- mainwage |> filter(!is.na(hh_e19b))
+frq(mainwage$hh_e26b)
+mainwage <- mainwage %>%
+  mutate(hh_e26a = replace(hh_e26a, hh_e26a > 12 & hh_e26b == 5, 1))  # some wrote 30 (probably  meant days)
+mainwage <- mainwage |> 
+  mutate(main_income=case_when(hh_e26b==5 ~ hh_e25 * hh_e22/hh_e26a,
+                          hh_e26b==4 ~ hh_e25 * hh_e22 * hh_e23 /hh_e26a,
+                          hh_e26b==3 ~ hh_e25 * (hh_e22 * hh_e23 * hh_e24/8) / hh_e26a,
+                          .default = NA_real_)) |>  # very rough calculation 
+  mutate(main_income=as.numeric(main_income))
+# two cases with inf. One is waiter , the other is driver. probably indicated total income generated. 
+mainwage <- mainwage |>
+  filter(!is.na(main_income)) |> 
+  mutate(main_income=case_when(hh_e26a==0 ~ hh_e25,
+                          .default = main_income)) # one got money but put month to 0
+look_for(mainwage)
+frq(mainwage$hh_e28b)
+mainwage <- mainwage |> 
+  mutate(allowance=case_when(hh_e28b==5 ~ hh_e27 * hh_e22/hh_e28a,
+                             hh_e28b==4 ~ hh_e27 * hh_e22 * hh_e23 /hh_e28a,
+                             hh_e28b==3 ~ hh_e27 * (hh_e22 * hh_e23 * hh_e24/8) / hh_e28a,
+                             .default = NA_real_)) |>  # very rough calculation 
+  mutate(allowance=as.numeric(allowance))
+mainwage <- mainwage |>  mutate(income=rowSums(across(c(main_income,allowance)), na.rm=TRUE))
+mainwage <- mainwage |> select(y4_hhid, income)
+look_for(wage, details = c("none"))
+#secondwage
+secondwage <- wage[,c(1,16:25)]
+look_for(secondwage)
+secondwage <- secondwage |> filter(!is.na(hh_e36))
+frq(secondwage$hh_e40b)
+secondwage <- secondwage |>
+  mutate(hh_e40a=as.numeric(hh_e40a)) |> 
+  mutate(main_income=hh_e39 * hh_e36/hh_e40a) |>  # only 5 obs (months) 
+  mutate(main_income=as.numeric(main_income))
+frq(secondwage$hh_e42b) # no allowance
+secondwage <- secondwage |> 
+  rename(income=main_income) |> 
+  select(y4_hhid, income)
+look_for(wage, details = c("none"))
+#ganyu
+ganyu <- wage[,c(1,26:29)]
+look_for(ganyu)
+ganyu <- ganyu |> filter(!is.na(hh_e56))
+ganyu <- ganyu |> 
+  mutate(income=hh_e56*hh_e57*hh_e58*hh_e59)
+ganyu <- collap(ganyu,income~y4_hhid, FUN=fsum)
+wage <- rbind(ganyu, mainwage, secondwage)
+remove(ganyu, mainwage, secondwage)
+wage <- collap(wage,income~y4_hhid, FUN=fsum)
+mlw4 <- left_join(mlw4, wage, by=c("hhid"="y4_hhid"))
+mlw4 <- mlw4 |> 
+  tidyr::replace_na(list(income = 0)) |> 
+  rename(wage_income=income)
+var_label(mlw4$wage_income) <- "income from main and temporary off-farm work"
+var_label(mlw4$subsistence_ag) <- "HH did not sell any crop harvest"
+var_label(mlw4$plot_area_GPS) <- "Area (ha) of maize plots"
+var_label(mlw4$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
+remove(wage)
+# enterprise
+enterprise <- read_dta("data/mlw/hh_mod_n2_19.dta")
+look_for(enterprise, details=c("none"))
+enterprise <- semi_join(enterprise,  maizehh, by=c("y4_hhid"="hh_id_merge"))
+# It is not possible to calculate monthly profits from the enterprise.
+# We will take the last month's profit. 
+# Enterprise data is better calculated for the last month's profit. An annual income cannot be precisely calculated.
+# Thus, to sum all other income, we must consider average monthly income for the wage income as well 
+# (unlike in ETH where yearly is calculated). 
+enterprise <- enterprise |> 
+  filter(!is.na(hh_n40)) |> 
+  rename(enterprise_income=hh_n40)
+enterprise <- collap(enterprise, enterprise_income ~ y4_hhid, FUN=fsum)   
+# other income
+other_income <- read_dta("data/mlw/hh_mod_p_19.dta") |> 
+  filter(hh_p01==1)
+other_income <- semi_join(other_income,  maizehh, by=c("y4_hhid"="hh_id_merge"))
+look_for(other_income, details = c("none"))
+frq(other_income$hh_p03_2) # rands
+table(other_income$hh_p03_2oth) # malawian kwacha botswana pula
+other_income <- other_income |> #many no currency assume local
+  mutate(int_transfer=case_when(hh_p03_2==4 ~ hh_p03c* 50.86, # Average exchange rate in 2019: 50.86 MWK.
+                                hh_p03_2==6 & hh_p03_2oth=="MALAWIAN KWACHA" ~ hh_p03c,
+                                hh_p03_2==6 & hh_p03_2oth=="BOTSWANA PULA" ~ hh_p03c * 69,
+                                .default = hh_p03c)) |>  
+  tidyr::replace_na(list(int_transfer = 0)) |> 
+  mutate(other_income=case_when(hh_p0a %in% c(101, 102, 103) ~ (int_transfer + hh_p03a + hh_p03b),
+                                hh_p0a>103 ~ hh_p02,
+                                .default = 0))
+other_income <- collap(other_income, other_income ~ y4_hhid, FUN=fsum)
+# other income is yearly,
+# wage_income is yearly,
+# enterprise is but last month. 
+mlw4 <- left_join(mlw4, other_income, by=c("hhid"="y4_hhid"))
+mlw4 <- mlw4 |> 
+  tidyr::replace_na(list(other_income = 0))
+mlw4 <- left_join(mlw4, enterprise, by=c("hhid"="y4_hhid"))
+mlw4 <- mlw4 |> 
+  tidyr::replace_na(list(enterprise_income = 0))
+mlw4 <- mlw4 |> 
+  mutate(other_income=other_income / 12,
+         wage_income=wage_income / 12,
+         tot_other_income=wage_income+other_income+enterprise_income)
+var_label(mlw4$tot_other_income) <- "Average monthly total other income"
+mlw4 <- left_join(mlw4, community, by="ea_id")
+remove(enterprise,other_income, community)
+look_for(mlw4)
+# market_distance is still missing for half of the observations. No data on market distance can be used. 
+mlw4 <- mlw4 |> select(-market_distance)
 
 
 

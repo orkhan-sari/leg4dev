@@ -246,6 +246,7 @@ mainwage <- mainwage |>
 look_for(mainwage)
 mainwage <- mainwage |> select(y3_hhid, income)
 look_for(wage, details = c("none"))
+# secondwage
 secondwage <- wage[,c(1,14:28)]
 look_for(secondwage)
 secondwage <- secondwage |> filter(!is.na(hh_e36))
@@ -283,7 +284,9 @@ var_label(mlw3$subsistence_ag) <- "HH did not sell any crop harvest"
 var_label(mlw3$plot_area_GPS) <- "Area (ha) of maize plots"
 var_label(mlw3$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
 remove(wage)
+# enterprise
 enterprise <- read_dta("data/mlw/hh_mod_n2_16.dta")
+look_for(enterprise, details=c("none"))
 enterprise <- enterprise[,c(1,35:59, 107:123)]
 look_for(enterprise, details = c("none"))
 enterprise <- semi_join(enterprise,  maizehh, by=c("y3_hhid"="hh_id_merge"))
@@ -295,7 +298,8 @@ enterprise <- semi_join(enterprise,  maizehh, by=c("y3_hhid"="hh_id_merge"))
 enterprise <- enterprise |> 
   filter(!is.na(hh_n40)) |> 
   rename(enterprise_income=hh_n40)
-enterprise <- collap(enterprise, enterprise_income ~ y3_hhid, FUN=fsum)  
+enterprise <- collap(enterprise, enterprise_income ~ y3_hhid, FUN=fsum) 
+# other income
 other_income <- read_dta("data/mlw/hh_mod_p_16.dta") |> 
   filter(hh_p01==1)
 other_income <- semi_join(other_income,  maizehh, by=c("y3_hhid"="hh_id_merge"))
@@ -306,9 +310,9 @@ other_income <- other_income |>
   mutate(int_transfer=case_when(hh_p03_2==1 ~ hh_p03c* 710.1497, # Average exchange rate in 2016: 710.1497 MW
                                 hh_p03_2==4 ~ hh_p03c* 48.48, # Average exchange rate in 2016: 48.48 MWK.
                                 hh_p03_2==6 ~ hh_p03c,
-                                .default = 0)) |>  
-  mutate(other_income=case_when(hh_p0a==101 ~ (int_transfer + hh_p03a + hh_p03b),
-                                hh_p0a %in% c(102, 103) ~ (hh_p03a + hh_p03b+ hh_p03c), # assumed other country local currency
+                                .default = hh_p03c)) |>
+  tidyr::replace_na(list(int_transfer = 0)) |> 
+  mutate(other_income=case_when(hh_p0a %in% c(101, 102, 103) ~ (int_transfer + hh_p03a + hh_p03b),
                                 hh_p0a>103 ~ hh_p02,
                                 .default = 0))
 other_income <- collap(other_income, other_income ~ y3_hhid, FUN=fsum)

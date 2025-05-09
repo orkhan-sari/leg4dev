@@ -46,51 +46,21 @@ look_for(hpdata)
 ### ### ### ### ### ### ### ###
 # Maize - legume intercropping---- 
 ### ### ### ### ### ### ### ###
-plot <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |> # plot level 
-  select(y4_hhid, plotnum, ag3a_03, ag3a_07_1, ag3a_07_2) |> 
-  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-"))
-look_for(plot)
-plot <- semi_join(plot, maizeplots, by="plot_id")
-table(plot$ag3a_03) 
-# 1204 Cultivated maize plots. We only keep those plots that are cultivated, even if these plots have been listed as maize fields in HP data.   
-plot <- plot |> filter(ag3a_03==1)
-plot <- plot |> 
-  group_by(y4_hhid)|>
-  mutate(count_plot=n())|>
-  ungroup()
-table(plot$ag3a_07_2)
-# but the kept obs are those with maize as the highest value crop
-
-intercropdata <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4a.dta") |> 
+intercropdata <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4a.dta") |>  # crops by plot
   select("y4_hhid", "plotnum", "zaocode", "zaoname", "ag4a_04") |> 
   rename(intercrop = ag4a_04) %>%
   filter(!is.na(zaocode))
-# Get all maize intercropped plots
-maize_intercrop_plots <- plot |>
-  left_join(intercropdata, by = c("y4_hhid", "plotnum")) |>
-  filter(!is.na(intercrop) & intercrop == 1)
+intercropdata <- intercropdata |> 
+  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-"))
+intercropdata <- semi_join(intercropdata, maizeplots, by="plot_id")
+intercropdata <- intercropdata |> 
+  mutate(intercrop=as.integer(
+    if_any(zaocode, ~ . %in% c(31, 32, 33, 34, 35, 36, 37, 43, 47))
+  ))
+look_for(intercropdata)
+intercropdata <- collap(intercropdata, intercrop~y4_hhid, FUN = fmax)
+frq(intercropdata$intercrop) # 395 maize plots intercropped with legumes
 
-table(maize_intercrop_plots$ag3a_07_2)
-
-legume_codes <- c(31, 32, 33, 34, 35, 36, 37, 43, 47)
-
-# Filter maize-legume intercropped plots based on legume codes
-maize_legume_intercrop <- maize_intercrop_plots |>
-  filter(zaocode %in% legume_codes)
-
-# Number of distinct plots with maize-legume intercropping
-num_plots_intercrop <- maize_legume_intercrop %>%
-  distinct(plot_id) %>%
-  nrow()
-
-# Number of distinct households with maize-legume intercropping
-num_households_intercrop <- maize_legume_intercrop %>%
-  distinct(y4_hhid) %>%
-  nrow()
-
-num_plots_intercrop
-num_households_intercrop
-##There are **438 distinct plots** where maize-legume intercropping has been practiced, spread across **367 distinct households**.
 
 # Also in HP data, keep only plots that have been cultivated. 
 plots <- plot |> select(plot_id)
@@ -99,6 +69,8 @@ maizehh <- maizeplots |>  distinct(hh_id_merge)
 hpdata <- semi_join(hpdata, maizeplots, by="plot_id")
 remove(plots)
 
+
+#------------------------------------------------
 
 ### ### ### ### ### ### ### ###
 # Maize - legume rotation----

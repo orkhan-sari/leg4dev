@@ -19,16 +19,16 @@ options(scipen = 999)
 # HP data ----
 ### ### ### ### ### ### ### ###
 hpdata <- read_dta("data/hp/Plot_dataset.dta") |>
-  filter(country=="Malawi", wave==4) 
+  filter(country == "Malawi", wave == 4) 
 # We concentrate on the plots where maize is the main crop. 
 maizeplots <- hpdata |> 
-  filter(main_crop=="MAIZE") |> 
+  filter(main_crop == "MAIZE") |> 
   select(hh_id_merge, parcel_id_merge, plot_id_merge) |> 
   mutate(plot_id=plot_id_merge)
 maizehh <- maizeplots |>  distinct(hh_id_merge)
 hpdata|>
-  filter(main_crop=="MAIZE") |> 
-  group_by(hh_id_obs, parcel_id_obs, plot_id_obs)|>
+  filter(main_crop == "MAIZE") |> 
+  group_by(hh_id_obs, parcel_id_obs, plot_id_obs) |>
   filter(n() > 1)|>
   ungroup() # 0 duplicates - plots are uniquely identified  
 hpdata <- hpdata|>
@@ -55,8 +55,8 @@ frq(garden$ag_d14) # many plots are rented out or fallow
 # We only keep those plots that are cultivated, even if these plots have been listed as maize fields in HP data.   
 garden <- garden |> filter(ag_d14==1)
 garden <- garden |> 
-  group_by(y4_hhid)|>
-  mutate(count_plot=n())|>
+  group_by(y4_hhid) |>
+  mutate(count_plot=n()) |>
   ungroup()
 val_labels(garden$ag_d20a)
 table(garden$ag_d20a) # in rare cases other corps are listed first, 

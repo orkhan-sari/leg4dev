@@ -4,7 +4,8 @@ pacman::p_load(tidyverse,
                haven,
                tibble,
                labelled,
-               collapse)
+               collapse,
+               sjmisc)
 getwd()
 options(scipen = 999)
 
@@ -41,8 +42,6 @@ hpdata <- hpdata|>
 look_for(hpdata) 
 # Four variables — soil_fertility_index, plot_dist_household, rain_shock, and flood_shock — have substantial missing data, each with 1,631 missing values.
 
-
-
 ### ### ### ### ### ### ### ###
 # Maize - legume intercropping---- 
 ### ### ### ### ### ### ### ###
@@ -53,21 +52,31 @@ intercropdata <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STAT
 intercropdata <- intercropdata |> 
   mutate(plot_id = paste(y4_hhid, plotnum, sep = "-"))
 intercropdata <- semi_join(intercropdata, maizeplots, by="plot_id")
+n_distinct(intercropdata$plot_id) # 1204 distinct plots
 intercropdata <- intercropdata |> 
-  mutate(intercrop=as.integer(
-    if_any(zaocode, ~ . %in% c(31, 32, 33, 34, 35, 36, 37, 43, 47))
-  ))
+  filter(zaocode %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47))
+# plots have a definition that is akin to parcels, and no parcels are tracked. Thus, even if a plot has three crops, it would not mean
+# intercropping. Thus, we must identify plots where both maize and legumes have been reported to be intercropped. 
+# In this case, we can believe that maize and legume are intercropped.
+legume_codes <- c(31, 32, 33, 34, 35, 36, 37, 43, 47)
+intercropdata <- intercropdata |>
+  group_by(plot_id) |>
+  mutate(
+    has_maize = any(zaocode == 11 & intercrop == 1),
+    has_legume = any(zaocode %in% legume_codes & intercrop == 1),
+    intercrop_legume = as.integer(has_maize & has_legume)
+  ) |>
+  ungroup()
 look_for(intercropdata)
-intercropdata <- collap(intercropdata, intercrop~y4_hhid, FUN = fmax)
-frq(intercropdata$intercrop) # 395 maize plots intercropped with legumes
+intercropdata <- collap(intercropdata, intercrop_legume ~plot_id, FUN = fmax)
+frq(intercropdata$intercrop_legume ) # 434 maize plots out of 1204 are intercropped with legumes.
 
 
-# Also in HP data, keep only plots that have been cultivated. 
-plots <- plot |> select(plot_id)
-maizeplots <- semi_join(maizeplots, plots, by="plot_id")
-maizehh <- maizeplots |>  distinct(hh_id_merge)
+# in HP data, keep only plots from the long panel (extended refresh sample not included) 
+maizeplots <- semi_join(maizeplots, intercropdata, by=c("plot_id_merge"="plot_id"))
+maizehh <- maizeplots |>  distinct(hh_id_merge) # 911 maize HHs in wave 4. 
 hpdata <- semi_join(hpdata, maizeplots, by="plot_id")
-remove(plots)
+remove(legume_codes)
 
 
 #------------------------------------------------

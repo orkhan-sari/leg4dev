@@ -18,6 +18,13 @@ codebook geocoords_id
   use ag3a_02_01("Distance from plot to home [in KMs]") from the 'ag_sec_3a' 
   section of the "TZA_2014_NPS-R4_v03_M" dataset (Wave 4). This variable has 
   1262 missing values and 1552 zero values, out of a total of 5537 observations.  
+  
+  
+  - ORKHAN:
+	Okay. Let us try ag_sec_3a.dta and see how many remain missing when merging 
+	the datasets. Please add the varaible label at the end mentioning that this
+	is based on self reported data. 
+	
 */
 
 
@@ -25,12 +32,18 @@ codebook rain_shock
 codebook flood_shock
 /*
 	In Tanzania (TZA), rain and flood shocks cannot be distinguished
-	(see page 30 of the HP Data Description document — World Bank)
+	(see page 28 of the HP Data Description document — World Bank)
 	because the agricultural questionnaire (page 19, Q18, TZA_2014_NPS-R4_v03_M)
 	asks: "What was the cause of these losses?" but does not explicitly mention 
 	rain or flood shocks.
 	The options given are: birds, animals, insects, diseases, theft, other.
+	
+	
+	- ORKHAN:
+	All missing in HP anyways, right?. Does trhis mean farmers never reported rain 
+	or flood wheen you look at the raw data? 
 */
+
 
 
 codebook soil_fertility_index
@@ -47,6 +60,12 @@ codebook nutrient_availability nutrient_retention rooting_conditions
 	
 	I couldn’t figure out how they created this variable in the .do file from 
 	the reproduction.new folder. :(
+	
+	
+	- ORKHAN: 
+	Okay, then we must leave this variable out from the analyses. 
+	Could you find any other varaible from raw data that could capture
+	the soil quality?
 */
 *------------------------------------------------------------------------------*
 
@@ -62,4 +81,10 @@ codebook share_kg_sold
 	100% or for households that did not harvest any crops.
 	(See page 37 of the HP Data Description document — World Bank.)
 	These conditions likely explain the presence of missing values.
+	
+	- ORKHAN:
+	yes, this is the same also for other coutnries. Please see line 326 in eth4 
+	as an example. I create a new varaible with captures if the hh does not 
+	intend to/consider seel any crop - susbsitnce orientation. Also look at 
+	mlw3 line 190.
 */

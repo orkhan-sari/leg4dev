@@ -396,7 +396,7 @@ remove(rural)
 # Other variables   ----
 ### ### ### ### ### ### ### ###
 
-## Non-farm income
+## Non-farm income----
 wage <- read_dta("data/eth/ess5/sect4_hh_w5.dta") |> 
   filter(saq14==1) |> 
   select(household_id, s4q33, s4q33b, s4q37, s4q38, s4q39, s4q40, s4q41, s4q33, s4q33b, s4q47, s4q50)
@@ -449,7 +449,26 @@ wave5 <- wave5 |>
 var_label(wave5$tot_other_income) <- "Yearly total other income"
 remove(wage,enterprise,other_income)
 
-
+##  Extension, advisory, credit----
+extension <- read_dta("data/eth/ess5/sect7_pp_w5.dta") |> 
+  select("household_id", "s7q04", "s7q06", "s7q08" ,"s7q09", "s7q10" )
+look_for(extension)
+extension <- extension |> 
+  filter(!if_all(c("s7q04", "s7q06", "s7q08", "s7q09", "s7q10"), is.na))
+frq(extension$s7q04)
+frq(extension$s7q09) # the label should be do you get advisory services?
+extension <- extension |>  
+  mutate(extension_program= case_when(s7q04==1 ~ 1,
+                                      .default = 0)) |> 
+  mutate(advisory_service= case_when(s7q09==1 ~  1,
+                                     .default = 0)) |> 
+  mutate(credit_unavailable=case_when(s7q08==1 ~ 1,
+                                      .default = 0)) |>  
+  select(household_id,extension_program, advisory_service, credit_unavailable)
+# The information is gathered at the holder level. For HH level data, we collapse and choose the max value. 
+extension <- collap(extension, extension_program +advisory_service + credit_unavailable ~household_id, FUN=fmax)
+wave5 <- left_join(wave5,extension,by="household_id")
+remove(extension)
 
 
 

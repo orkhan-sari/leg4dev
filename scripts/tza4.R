@@ -76,10 +76,6 @@ frq(intercropdata$intercrop_legume ) # 434 maize plots out of 1204 are intercrop
 maizeplots <- semi_join(maizeplots, intercropdata, by=c("plot_id_merge"="plot_id"))
 maizehh <- maizeplots |>  distinct(hh_id_merge) # 911 maize HHs in wave 4. 
 hpdata <- semi_join(hpdata, maizeplots, by="plot_id")
-remove(legume_codes)
-
-
-#------------------------------------------------
 
 ### ### ### ### ### ### ### ###
 # Maize - legume rotation----
@@ -91,58 +87,40 @@ remove(legume_codes)
 
 LRseason <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4a.dta")  # Long rainy season data
 SRseason <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4b.dta")  # Short rainy season data
-
 #Identify maize plots in the long rainy season
-maize_long_rainy <- LRseason |>
+LRseason <- LRseason |>
   filter(zaocode == 11) |>  # Only keep plots where maize was cultivated in the long rainy season
   select(y4_hhid, plotnum, zaocode) |>  # Keep household and plot ID
   mutate(plot_id_merge = paste(y4_hhid, plotnum, sep = "-"))
 
-
 #Identify legume plots in the short rainy season
-legume_short_rainy <- SRseason |>
+SRseason <- SRseason |>
   filter(zaocode %in% legume_codes) |>  # Only keep plots where legumes were cultivated in the short rainy season
   select(y4_hhid, plotnum, zaocode) |>  # Keep household and plot ID
   mutate(plot_id_merge = paste(y4_hhid, plotnum, sep = "-"))
-
-# Merge the maize plots from the long rainy season with hpdata (to ensure they are from households with maize as high-value crop)
-maize_long_rainy <- maize_long_rainy |> 
-  semi_join(hpdata, by = "plot_id_merge")
-
-#Merge the legume plots from the short rainy season with hpdata 
-legume_plots_hp <- semi_join(legume_short_rainy, hpdata, by = "plot_id_merge")
-
-
+# Merge the maize plots to ensure they are from households with maize as high-value crop
+LRseason <- semi_join(LRseason, hpdata, by = "plot_id_merge")
+SRseason <- semi_join(SRseason, hpdata, by = "plot_id_merge")
+SRseason <- SRseason |> 
+  mutate(rotation=1) |> 
+  select(plot_id_merge, rotation)
+LRseason |> group_by(plot_id_merge) |> 
+  filter(n()>1) |> 
+  ungroup() 
+SRseason |> group_by(plot_id_merge) |> 
+  filter(n()>1) |> 
+  ungroup() # several duplicates - intercropped. 
+SRseason <- SRseason |> 
+  distinct(plot_id_merge, .keep_all = TRUE)
+LRseason <- LRseason |> 
+  select(plot_id_merge)
 # Merge maize plots from the long rainy season with legume plots from the short rainy season 
-maize_legume_rotation <- maize_long_rainy |>
-  inner_join(legume_plots_hp, by = "plot_id_merge") 
-
-maize_legume_rotation <- maize_legume_rotation |>
-  rename(
-    y4_hhid = y4_hhid.x,  
-    plotnum = plotnum.x,  
-    maizecode = zaocode.x,
-    legumecode = zaocode.y 
-  ) |>
-  select(-y4_hhid.y, -plotnum.y)  
-
-summary(maize_legume_rotation)
-# Now, we have all the plots that had maize in the long rainy season and legumes in the short rainy season.
-
-# Count the number of households with maize-legume rotation
-num_households_rotation <- maize_legume_rotation |> 
-  distinct(y4_hhid) |> 
-  nrow()
-
-# Count the number of plots with maize-legume rotation
-num_plots_rotation <- maize_legume_rotation |> 
-  distinct(plot_id_merge) |> 
-  nrow()
-
-num_households_rotation
-num_plots_rotation
+LRseason <- left_join(LRseason, SRseason, by = "plot_id_merge" )
+frq(LRseason$rotation)
 #There are **37 distinct plots** where maize-legume rotation has been practiced, spread across **33 distinct households**.
-
+LRseason$rotation[is.na(LRseason$rotation)] <- 0
+hpdata <- left_join(hpdata, LRseason, by = "plot_id_merge")
+remove(LRseason, SRseason)
 
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####

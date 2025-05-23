@@ -429,9 +429,9 @@ wave4 <- left_join(wave4,extension,by="household_id")
 remove(extension)
 
 ## TLU ----
-## Storck et al (1991) Farming systems and resource economics in the tropics: 
-## farming system and farm management practices of smallholders in the Hararghe Highland
-## https://agrifoodecon.springeropen.com/articles/10.1186/s40100-017-0075-z/tables/6   
+## page 10: https://appec-h.com/wp-content/uploads/2023/02/Livestock-production-systems.pdf
+## Large ruminants = 0.7 TLU, small ruminants = 0.1, pigs = 0.2, poultry = 0.01, horses = 0.8,
+## mules=  0.7, camels= 1
 tlu <- read_dta("data/eth/ess4/sect8_1_ls_w4.dta") |> 
   select("household_id", "ls_code", "ls_s8_1q01","ls_s8_1q02")
 tlu <- tlu |> 
@@ -441,19 +441,17 @@ tlu <- tlu |>
 frq(tlu$ls_code)
 tlu <- tlu |> 
   filter(ls_code!=16) |>  # bee colony not considered
-  mutate(tlu=case_when(ls_code %in% c(1,2,3,4) ~ owned * 1,
-                       ls_code==5 ~ owned * 0.75,
-                       ls_code==6 ~ owned * 0.25,
-                       ls_code %in% c(7,8) ~ owned * 0.13,
-                       ls_code==9 ~ owned * 1.25,
-                       ls_code %in% c(10,11,12) ~ owned * 0.013,
-                       ls_code==13 ~ owned * 1.10,
+  mutate(tlu=case_when(ls_code %in% c(1:6) ~ owned * 0.7,
+                       ls_code %in% c(7,8) ~ owned * 0.1,
+                       ls_code==9 ~ owned * 1,
+                       ls_code %in% c(10,11,12) ~ owned * 0.01,
+                       ls_code==13 ~ owned * 0.8,
                        ls_code %in% c(14,15) ~ owned * 0.70,
                        .default = 0))
-
-
-
-
+tlu <- collap(tlu, tlu ~ household_id, FUN = fsum)
+wave4 <- left_join(wave4,tlu,by="household_id")
+remove(tlu)
+wave4$tlu[is.na(wave4$tlu)] <- 0
 # Notes on missing data ----
 ## 1023 hhs before any cleaning of missing data
 ## 83 missing for manager age

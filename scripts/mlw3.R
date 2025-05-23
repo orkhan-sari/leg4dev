@@ -336,10 +336,98 @@ look_for(mlw3)
 # market_distance still missing for 605 observations. No data on market distance can be used. 
 mlw3 <- mlw3 |> select(-market_distance)
 
+##  Extension, advisory, credit----
+extension <- read_dta("data/mlw/ag_mod_t1_16.dta") |> 
+  select(y3_hhid, ag_t0a, ag_t01)
+frq(extension$ag_t01)
+extension <- extension |>  
+  mutate(extension_service= case_when(ag_t01==1 ~ 1,
+                                      .default = 0)) 
+extension <- collap(extension, extension_service~y3_hhid, FUN = fmax)
+frq(extension$extension_service) # most have received some kind of extension
+extension <- read_dta("data/mlw/ag_mod_t1_16.dta") |> 
+  select(y3_hhid, ag_t0a, ag_t01, ag_t01_oth) |> 
+  filter(ag_t01==1)
+frq(extension$ag_t0a)
+extension <- extension |> 
+  mutate(ag_t0a=case_when(
+    ag_t01_oth=="BEE KEEPING" ~ 311,
+    .default=ag_t0a)) # ntayakhasu is means no new ridge
+extension <- extension |> 
+  mutate(extension_service=case_when(ag_t0a %in% c(301:307, 309, 314:316) ~ 1,
+                             .default = 0))
+extension <- collap(extension, extension_service~y3_hhid, FUN = fmax)
+frq(extension$extension_service) # again, most have received relevant extension advice.
+# We will consider most important sources like government and private ag. extension.
+extension <- read_dta("data/mlw/ag_mod_t1_16.dta") |> 
+  select(y3_hhid, ag_t0a, ag_t01, ag_t01_oth, ag_t02) |> 
+  filter(ag_t01==1)
+frq(extension$ag_t0a)
+frq(extension$ag_t02)
+# Many report to have received extension from electronic media like tv and radio and other farmers. 
+# We will consider those extension services that have been provided by gov, private and cooperative type institutions. 
+extension <- extension |> 
+  mutate(ag_t0a=case_when(
+    ag_t01_oth=="BEE KEEPING" ~ 311,
+    .default=ag_t0a)) # ntayakhasu is means no new ridge
+extension <- extension |> 
+  mutate(extension_service=case_when(ag_t0a %in% c(301:307, 309, 314:316) &
+                                      ag_t02 %in% c(1:10) ~ 1,
+                                     .default = 0))
+extension <- collap(extension, extension_service~y3_hhid, FUN = fmax)
+frq(extension$extension_service)
+mlw3 <- left_join(mlw3, extension, by=c("hhid"="y3_hhid"))
+mlw3$extension_service[is.na(mlw3$extension_service)] <- 0
+var_label(mlw3$extension_service) <- "received extension from institutions" 
+remove(extension)
 
+## TLU ----
+## page 10: https://appec-h.com/wp-content/uploads/2023/02/Livestock-production-systems.pdf
+## Large ruminants = 0.7 TLU, small ruminants = 0.1, pigs = 0.2, poultry = 0.01, horses = 0.8,
+## mules=  0.7, camels= 1
+tlu <- read_dta("data/mlw/ag_mod_r1_16.dta") |>
+  select(y3_hhid, ag_r00, ag_r0a, ag_r01, ag_r01_oth, ag_r02) |> 
+  filter(ag_r01==1)
+frq(tlu$ag_r0a)
+tlu <- tlu |> 
+  mutate(tlu=case_when(ag_r0a %in% c(301:304, 3304) ~ ag_r02 * 0.7,
+                       ag_r0a %in% c(307:308) ~ ag_r02 * 0.1,
+                       ag_r0a==309 ~ ag_r02 * 0.2,
+                       ag_r0a %in% c(311:315, 319, 3310, 3314) ~ ag_r02 * 0.01,
+                       ag_r0a==3305 ~ ag_r02 * 0.7, 
+                       .default = 0))
+tlu <- collap(tlu, tlu ~ y3_hhid, FUN = fsum)
+mlw3 <- left_join(mlw3, tlu, by=c("hhid"="y3_hhid"))
+remove(tlu)
 
-
-
+## Land tenure ----
+tenure <- read_dta("data/mlw/ag_mod_v_16.dta") 
+frq(tenure$ag_v0a)
+# some information is reported once form one parcel and other parcels are missing. 
+tenure <- tenure |> 
+  mutate(parcel_owned=case_when(ag_v0a==1~1,
+                                .default = 0)) |> 
+  select(y3_hhid, parcel_owned, ag_v11, ag_v14) 
+frq(tenure$ag_v11)
+frq(tenure$ag_v14)
+# Interestingly, may who do not expect to have any disagreements in the next 5 years, are not so sure
+# about the possession of the land in 10 years. This is an indicator of long term perspectives and expectations
+ownership <- collap(tenure, parcel_owned~y3_hhid, FUN = fmax)
+frq(ownership$parcel_owned) # 254 hhs with no land owned
+frq(tenure$ag_v11)
+frq(tenure$ag_v14)
+tenure <- tenure |>
+  mutate(ag_v14=case_when(is.na(ag_v14) & ag_v11 >1 ~ 2,
+                          is.na(ag_v14) & ag_v11 ==1 ~ 5,
+                          .default = ag_v14)) |> 
+         # if not sure about disagreement also unsure about ownership in 10 years
+  mutate(tenure_security=(case_when(ag_v14 %in% c(3:5) ~ 1,
+                                    .default = 0)))
+tenure <- collap(tenure, tenure_security~y3_hhid, FUN = fmax)
+var_label(tenure$tenure_security) <- "very likely to still possess land in ten years"
+mlw3 <- left_join(mlw3, ownership, by=c("hhid"="y3_hhid"))
+mlw3 <- left_join(mlw3, tenure, by=c("hhid"="y3_hhid"))
+remove(tenure, ownership,hh16, maizehh)
 
 
 

@@ -253,7 +253,7 @@ wave5 <- plotdata5 |>
 look_for(wave5)  
 wave5basics <- wave5 |> 
   select(household_id, hh_id_obs) |> 
-  distinct(household_id)
+  distinct()
 wave5mean <- collap(wave5,
                     farm_size + age_manager + dist_market + plot_dist_household + ag_asset_index + 
                     soil_fertility_index  ~ household_id,
@@ -469,6 +469,32 @@ extension <- extension |>
 extension <- collap(extension, extension_program +advisory_service + credit_unavailable ~household_id, FUN=fmax)
 wave5 <- left_join(wave5,extension,by="household_id")
 remove(extension)
+
+## TLU ----
+## page 10: https://appec-h.com/wp-content/uploads/2023/02/Livestock-production-systems.pdf
+## Large ruminants = 0.7 TLU, small ruminants = 0.1, pigs = 0.2, poultry = 0.01, horses = 0.8,
+## mules=  0.7, camels= 1
+tlu <- read_dta("data/eth/ess5/sect8_1_ls_w5.dta") |> 
+  select("household_id", "ls_code", "ls_s8_1q01","ls_s8_1q02")
+tlu <- tlu |> 
+  filter(ls_s8_1q01>0) |> 
+  mutate(owned=ls_s8_1q01-ls_s8_1q02) |> 
+  select("household_id", "ls_code", "owned")
+frq(tlu$ls_code)
+tlu <- tlu |> 
+  filter(ls_code!=16) |>  # bee colony not considered
+  mutate(tlu=case_when(ls_code %in% c(1:6) ~ owned * 0.7,
+                       ls_code %in% c(7,8) ~ owned * 0.1,
+                       ls_code==9 ~ owned * 1,
+                       ls_code %in% c(10,11,12) ~ owned * 0.01,
+                       ls_code==13 ~ owned * 0.8,
+                       ls_code %in% c(14,15) ~ owned * 0.70,
+                       .default = 0))
+tlu <- collap(tlu, tlu ~ household_id, FUN = fsum)
+wave5 <- left_join(wave5,tlu,by="household_id")
+remove(tlu)
+wave5$tlu[is.na(wave5$tlu)] <- 0
+
 
 
 

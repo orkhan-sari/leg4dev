@@ -333,7 +333,57 @@ look_for(mlw4)
 # market_distance is still missing for half of the observations. No data on market distance can be used. 
 mlw4 <- mlw4 |> select(-market_distance)
 
+##  Extension, advisory, credit----
+# We will consider most important sources like government and private ag. extension.
+extension <- read_dta("data/mlw/ag_mod_t1_19.dta") |> 
+  select(y4_hhid, ag_t0a, ag_t01, ag_t01_oth, ag_t02) |> 
+  filter(ag_t01==1)
+frq(extension$ag_t0a)
+frq(extension$ag_t02)
+# Many report to have received extension from electronic media like tv and radio and other farmers. 
+# We will consider those extension services that have been provided by gov, private and cooperative type institutions. 
+extension <- extension |> 
+  mutate(ag_t0a=case_when(
+    ag_t01_oth=="CHICKEN PRODUCTION" ~ 312,
+    .default=ag_t0a))
+extension <- extension |> 
+  mutate(extension_service=case_when(ag_t0a %in% c(301:307, 309, 314:316) &
+                                       ag_t02 %in% c(1:10) ~ 1,
+                                     .default = 0))
+extension <- collap(extension, extension_service~y4_hhid, FUN = fmax)
+frq(extension$extension_service)
+mlw4 <- left_join(mlw4, extension, by=c("hhid"="y4_hhid"))
+mlw4$extension_service[is.na(mlw4$extension_service)] <- 0
+var_label(mlw4$extension_service) <- "received extension from institutions" 
+remove(extension)
 
+## TLU ----
+## page 10: https://appec-h.com/wp-content/uploads/2023/02/Livestock-production-systems.pdf
+## Large ruminants = 0.7 TLU, small ruminants = 0.1, pigs = 0.2, poultry = 0.01, horses = 0.8,
+## mules=  0.7, camels= 1
+tlu <- read_dta("data/mlw/ag_mod_r1_19.dta") |>
+  select(y4_hhid, ag_r00, ag_r0a, ag_r01, ag_r01_oth, ag_r02) |> 
+  filter(ag_r01==1)
+frq(tlu$ag_r0a)
+tlu <- tlu |> 
+  mutate(tlu=case_when(ag_r0a %in% c(301:304, 3304) ~ ag_r02 * 0.7,
+                       ag_r0a %in% c(307:308) ~ ag_r02 * 0.1,
+                       ag_r0a==309 ~ ag_r02 * 0.2,
+                       ag_r0a %in% c(311:315, 319, 3310, 3314) ~ ag_r02 * 0.01,
+                       ag_r0a==3305 ~ ag_r02 * 0.7, 
+                       .default = 0))
+tlu <- collap(tlu, tlu ~ y4_hhid, FUN = fsum)
+mlw4 <- left_join(mlw4, tlu, by=c("hhid"="y4_hhid"))
+remove(tlu,hh16, maizehh)
+
+## Land tenure - not collected ----
+
+## Notes on missing data ----
+## 1023 hhs before any cleaning of missing data
+## 83 missing for manager age
+## 41 missing household size, dependency ratio, consumption and some other hh level variables
+## 95 hhs do not have agricultural assets but still have asset index. This is becuase, pca (factor) analysis still includes those with 
+## no asset and gives them a lower score. 
 
 
 

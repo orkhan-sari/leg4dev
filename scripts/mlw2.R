@@ -1,0 +1,348 @@
+# mlw 2 ----
+## necessary libraries
+pacman::p_load(tidyverse,
+               haven,
+               tibble,
+               labelled,
+               collapse,
+               sjmisc)
+getwd()
+options(scipen = 999)
+
+### ### ### ### ### ### ### ###
+# HP data ----
+### ### ### ### ### ### ### ###
+hpdata <- read_dta("data/hp/Plot_dataset.dta") |>
+  filter(country=="Malawi", wave==2) 
+# We concentrate on the plots where maize is the main crop. 
+maizeplots <- hpdata |> 
+  filter(main_crop=="MAIZE") |> 
+  select(hh_id_merge, parcel_id_merge, plot_id_merge) |> 
+  mutate(plot_id=plot_id_merge)
+maizehh <- maizeplots |>  distinct(hh_id_merge)
+hpdata|>
+  filter(main_crop=="MAIZE") |> 
+  group_by(hh_id_obs, parcel_id_obs, plot_id_obs)|>
+  filter(n() > 1)|>
+  ungroup() # 0 duplicates - plots are uniquely identified  
+hpdata <- hpdata|>
+  filter(main_crop=="MAIZE") |> 
+  select(hh_id_merge, hh_id_obs, ea_id_merge, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop,
+         farm_size, manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, 
+         primary_education_manager, respondent_id_obs, respondent_id_merge, improved,organic_fertilizer, 
+         inorganic_fertilizer, soil_fertility_index, plot_dist_household, ag_asset_index, plot_certificate, 
+         drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop, used_pesticides, yield_value_LCU, 
+         yield_value_USD) |>
+  mutate(plot_id=plot_id_merge)
+look_for(hpdata) # many missing, especially improved seeds
+
+### ### ### ### ### ### ### ###
+# Maize - legume intercropping----
+### ### ### ### ### ### ### ###
+### Garden means parcel; Garden -> Plot
+garden <- read_dta("data/mlw/ag_mod_d_13.dta") |>   # plot level 
+  select(y2_hhid, ag_d00, ag_d14, ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e) |> 
+  mutate(plot_id = paste(y2_hhid, ag_d00, sep = "-"))
+look_for(garden)
+garden <- semi_join(garden, maizeplots, by="plot_id")
+frq(garden$ag_d14) # some are fallow and missing
+# We only keep those plots that are cultivated, even if these plots have been listed as maize fields in HP data.   
+garden <- garden |> filter(ag_d14==1)
+frq(garden$ag_d20a)
+garden <- garden |> 
+  group_by(y2_hhid)|>
+  mutate(count_plot=n())|>
+  ungroup()
+val_labels(garden$ag_d20a)
+table(garden$ag_d20a) # in ver rare cases other corps are listed first, 
+# but the kept obs are those with maize as the highest value crop
+garden <- garden |> 
+  mutate(intercrop=as.integer(
+    if_any(c(ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e), ~ . %in% c(11:16, 27, 34:36, 46))
+  ))
+
+# Also in HP data, keep only plots that have been cultivated. 
+plots <- garden |> select(plot_id)
+maizeplots <- semi_join(maizeplots, plots, by="plot_id")
+maizehh <- maizeplots |>  distinct(hh_id_merge)
+hpdata <- semi_join(hpdata, maizeplots, by="plot_id")
+remove(plots)
+
+### ### ### ### ### ### ### ###
+# Maize - legume rotation----
+### ### ### ### ### ### ### ###
+modm <- read_dta("data/mlw/ag_mod_m_13.dta") |> 
+  select(y2_hhid, ag_m00, ag_m0c) |> 
+  filter(!is.na(ag_m0c))
+# plot id is with D's (dry) but with R's in the rainy season
+library(stringr)
+modm <- modm |> 
+  mutate(ag_m00 = str_replace(ag_m00, "^D", "R")) |> 
+  mutate(plot_id = paste(y2_hhid, ag_m00, sep = "-"))
+val_labels(modm$ag_m0c)
+modm <- modm |> 
+  mutate(rotation=case_when(ag_m0c %in% c(11:16, 27, 34:36, 46) ~ 1,
+                          .default = 0)) |> 
+  filter(rotation==1) # only 82 observations 
+modm |> 
+  group_by(plot_id)|>
+  filter(n() > 1)|>
+  ungroup() #1 duplicate with beans and peas, thus 81 plots only. 
+modm <- modm |> 
+  distinct(plot_id, .keep_all = TRUE) |> 
+  select(plot_id, rotation)
+garden <- left_join(garden, modm, by="plot_id")
+frq(garden$rotation) # 59 plots only.
+garden$rotation[is.na(garden$rotation)] <- 0
+plot2 <- garden |> 
+  select(y2_hhid, plot_id, count_plot, intercrop, rotation)
+remove(garden,modm)
+var_label(plot2$intercrop) <- "legume intercropped maize plot"
+var_label(plot2$rotation) <- "legume is cultivated after" # ONLY AFTER CAN BE IDENTIFIED
+var_label(plot2$count_plot) <- "number of main maize plots"
+
+### ### ### ### ### ### ### ###
+# Gender: measures of women's status ####
+### ### ### ### ### ### ### ###
+modd <-  read_dta("data/mlw/ag_mod_d_13.dta") |>   # plot level 
+  select(y2_hhid, ag_d00, ag_d01) |> 
+  mutate(plot_id = paste(y2_hhid, ag_d00, sep = "-")) |> 
+  rename(id_code=ag_d01)
+modd <- semi_join(modd, maizeplots, by="plot_id")
+individual <- read_dta("data/mlw/hh_mod_b_13.dta") |> 
+  select(y2_hhid, hh_b01, hh_b03, hh_b05a) |> 
+  mutate(female=ifelse(hh_b03==2,1,0)) |> 
+  rename(id_code=hh_b01)
+modd <- left_join(modd,individual, by=c("y2_hhid", "id_code"))
+remove(individual)
+var_label(modd$female) <- "female primary dm concern. activities on maize plots" # also on crops to be planted
+modd <- modd |> select(plot_id, female,hh_b05a )
+plot2 <- left_join(plot2, modd, by="plot_id")
+plot2 <- plot2 |> rename(age_manager_row=hh_b05a)
+remove(modd)
+
+### ### ### ### ### ### ### ###
+# Nutrition indicators ---- 
+### ### ### ### ### ### ### ###
+# HDDS
+# total consumption is absent if MLW
+hdds2 <- read_dta("data/hp/Household_dataset.dta") |>
+  filter(country=="Malawi", wave==2) |>
+  select(hh_id_merge, hh_size, hh_shock, hh_dependency_ratio, hh_asset_index, HDDS, share_kg_sold)
+hdds2 <- hdds2|> 
+  semi_join(maizehh, by="hh_id_merge")
+look_for(hdds2) # 208 missing for share_kg_sold
+
+### ### ### ### ### ### ### ###
+# Final data  ----
+### ### ### ### ### ### ### ###
+plot2 <- left_join(plot2, hpdata, by="plot_id")
+remove(hpdata)
+look_for(plot2)
+plot2 <- plot2 |> rename(hhid=y2_hhid)
+plot2 <- plot2 |> relocate(ea_id_merge,.after = hhid)
+remove(maizeplots)
+table(plot2$female_manager, plot2$female) # same information.
+plot2 <- plot2 |> select(-female)
+# manager age is missing for 2 plots.
+
+## Collapse / aggregate ----
+mlw2 <- plot2 |> 
+  select(-hh_id_merge,-plot_id_merge, -plot_id_obs, -parcel_id_merge, -parcel_id_obs,
+         -respondent_id_obs, -respondent_id_merge,-age_manager_row)
+look_for(mlw2)
+mlw2basics <- mlw2 |> 
+  select(hhid, hh_id_obs, ea_id_merge) |> 
+  distinct()
+wave2mean <- collap(mlw2,
+                    farm_size + age_manager + plot_dist_household + ag_asset_index + count_plot + 
+                      soil_fertility_index  ~ hhid,
+                    FUN = fmean,
+                    na.rm = TRUE)
+wave2sum <- collap(mlw2,
+                   plot_area_GPS +nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
+                   FUN = fsum,
+                   na.rm = TRUE)
+aggregated_vars <- c("farm_size", "age_manager", "plot_dist_household", "soil_fertility_index",
+                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", 
+                     "yield_value_LCU", "yield_value_USD")
+mlw2 <- mlw2 %>% select(-all_of(aggregated_vars))
+look_for(mlw2)
+mlw2 <- mlw2 |> 
+  select(1,4:5, 10:21)
+look_for(mlw2)
+# For all remaining binary variables, I will select the max. Meaning, for example,
+# at least one plot is managed by female, at least one maize plot manager has primary education, 
+# at least one plot is being intercropped and etc. 
+mlw2 <- mlw2 |> 
+  mutate(across(c(female_manager, formal_education_manager, primary_education_manager,
+                  inorganic_fertilizer, plot_certificate, irrigated),
+                as.numeric))
+wave2max <- collap(mlw2,
+                   ~ hhid, 
+                   FUN = fmax,
+                   na.rm = TRUE)
+mlw2 <- left_join(mlw2basics, wave2mean, by=join_by("hhid"))
+mlw2 <- left_join(mlw2, wave2sum, by=join_by("hhid"))
+mlw2 <- left_join(mlw2, wave2max, by=join_by("hhid"))
+mlw2 <- left_join(mlw2, hdds2, by=c("hhid"="hh_id_merge"))
+remove(mlw2basics, wave2max, wave2sum,wave2mean,aggregated_vars, hdds2, plot2)
+mlw2 <- mlw2 |> mutate(wave="wave2")
+
+## Cleaning missing data ----
+look_for(mlw2)
+
+### share_kg_sold----
+### share_kg_sold in HP data has many missing; reason: set to missing if reported share above 100% percent or
+##  if household does not harvest any crops.
+##  We will capture subsistence orientation: HHs do not sell any crops. 
+sales <- read_dta("data/mlw/ag_mod_i_13.dta") |> 
+  select(y2_hhid, ag_i0b, ag_i01)
+sales <- semi_join(sales, maizehh, by=c("y2_hhid"="hh_id_merge"))
+look_for(sales)
+frq(sales$ag_i01)
+sales <- sales |> mutate(subsistence_ag=if_else(ag_i01==2,1,0))
+sales <- collap(sales, subsistence_ag~y2_hhid, FUN = fmin) # if some consider for sale then not a subsistence. 
+sales <- sales |> rename(hhid=y2_hhid)
+mlw2 <- left_join(mlw2, sales, by="hhid")
+frq(mlw2$subsistence_ag) # 4 still missing. no harvest? 
+remove(sales)
+
+### ### ### ### ### ### ### ###
+# Other variables   ----
+### ### ### ### ### ### ### ###
+## Distance ----
+# No wave 2 data 
+
+## Non-farm income ----
+wage <- read_dta("data/mlw/hh_mod_e_13.dta")
+look_for(wage, details = c("none"))
+wage <- wage[,c(2, 35:36, 44:50, 53:55, 71:77, 80:82, 101:104)]
+wage <- semi_join(wage, maizehh, by=c("y2_hhid"="hh_id_merge"))
+look_for(wage, details = c("none"))
+mainwage <- wage[,1:13]
+mainwage <- mainwage |> filter(!is.na(hh_e19b))
+frq(mainwage$hh_e26b)
+mainwage <- mainwage |> 
+  mutate(main_income=case_when(hh_e26b==5 ~ hh_e25 * hh_e22/hh_e26a,
+                               hh_e26b==4 ~ hh_e25 * hh_e22 * hh_e23 /hh_e26a,
+                               hh_e26b==3 ~ hh_e25 * (hh_e22 * hh_e23 * hh_e24/8) / hh_e26a,
+                               .default = NA_real_)) |>  # very rough calculation 
+  mutate(main_income=as.numeric(main_income))
+# 4 missing; one teacher probably gave total year. 
+mainwage |> filter(y2_hhid=="1738-001")
+# difficult ot decide if this is an enumerator error or there is another person who earned much less. ignore
+mainwage$main_income[is.na(mainwage$main_income)] <- 0
+look_for(mainwage)
+frq(mainwage$hh_e28b)
+mainwage <- mainwage |> 
+  mutate(allowance=case_when(hh_e28b==5 ~ hh_e27 * hh_e22/hh_e28a,
+                             hh_e28b==4 ~ hh_e27 * hh_e22 * hh_e23 /hh_e28a,
+                             hh_e28b==3 ~ hh_e27 * (hh_e22 * hh_e23 * hh_e24/8) / hh_e28a,
+                             .default = NA_real_)) |>  # very rough calculation 
+  mutate(allowance=as.numeric(allowance))
+mainwage <- mainwage |> mutate(income=rowSums(across(c(main_income,allowance)), na.rm=TRUE))
+mainwage <- mainwage |> select(y2_hhid, income)
+look_for(wage, details = c("none"))
+#secondwage
+secondwage <- wage[,c(1,14:27)]
+look_for(secondwage)
+secondwage <- secondwage |> filter(!is.na(hh_e36))
+frq(secondwage$hh_e40b) # 5 obs
+secondwage <- secondwage |>
+  mutate(main_income=case_when(hh_e40b==5 ~ hh_e39 * hh_e36/hh_e40a,
+                               hh_e40b==4 ~ hh_e39 * hh_e36 * hh_e37 /hh_e40a,
+                               hh_e40b==3 ~ hh_e39 * (hh_e36 * hh_e37 * hh_e38/8) /hh_e40a,
+                               .default = NA_real_)) |> 
+  mutate(main_income=as.numeric(main_income))
+frq(secondwage$hh_e42a) # no allowance
+secondwage <- secondwage |> 
+  rename(income=main_income) |> 
+  select(y2_hhid, income)
+look_for(wage, details = c("none"))
+#ganyu
+ganyu <- wage[,c(1,24:27)]
+look_for(ganyu)
+ganyu <- ganyu |> filter(!is.na(hh_e56))
+ganyu <- ganyu |> 
+  mutate(income=hh_e56*hh_e57*hh_e58*hh_e59)
+ganyu <- collap(ganyu,income~y2_hhid, FUN=fsum)
+wage <- rbind(ganyu, mainwage, secondwage)
+remove(ganyu, mainwage, secondwage)
+wage <- collap(wage,income~y2_hhid, FUN=fsum)
+mlw2 <- left_join(mlw2, wage, by=c("hhid"="y2_hhid"))
+mlw2 <- mlw2 |> 
+  tidyr::replace_na(list(income = 0)) |> 
+  rename(wage_income=income)
+var_label(mlw2$wage_income) <- "income from main and temporary off-farm work"
+var_label(mlw2$subsistence_ag) <- "HH did not sell any crop harvest"
+var_label(mlw2$plot_area_GPS) <- "Area (ha) of maize plots"
+var_label(mlw2$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
+remove(wage)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

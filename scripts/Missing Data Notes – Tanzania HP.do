@@ -162,8 +162,7 @@ codebook share_kg_sold
 	mlw3 line 190.
 	
 	- DRISYA:
-	I’ve taken a similar approach for Tanzania’s subsistence orientation, though
-	I’m not fully sure if it’s correct. 
+	I’ve taken a similar approach of Malawi's for Tanzania’s subsistence orientation.
 	
 	Maize-producing households were identified using maizehh and matched with 
 	sale data (ag5a_01) from the agricultural questionnaire (p.22) and the 

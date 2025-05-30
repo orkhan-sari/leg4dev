@@ -152,4 +152,15 @@ codebook share_kg_sold
 	as an example. I create a new varaible with captures if the hh does not 
 	intend to/consider seel any crop - susbsitnce orientation. Also look at 
 	mlw3 line 190.
+	
+	- DRISYA:
+	I’ve taken a similar approach for Tanzania’s subsistence orientation, though
+	I’m not fully sure if it’s correct. 
+	
+	Maize-producing households were identified using maizehh and matched with 
+	sale data (ag5a_01) from the agricultural questionnaire (p.22) and the 
+	raw data file ag_sec_5a. Households responding “no” (2) to selling were 
+	classified as subsistence-oriented, resulting in 1,323 households who 
+	grew but did not sell maize in the 2014 long rainy season.
+	
 */

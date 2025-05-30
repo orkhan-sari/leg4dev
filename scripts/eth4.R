@@ -26,10 +26,10 @@ hpdata|>
   filter(n() > 1)|>
   ungroup() # 0 duplicates - plots are uniquely identified  
 hpdata <- hpdata|>
-  select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size,
+  select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size, 
          manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
-         respondent_id_merge, improved,organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, 
-         plot_dist_household, ag_asset_index, plot_certificate, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
+         respondent_id_merge, improved, organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, elevation, 
+         plot_dist_household, ag_asset_index, plot_certificate, drought_shock, rain_shock, flood_shock,irrigated, nb_seasonal_crop,
          used_pesticides, yield_value_LCU, yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
 look_for(hpdata) #many missing
@@ -107,7 +107,6 @@ cropdata|>
   filter(n() > 1) |> 
   ungroup() # 0 duplicates 
 look_for(cropdata)
-glimpse(cropdata)
 cropdata4 <- cropdata |>
   mutate(rotation=ifelse(s3q34 ==1, 1, 0))
 comment(cropdata4) <- "main crop maize plots"
@@ -233,7 +232,7 @@ remove(individual, cropdata4, mode_function)
 # consumption quantile
 hhhp4 <- read_dta("data/hp/Household_dataset.dta") |>
   filter(country=="Ethiopia", wave==4) |>
-  select(hh_id_merge, hh_size, hh_shock, hh_dependency_ratio,totcons_USD, cons_quint, hh_asset_index,
+  select(hh_id_merge, hh_size, hh_shock, hh_dependency_ratio, totcons_USD, cons_quint, hh_asset_index,
          HDDS, share_kg_sold)
 hhhp4 <- hhhp4|> 
   semi_join(maizehh, by=c("hh_id_merge"))
@@ -249,23 +248,22 @@ plotdata4 <- plotdata4 |>
   select(-s3q13, -s4q03,-s4q01b)
 look_for(plotdata4)
 wave4 <- plotdata4 |> 
-  select(1, 10, 15:42)
+  select(1, 10, 15:43)
 look_for(wave4)  
 wave4basics <- wave4 |> 
   select(household_id, hh_id_obs) |> 
   distinct()
 wave4mean <- collap(wave4,
-                    farm_size + age_manager + dist_market + plot_dist_household + ag_asset_index + 
+                    farm_size + age_manager + dist_market + elevation + plot_dist_household + ag_asset_index + 
                     soil_fertility_index  ~ household_id,
                     FUN = fmean,
                     na.rm = TRUE)
 wave4sum <- collap(wave4,
-                   plot_area_GPS +nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ household_id,
+                   plot_area_GPS + nb_seasonal_crop + yield_value_LCU + yield_value_USD  ~ household_id,
                    FUN = fsum,
                    na.rm = TRUE)
-aggregated_vars <- c("farm_size", "age_manager", "dist_market", "plot_dist_household", "soil_fertility_index",
-                     "ag_asset_index", "plot_area_GPS", "nb_seasonal_crop", 
-                     "yield_value_LCU", "yield_value_USD")
+aggregated_vars <- c("farm_size", "age_manager", "dist_market", "elevation", "plot_dist_household", "soil_fertility_index",
+                     "ag_asset_index", "plot_area_GPS", "nb_seasonal_crop", "yield_value_LCU", "yield_value_USD")
 wave4 <- wave4 %>% select(-all_of(aggregated_vars))
 look_for(wave4)
 wave4 <- wave4 |> 
@@ -449,9 +447,9 @@ tlu <- tlu |>
                        ls_code %in% c(14,15) ~ owned * 0.70,
                        .default = 0))
 tlu <- collap(tlu, tlu ~ household_id, FUN = fsum)
-wave4 <- left_join(wave4,tlu,by="household_id")
-remove(tlu)
-wave4$tlu[is.na(wave4$tlu)] <- 0
+eth4 <- left_join(wave4,tlu,by="household_id")
+remove(tlu, wave4)
+eth4$tlu[is.na(eth4$tlu)] <- 0
 # Notes on missing data ----
 ## 1023 hhs before any cleaning of missing data
 ## 83 missing for manager age

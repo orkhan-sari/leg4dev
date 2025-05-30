@@ -30,8 +30,8 @@ hpdata <- hpdata|>
   select(hh_id_merge, hh_id_obs, ea_id_merge, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop,
          farm_size, manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, 
          primary_education_manager, respondent_id_obs, respondent_id_merge, improved,organic_fertilizer, 
-         inorganic_fertilizer, soil_fertility_index, plot_dist_household, ag_asset_index, plot_certificate, 
-         drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop, used_pesticides, yield_value_LCU, 
+         inorganic_fertilizer, soil_fertility_index, elevation, plot_dist_household, ag_asset_index, plot_certificate, 
+         drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop, used_pesticides, yield_value_LCU, 
          yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
 look_for(hpdata) # many missing, especially improved seeds
@@ -155,21 +155,21 @@ mlw2basics <- mlw2 |>
   select(hhid, hh_id_obs, ea_id_merge) |> 
   distinct()
 wave2mean <- collap(mlw2,
-                    farm_size + age_manager + plot_dist_household + ag_asset_index + count_plot + 
+                    farm_size + age_manager + elevation + plot_dist_household + ag_asset_index + count_plot + 
                       soil_fertility_index  ~ hhid,
                     FUN = fmean,
                     na.rm = TRUE)
 wave2sum <- collap(mlw2,
-                   plot_area_GPS +nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
+                   plot_area_GPS + nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
                    FUN = fsum,
                    na.rm = TRUE)
-aggregated_vars <- c("farm_size", "age_manager", "plot_dist_household", "soil_fertility_index",
+aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_household", "soil_fertility_index",
                      "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", 
                      "yield_value_LCU", "yield_value_USD")
 mlw2 <- mlw2 %>% select(-all_of(aggregated_vars))
 look_for(mlw2)
 mlw2 <- mlw2 |> 
-  select(1,4:5, 10:21)
+  select(1, 4:5, 10:21)
 look_for(mlw2)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -280,13 +280,87 @@ var_label(mlw2$plot_area_GPS) <- "Area (ha) of maize plots"
 var_label(mlw2$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
 remove(wage)
 
+# enterprise
+enterprise <- read_dta("data/mlw/hh_mod_n2_13.dta")
+look_for(enterprise, details=c("none"))
+enterprise <- semi_join(enterprise,  maizehh, by=c("y2_hhid"="hh_id_merge"))
+# It is not possible to calculate monthly profits from the enterprise.
+# We will take the last month's profit. 
+# Enterprise data is better calculated for the last month's profit. An annual income cannot be precisely calculated.
+# Thus, to sum all other income, we must consider average monthly income for the wage income as well 
+# (unlike in ETH where yearly is calculated). 
+enterprise <- enterprise |> 
+  filter(!is.na(hh_n40)) |> 
+  rename(enterprise_income=hh_n40)
+enterprise <- collap(enterprise, enterprise_income ~ y2_hhid, FUN=fsum)   
 
+# other income
+other_income <- read_dta("data/mlw/hh_mod_p_13.dta") |> 
+  filter(hh_p01==1)
+other_income <- semi_join(other_income,  maizehh, by=c("y2_hhid"="hh_id_merge"))
+look_for(other_income, details = c("none"))
+other_income <- other_income |> 
+  mutate(other_income=rowSums(across(c(hh_p02, hh_p03a, hh_p03b, hh_p03c)), na.rm=TRUE))
+other_income <- collap(other_income, other_income ~ y2_hhid, FUN=fsum)
+# other income is yearly,
+# wage_income is yearly,
+# enterprise is but last month. 
+mlw2 <- left_join(mlw2, other_income, by=c("hhid"="y2_hhid"))
+mlw2 <- mlw2 |> 
+  tidyr::replace_na(list(other_income = 0))
+mlw2 <- left_join(mlw2, enterprise, by=c("hhid"="y2_hhid"))
+mlw2 <- mlw2 |> 
+  tidyr::replace_na(list(enterprise_income = 0))
+mlw2 <- mlw2 |> 
+  mutate(other_income=other_income / 12,
+         wage_income=wage_income / 12,
+         tot_other_income=wage_income+other_income+enterprise_income)
+var_label(mlw2$tot_other_income) <- "Average monthly total other income"
+remove(enterprise,other_income)
+look_for(mlw2)
+# market_distance from community is missing in this wave
 
+##  Extension, advisory, credit----
+# We will consider most important sources like government and private ag. extension.
+extension <- read_dta("data/mlw/ag_mod_t1_13.dta") |> 
+  select(y2_hhid, ag_t0a, ag_t01, ag_t02) |> 
+  filter(ag_t01==1)
+frq(extension$ag_t0a)
+frq(extension$ag_t02)
+# Many report to have received extension from electronic media like tv and radio and other farmers. 
+# We will consider those extension services that have been provided by gov, private and cooperative type institutions. 
+extension <- extension |> 
+  mutate(extension_service=case_when(ag_t0a %in% c(301:307, 309) &
+                                       ag_t02 %in% c(1:10) ~ 1,
+                                     .default = 0))
+extension <- collap(extension, extension_service~y2_hhid, FUN = fmax)
+frq(extension$extension_service)
+mlw2 <- left_join(mlw2, extension, by=c("hhid"="y2_hhid"))
+mlw2$extension_service[is.na(mlw2$extension_service)] <- 0
+var_label(mlw2$extension_service) <- "received extension from institutions" 
+remove(extension)
 
-
-
-
-
+## TLU ----
+## page 10: https://appec-h.com/wp-content/uploads/2023/02/Livestock-production-systems.pdf
+## Large ruminants = 0.7 TLU, small ruminants = 0.1, pigs = 0.2, poultry = 0.01, horses = 0.8,
+## mules=  0.7, camels= 1
+tlu <- read_dta("data/mlw/ag_mod_r1_13.dta") |> 
+  select(y2_hhid, ag_r00, ag_r0a, ag_r01, ag_r02) |> 
+  filter(ag_r01==1)
+frq(tlu$ag_r0a)
+tlu <- tlu |> 
+  mutate(tlu=case_when(ag_r0a %in% c(301:304, 3304) ~ ag_r02 * 0.7,
+                       ag_r0a %in% c(307:308) ~ ag_r02 * 0.1,
+                       ag_r0a==309 ~ ag_r02 * 0.2,
+                       ag_r0a %in% c(311:315, 319, 3310, 3314) ~ ag_r02 * 0.01,
+                       ag_r0a==3305 ~ ag_r02 * 0.7, 
+                       .default = 0))
+tlu <- collap(tlu, tlu ~ y2_hhid, FUN = fsum)
+mlw2 <- left_join(mlw2, tlu, by=c("hhid"="y2_hhid"))
+remove(tlu, maizehh)
+mlw2 <- mlw2 |> 
+  rename(ea_id=ea_id_merge)
+## Land tenure - not collected ----
 
 
 

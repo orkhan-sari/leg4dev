@@ -25,10 +25,10 @@ hpdata|>
   filter(n() > 1)|>
   ungroup() # 0 duplicates - plots are uniquely identified  
 hpdata <- hpdata|>
-  select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size,
+  select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size, 
          manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
-         respondent_id_merge, improved,organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, 
-         plot_dist_household, ag_asset_index, plot_certificate, drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop,  
+         respondent_id_merge, improved, organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, elevation,
+         plot_dist_household, ag_asset_index, plot_certificate, drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop,
          used_pesticides, yield_value_LCU, yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
 look_for(hpdata) #many missing
@@ -126,7 +126,6 @@ dup <- cropdata|>
 remove(dup)
 cropdata <- cropdata |> filter(!is.na(s3q03)) # remove duplicate and one more missing.
 look_for(cropdata)
-glimpse(cropdata)
 cropdata5 <- cropdata |>
   mutate(rotation=ifelse(s3q34 ==1, 1, 0))
 comment(cropdata5) <- "main crop maize plots"
@@ -233,7 +232,7 @@ remove(individual, cropdata5, mode_function)
 # consumption quantile
 hhhp5 <- read_dta("data/hp/Household_dataset.dta") |>
   filter(country=="Ethiopia", wave==5) |>
-  select(hh_id_merge, hh_size, hh_shock, hh_dependency_ratio,totcons_USD, cons_quint, hh_asset_index,
+  select(hh_id_merge, hh_size, hh_shock, hh_dependency_ratio, totcons_USD, cons_quint, hh_asset_index,
          HDDS, share_kg_sold)
 hhhp5 <- hhhp5|> 
   semi_join(maizehh, by=c("hh_id_merge"))
@@ -249,21 +248,21 @@ plotdata5 <- plotdata5 |>
   select(-s3q13,-s4q01b,-s4q03)
 look_for(plotdata5)
 wave5 <- plotdata5 |> 
-  select(1, 10, 15:42)
+  select(1, 10, 15:43)
 look_for(wave5)  
 wave5basics <- wave5 |> 
   select(household_id, hh_id_obs) |> 
   distinct()
 wave5mean <- collap(wave5,
-                    farm_size + age_manager + dist_market + plot_dist_household + ag_asset_index + 
+                    farm_size + age_manager + dist_market + elevation + plot_dist_household + ag_asset_index + 
                     soil_fertility_index  ~ household_id,
                     FUN = fmean,
                     na.rm = TRUE)
 wave5sum <- collap(wave5,
-                   plot_area_GPS +nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ household_id,
+                   plot_area_GPS + nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ household_id,
                    FUN = fsum,
                    na.rm = TRUE)
-aggregated_vars <- c("farm_size", "age_manager", "dist_market", "plot_dist_household", "soil_fertility_index",
+aggregated_vars <- c("farm_size", "age_manager", "dist_market", "elevation", "plot_dist_household", "soil_fertility_index",
                      "ag_asset_index", "plot_area_GPS", "nb_seasonal_crop", 
                      "yield_value_LCU", "yield_value_USD")
 wave5 <- wave5 %>% select(-all_of(aggregated_vars))
@@ -441,7 +440,7 @@ table(is.na(wave5$other_income)) # 247 maize producers
 wave5 <- wave5 |> 
   tidyr::replace_na(list(other_income = 0))
 wave5 <- left_join(wave5, enterprise, by="household_id")
-table(is.na(wave4$enterprise_income)) # 104 maize producers
+table(is.na(wave5$enterprise_income)) # 156 maize producers
 wave5 <- wave5 |> 
   tidyr::replace_na(list(enterprise_income = 0))
 wave5 <- wave5 |> 
@@ -491,9 +490,9 @@ tlu <- tlu |>
                        ls_code %in% c(14,15) ~ owned * 0.70,
                        .default = 0))
 tlu <- collap(tlu, tlu ~ household_id, FUN = fsum)
-wave5 <- left_join(wave5,tlu,by="household_id")
-remove(tlu)
-wave5$tlu[is.na(wave5$tlu)] <- 0
+eth5 <- left_join(wave5,tlu,by="household_id")
+remove(tlu, wave5)
+eth5$tlu[is.na(eth5$tlu)] <- 0
 
 
 

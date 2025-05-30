@@ -11,7 +11,7 @@ options(scipen = 999)
 
 # In 2019, 3,178 households stemmed from 2,368 of the 2016 households representing 
 # a household-level attrition rate of 5.6 percent.
-# Individuals split from a household were followed. Who gest the hhid? - 
+# Individuals split from a household were followed. Who gets the hhid? - 
 # Check page 4 in HP https://hdl.handle.net/10986/42446 
 # hh_id_obs from the HP data is the key for panel identifier later. 
 
@@ -36,8 +36,8 @@ hpdata <- hpdata|>
   select(hh_id_merge, hh_id_obs, ea_id_merge, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop,
          farm_size, manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, 
          primary_education_manager, respondent_id_obs, respondent_id_merge, improved,organic_fertilizer, 
-         inorganic_fertilizer, soil_fertility_index, plot_dist_household, ag_asset_index, plot_certificate, 
-         drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop, used_pesticides, yield_value_LCU, 
+         inorganic_fertilizer, soil_fertility_index, elevation, plot_dist_household, ag_asset_index, plot_certificate, 
+         drought_shock, rain_shock, flood_shock, irrigated,  nb_seasonal_crop, used_pesticides, yield_value_LCU, 
          yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
 look_for(hpdata) # many missing
@@ -148,7 +148,7 @@ mlw4basics <- mlw4 |>
   select(hhid, ea_id_merge, hh_id_obs) |> 
   distinct()
 wave4mean <- collap(mlw4,
-                    farm_size + age_manager + plot_dist_household + ag_asset_index + count_plot + 
+                    farm_size + age_manager + elevation + plot_dist_household + ag_asset_index + count_plot + 
                       soil_fertility_index  ~ hhid,
                     FUN = fmean,
                     na.rm = TRUE)
@@ -156,7 +156,7 @@ wave4sum <- collap(mlw4,
                    plot_area_GPS +nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
                    FUN = fsum,
                    na.rm = TRUE)
-aggregated_vars <- c("farm_size", "age_manager", "plot_dist_household", "soil_fertility_index",
+aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_household", "soil_fertility_index",
                      "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", 
                      "yield_value_LCU", "yield_value_USD")
 mlw4 <- mlw4 %>% select(-all_of(aggregated_vars))
@@ -374,16 +374,10 @@ tlu <- tlu |>
                        .default = 0))
 tlu <- collap(tlu, tlu ~ y4_hhid, FUN = fsum)
 mlw4 <- left_join(mlw4, tlu, by=c("hhid"="y4_hhid"))
-remove(tlu,hh16, maizehh)
+remove(tlu, maizehh)
 
 ## Land tenure - not collected ----
 
-## Notes on missing data ----
-## 1023 hhs before any cleaning of missing data
-## 83 missing for manager age
-## 41 missing household size, dependency ratio, consumption and some other hh level variables
-## 95 hhs do not have agricultural assets but still have asset index. This is becuase, pca (factor) analysis still includes those with 
-## no asset and gives them a lower score. 
 
 
 

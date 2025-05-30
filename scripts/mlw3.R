@@ -35,9 +35,9 @@ hpdata <- hpdata|>
   filter(main_crop=="MAIZE") |> 
   select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop,
          farm_size, manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, 
-         primary_education_manager, respondent_id_obs, respondent_id_merge, improved,organic_fertilizer, 
-         inorganic_fertilizer, soil_fertility_index, plot_dist_household, ag_asset_index, plot_certificate, 
-         drought_shock, rain_shock,flood_shock,irrigated,  nb_seasonal_crop, used_pesticides, yield_value_LCU, 
+         primary_education_manager, respondent_id_obs, respondent_id_merge, improved, organic_fertilizer, 
+         inorganic_fertilizer, soil_fertility_index, elevation, plot_dist_household, ag_asset_index, plot_certificate, 
+         drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop, used_pesticides, yield_value_LCU, 
          yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
 look_for(hpdata) # many missing
@@ -150,15 +150,15 @@ mlw3basics <- mlw3 |>
   select(hhid, hh_id_obs, ea_id, y2_hhid) |> 
   distinct()
 wave3mean <- collap(mlw3,
-                    farm_size + age_manager + plot_dist_household + ag_asset_index + count_plot + 
+                    farm_size + age_manager + elevation + plot_dist_household + ag_asset_index + count_plot + 
                     soil_fertility_index  ~ hhid,
                     FUN = fmean,
                     na.rm = TRUE)
 wave3sum <- collap(mlw3,
-                   plot_area_GPS +nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
+                   plot_area_GPS + nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
                    FUN = fsum,
                    na.rm = TRUE)
-aggregated_vars <- c("farm_size", "age_manager", "plot_dist_household", "soil_fertility_index",
+aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_household", "soil_fertility_index",
                      "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", 
                      "yield_value_LCU", "yield_value_USD")
 mlw3 <- mlw3 %>% select(-all_of(aggregated_vars))
@@ -403,14 +403,14 @@ remove(tlu)
 ## Land tenure ----
 tenure <- read_dta("data/mlw/ag_mod_v_16.dta") 
 frq(tenure$ag_v0a)
-# some information is reported once form one parcel and other parcels are missing. 
+# some information is reported once from one parcel and other parcels are missing. 
 tenure <- tenure |> 
   mutate(parcel_owned=case_when(ag_v0a==1~1,
                                 .default = 0)) |> 
   select(y3_hhid, parcel_owned, ag_v11, ag_v14) 
 frq(tenure$ag_v11)
 frq(tenure$ag_v14)
-# Interestingly, may who do not expect to have any disagreements in the next 5 years, are not so sure
+# Interestingly, many who do not expect to have any disagreements in the next 5 years, are not so sure
 # about the possession of the land in 10 years. This is an indicator of long term perspectives and expectations
 ownership <- collap(tenure, parcel_owned~y3_hhid, FUN = fmax)
 frq(ownership$parcel_owned) # 254 hhs with no land owned

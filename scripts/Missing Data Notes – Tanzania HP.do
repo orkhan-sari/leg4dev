@@ -25,7 +25,15 @@ codebook geocoords_id
 	the datasets. Please add the varaible label at the end mentioning that this
 	is based on self reported data. 
 	
+  - DRISYA:
+	I’ve used ag_sec_3a.dta, filtered to keep only the relevant plots after 
+	merging, and added the variable label: "Distance from plot to home (in KMs),
+	self-reported" to indicate the source. There are no missing values for 
+	plot_hh_distance in the merged dataset 
+	— I think this variable works well for our purpose.
+	
 */
+
 
 
 codebook rain_shock
@@ -42,8 +50,19 @@ codebook flood_shock
 	- ORKHAN:
 	All missing in HP anyways, right?. Does trhis mean farmers never reported rain 
 	or flood wheen you look at the raw data? 
+	
 */
+use "C:\Users\ASUS\AppData\Local\Temp\4f3c7f6a-52b1-4e26-ac7e-d0fdc7e1bc36_TZA_2014_NPS-R4_v03_M_STATA11.zip.c36\TZA_2014_NPS-R4_v03_M_STATA11\ag_sec_4a.dta" 
+codebook ag4a_18	
 
+/*
+	- DRISYA:
+	No — rain or flood shocks are not reported in the raw data either. 
+	Since the questionnaire didn’t list them as explicit options, farmers 
+	couldn’t select them directly. A few farmers chose “other,” but there’s no 
+	further detail provided to clarify if those refer to rain or flood. 
+	
+*/	
 
 
 codebook soil_fertility_index
@@ -66,7 +85,53 @@ codebook nutrient_availability nutrient_retention rooting_conditions
 	Okay, then we must leave this variable out from the analyses. 
 	Could you find any other varaible from raw data that could capture
 	the soil quality?
+
 */
+use "C:\Users\ASUS\AppData\Local\Temp\f40b4da7-7440-4eac-aec8-bfae4deea222_TZA_2014_NPS-R4_v03_M_STATA11.zip.222\TZA_2014_NPS-R4_v03_M_STATA11\ag_sec_3a.dta"
+codebook ag3a_10 ag3a_11 ag3a_12
+
+/*
+	
+	- DRISYA:
+	I identified the following soil-related questions in the raw data that could
+	serve as alternative indicators of soil quality. These items are sourced 
+	from the Agriculture Questionnaire – Section 3a: Plot Details – Long Rainy 
+	Season (page 7), with the corresponding variables located in the dataset 
+	ag_sec_3a under ag3a_10, ag3a_11, and ag3a_12:
+
+	ag3a_10 – What was the soil type of this plot?
+
+		1 = Sandy (614 plots)
+
+		2 = Loam (2,511 plots)
+
+		3 = Clay (733 plots)
+
+		4 = Other, specify (134 plots)
+
+		Missing: 1,545 out of 5,537 observations
+
+	ag3a_11 – What was the soil quality of this plot?
+
+		1 = Good (1,694 plots)
+
+		2 = Average (2,004 plots)
+
+		3 = Bad (294 plots)
+
+		Missing: 1,545 out of 5,537 observations
+
+	ag3a_12 – How do you know the quality of the soil?
+
+		1 = Scientifically tested (10 plots)
+
+		2 = Own experience (3,323 plots)
+
+		3 = Other, specify (659 plots)
+
+		Missing: 1,545 out of 5,537 observations
+*/
+
 *------------------------------------------------------------------------------*
 
 

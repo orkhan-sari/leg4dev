@@ -139,6 +139,33 @@ LRseason$rotation[is.na(LRseason$rotation)] <- 0
 hpdata <- left_join(hpdata, LRseason, by = "plot_id_merge")
 remove(LRseason, SRseason)
 
+
+### ### ### Auxiliary Check: How Many LR Legume-Growing Households Planted Maize in the SR ### ### ### 
+
+legume_codes <- c(31, 32, 33, 34, 35, 36, 37, 43, 47)
+
+# Households that grew legumes in the Long Rainy Season
+LR_legume_hhs <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4a.dta") |> 
+  filter(zaocode %in% legume_codes) |> 
+  distinct(y4_hhid)
+
+# Households that grew maize in the Short Rainy Season
+SR_maize_hhs <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4b.dta") |> 
+  filter(zaocode == 11) |> 
+  distinct(y4_hhid)
+
+#How many legume-growing HHs in LR also grew maize in SR?
+legume_then_maize_hhs <- inner_join(LR_legume_hhs, SR_maize_hhs, by = "y4_hhid")
+
+n_LR_legume_hhs <- nrow(LR_legume_hhs)
+n_LR_legume_and_SR_maize_hhs <- nrow(legume_then_maize_hhs)
+
+cat("Total households that grew legumes in LR:", n_LR_legume_hhs, "\n")
+cat("Of them, households that also grew maize in SR:", n_LR_legume_and_SR_maize_hhs, "\n")
+
+# Out of 981 households that grew legumes in the Long Rainy Season (LR),155 also grew maize in the Short Rainy Season (SR)
+#Maybe this suggests that most of these households were likely primarily legume growers, with limited transition to maize in SR.
+
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###

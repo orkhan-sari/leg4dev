@@ -165,7 +165,6 @@ hdds4 <- hdds4|>
   semi_join(maizehh, by="hh_id_merge")
 
 ############################################################################################################################################
-
 ### ### ### ### ### ### ### ###
 #HH Plot distance
 ### ### ### ### ### ### ### ###
@@ -182,6 +181,23 @@ attr(plot_hh_dist$plot_hh_distance, "label") <- "Distance from plot to home (in 
 
 look_for(plot_hh_dist)
 #No missing values found for plot_hh_distance
+
+### ### ### ### ### ### ### ###
+#Soil Type
+### ### ### ### ### ### ### ###
+
+soil_type <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |>  
+  select(y4_hhid, plotnum, ag3a_10) |>  
+  rename(soil_type = ag3a_10) |>  
+  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-"))
+
+soil_type <- semi_join(soil_type, maizeplots, by = "plot_id")
+
+look_for(soil_type)  #No missing values found for soil_type
+
+soil_type %>%
+  count(soil_type, sort = TRUE)
+
 
 ### ### ### ### ### ### ### ###
 #Subsistence orientation

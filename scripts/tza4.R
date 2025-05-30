@@ -60,6 +60,22 @@ look_for(plot_hh_dist)
 #No missing values found for plot_hh_distance
 
 ### ### ### ### ### ### ### ###
+#Subsistence orientation
+### ### ### ### ### ### ### ###
+
+# Identify households with a subsistence orientation (did not sell any maize in 2014)
+
+subsistence_ag <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_5a.dta") |>
+  select(hh_id_merge = y4_hhid, sell_produce = ag5a_01) |>
+  semi_join(maizehh, by = "hh_id_merge")
+
+# Count households by selling status: 1 = Sold, 2 = Did not sell, NA = Missing
+subsistence_ag |> count(sell_produce) # Only 1 HH has a missing value.
+
+# Filter households who did not sell maize (sell_produce == 2)
+subsistence_only <- subsistence_ag |> filter(sell_produce == 2)
+
+### ### ### ### ### ### ### ###
 # Maize - legume intercropping---- 
 ### ### ### ### ### ### ### ###
 intercropdata <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4a.dta") |>  # crops by plot

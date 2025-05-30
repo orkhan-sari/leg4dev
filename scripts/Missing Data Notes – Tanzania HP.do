@@ -132,6 +132,14 @@ codebook ag3a_10 ag3a_11 ag3a_12
 		Missing: 1,545 out of 5,537 observations
 */
 
+/*
+	- DRISYA:
+
+	Out of the identified soil-related variables, I used `ag3a_10` (soil type) from `ag_sec_3a`  
+	and matched it with maize plots (from `hpdata`) using `plot_id`. This serves as a proxy  
+	for soil quality in the absence of geovariables used for the PCA-based soil_fertility_index.
+*/
+
 *------------------------------------------------------------------------------*
 
 

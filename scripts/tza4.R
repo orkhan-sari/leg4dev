@@ -15,23 +15,6 @@ hh14 <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/hh_fi
   distinct(y4_hhid, .keep_all = TRUE) 
 
 ### ### ### ### ### ### ### ###
-#HH Plot distance
-### ### ### ### ### ### ### ###
-
-
-plot_hh_dist <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |>  
-  select(y4_hhid, plotnum, ag3a_02_1) |>  
-  rename(plot_hh_distance = ag3a_02_1) |>  
-  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-"))
-
-plot_hh_dist <- semi_join(plot_hh_dist, maizeplots, by = "plot_id")
-
-attr(plot_hh_dist$plot_hh_distance, "label") <- "Distance from plot to home (in KMs), self-reported"
-
-look_for(plot_hh_dist)
-#No missing values found for plot_hh_distance
-
-### ### ### ### ### ### ### ###
 # HP data ----
 ### ### ### ### ### ### ### ###
 hpdata <- read_dta("data/hp/Plot_dataset.dta") |>
@@ -58,6 +41,23 @@ hpdata <- hpdata|>
   mutate(plot_id=plot_id_merge)
 look_for(hpdata) 
 # Four variables — soil_fertility_index, plot_dist_household, rain_shock, and flood_shock — have substantial missing data, each with 1,631 missing values.
+
+### ### ### ### ### ### ### ###
+#HH Plot distance
+### ### ### ### ### ### ### ###
+
+
+plot_hh_dist <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |>  
+  select(y4_hhid, plotnum, ag3a_02_1) |>  
+  rename(plot_hh_distance = ag3a_02_1) |>  
+  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-"))
+
+plot_hh_dist <- semi_join(plot_hh_dist, maizeplots, by = "plot_id")
+
+attr(plot_hh_dist$plot_hh_distance, "label") <- "Distance from plot to home (in KMs), self-reported"
+
+look_for(plot_hh_dist)
+#No missing values found for plot_hh_distance
 
 ### ### ### ### ### ### ### ###
 # Maize - legume intercropping---- 

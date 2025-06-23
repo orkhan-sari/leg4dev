@@ -54,7 +54,7 @@ garden <- garden |>
   mutate(count_plot=n())|>
   ungroup()
 val_labels(garden$ag_d20a)
-table(garden$ag_d20a) # in ver rare cases other corps are listed first, 
+table(garden$ag_d20a) # in very rare cases other crops are listed first, 
 # but the kept obs are those with maize as the highest value crop
 garden <- garden |> 
   mutate(intercrop=as.integer(
@@ -104,6 +104,7 @@ var_label(plot2$count_plot) <- "number of main maize plots"
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
+## DM at plot level ----
 modd <-  read_dta("data/mlw/ag_mod_d_13.dta") |>   # plot level 
   select(y2_hhid, ag_d00, ag_d01) |> 
   mutate(plot_id = paste(y2_hhid, ag_d00, sep = "-")) |> 
@@ -120,6 +121,26 @@ modd <- modd |> select(plot_id, female,hh_b05a )
 plot2 <- left_join(plot2, modd, by="plot_id")
 plot2 <- plot2 |> rename(age_manager_row=hh_b05a)
 remove(modd)
+
+## Asset ownership ---- 
+## no data available on owners
+
+## Education ----
+individual <- read_dta("data/mlw/hh_mod_b_13.dta") |> 
+  select(y2_hhid, hh_b01,  hh_b03, hh_b04, hh_b05a, hh_b22_3) |> 
+  mutate(female=ifelse(hh_b03==2,1,0)) |> 
+  filter(female==1) |> 
+  filter(hh_b05a>17)
+individual <- semi_join(individual, maizehh, by=c("y2_hhid" = "hh_id_merge"))
+frq(individual$hh_b22_3) # pscl - primary school; junior certificate of edu; Malawi school certificate
+look_for(individual)
+individual$hh_b22_3 <- as.numeric(individual$hh_b22_3)
+individual <- collap(individual, hh_b22_3 ~ y2_hhid, FUN = fmax, na.rm = TRUE)
+frq(individual$hh_b22_3)
+individual <- individual |> 
+  mutate(female_edu=ifelse(hh_b22_3==1,0,1)) |> 
+  select(-hh_b22_3)
+frq(individual$female_edu)
 
 ### ### ### ### ### ### ### ###
 # Nutrition indicators ---- 
@@ -141,7 +162,6 @@ remove(hpdata)
 look_for(plot2)
 plot2 <- plot2 |> rename(hhid=y2_hhid)
 plot2 <- plot2 |> relocate(ea_id_merge,.after = hhid)
-remove(maizeplots)
 table(plot2$female_manager, plot2$female) # same information.
 plot2 <- plot2 |> select(-female)
 # manager age is missing for 2 plots.
@@ -186,12 +206,14 @@ mlw2 <- left_join(mlw2basics, wave2mean, by=join_by("hhid"))
 mlw2 <- left_join(mlw2, wave2sum, by=join_by("hhid"))
 mlw2 <- left_join(mlw2, wave2max, by=join_by("hhid"))
 mlw2 <- left_join(mlw2, hdds2, by=c("hhid"="hh_id_merge"))
-remove(mlw2basics, wave2max, wave2sum,wave2mean,aggregated_vars, hdds2, plot2)
+mlw2 <- left_join(mlw2, individual, by=c("hhid"="y2_hhid"))
+mlw2 <- mlw2 |> 
+  mutate(female_edu=if_else(is.na(female_edu), 0, female_edu))
+remove(mlw2basics, wave2max, wave2sum,wave2mean,aggregated_vars, hdds2, plot2, individual)
 mlw2 <- mlw2 |> mutate(wave="wave2")
 
 ## Cleaning missing data ----
 look_for(mlw2)
-
 ### share_kg_sold----
 ### share_kg_sold in HP data has many missing; reason: set to missing if reported share above 100% percent or
 ##  if household does not harvest any crops.
@@ -278,6 +300,7 @@ var_label(mlw2$wage_income) <- "income from main and temporary off-farm work"
 var_label(mlw2$subsistence_ag) <- "HH did not sell any crop harvest"
 var_label(mlw2$plot_area_GPS) <- "Area (ha) of maize plots"
 var_label(mlw2$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
+var_label(mlw2$female_edu) <- "HH has an educated adult female"
 remove(wage)
 
 # enterprise
@@ -362,13 +385,25 @@ mlw2 <- mlw2 |>
   rename(ea_id=ea_id_merge)
 ## Land tenure - not collected ----
 
-
-
-
-
-
-
-
+### ### ### ### ### ### ### ###
+## Soil type ---- 
+### ### ### ### ### ### ### ###
+modd <-  read_dta("data/mlw/ag_mod_d_13.dta") |>   # plot level 
+  select(y2_hhid, ag_d00, ag_d01, ag_d21) |> 
+  mutate(plot_id = paste(y2_hhid, ag_d00, sep = "-")) |> 
+  rename(id_code=ag_d01)
+modd <- semi_join(modd, maizeplots, by="plot_id")
+look_for(modd)
+frq(modd$ag_d21)
+labels <- attributes(modd$ag_d21)
+modd$ag_d21 <- as.numeric(modd$ag_d21)
+modd <- collap(modd, ag_d21 ~ y2_hhid, FUN = fmode, na.rm= TRUE)
+attributes(modd$ag_d21) <- labels
+mlw2 <- left_join(mlw2, modd, by=c("hhid"="y2_hhid"))
+mlw2 <- mlw2 |> 
+  rename(soil_type=ag_d21)
+var_label(mlw2$soil_type) <- "HH dominant soil type"
+remove(modd, maizeplots, labels)
 
 
 

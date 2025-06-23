@@ -163,66 +163,59 @@ table(plotdata5$female_manager, plotdata5$female) # comparing manager and decisi
 # 1    0  251 # Perfect match, managers are decision-makers. 
 plotdata5 <- plotdata5 |> select(-female)
 
-## Agri asset ownership ----
-agriasset <- read_dta("data/eth/ess5/sect11_hh_w5.dta") |> 
-  select(household_id, asset_cd,s11q00, s11q02_1, s11q02_2) |>
-  filter(asset_cd %in% c(15, 16, 30, 31, 32, 33, 34)) |># agricultural assets
+## Asset ownership ----
+assets <- read_dta("data/eth/ess5/sect11_hh_w5.dta") |> 
+  select(household_id, asset_cd, s11q00, s11q02_1, s11q02_2) |>
+  filter(asset_cd %in% c(13:18, 21:24, 29:35)) |># agricultural and other valuable assets like car, motor, refrigerator
   filter(s11q00==1)  # keep assets owned
-agriasset <- agriasset |> 
+assets <- assets |> 
   semi_join(maizehh, by= join_by("household_id"=="hh_id_merge")) # keep maize producers. 
-agriasset <- left_join(agriasset, individual, by=c("household_id" = "household_id",
+assets <- left_join(assets, individual, by=c("household_id" = "household_id",
                                                    "s11q02_1"= "s3q13"))
-agriasset <- left_join(agriasset, 
+assets <- left_join(assets, 
                        individual |>rename(female2=female),
                        by=c("household_id" = "household_id", "s11q02_2"= "s3q13"))
-agriasset <- agriasset |>
+assets <- assets |>
   mutate(womens_asset=case_when(female==1~1,
                                 female2==1~1,
                                 .default = 0))
-agriasset <- agriasset |>
-  mutate(dm_agriasset=
-           case_when(womens_asset==1 & female==1 & is.na(female2) ~ 2,
-                     womens_asset==1 & female==1 & female2==1 ~ 2, 
-                     womens_asset==1 & female==0 & female2==1  ~ 1,
-                     womens_asset==1 & female==1 & female2==0  ~ 1,
-                     .default =0))
-agriasset <- agriasset |>
-  group_by(household_id)|>
-  mutate(dupl=n())|>
+assets <- assets |>
+  group_by(household_id) |> 
+  summarise(total=n(),
+            female_owned=sum(womens_asset, na.rm = TRUE),
+            share_female_owned=female_owned/total) |> 
+  select(household_id, share_female_owned) |> 
   ungroup()
-table(agriasset$dupl)
-
-# 1   2   3   4   5 
-# 297 602 738 140  10 
-
-agriasset <- agriasset |>
-  select(household_id, dm_agriasset, dupl)
-# Function to calculate the most frequent value
-mode_function <- function(x) {
-  ux <- unique(x)
-  ux[which.max(tabulate(match(x, ux)))]
-}
-agriasset <- agriasset |>
-  select(household_id, dm_agriasset, dupl) |>
-  group_by(household_id) |>
-  mutate(agri_asset=case_when(
-    dupl==2 ~ max(dm_agriasset, na.rm = TRUE), # two assets: if women had any say
-    dupl>2 ~ mode_function(dm_agriasset),     # many assets: more frequent dm pattern 
-    dupl==1 ~ dm_agriasset,
-    .default = NA_real_)) |>
-  ungroup()
-agriasset$dm_agriasset_order <- ordered(agriasset$agri_asset, 
-                                        levels = c(0, 1, 2), 
-                                        labels = c("male", "joint", "female"))
-agriasset %>%
-  group_by(household_id) %>%
-  filter(n() == 2) %>%  # Keep only household_ids that appear exactly twice
-  summarise(n_unique = n_distinct(dm_agriasset_order)) %>%
-  filter(n_unique > 1)  # Keep only those with different values
-# no hh with two type assets but different decision-maker.
-agriasset <- collap(agriasset, dm_agriasset_order ~ household_id, catFUN = fmode)
+ggplot(assets, aes(x = share_female_owned)) +
+  geom_histogram(binwidth = 0.05, fill = "blue", color = "red") +
+  labs(
+    title = "Distribution of Share of Female-Owned Assets",
+    x = "Share of Female-Owned Assets",
+    y = "Frequency"
+  ) +
+  theme_minimal()
 look_for(plotdata5)
-remove(individual, cropdata5, mode_function)
+remove(individual, cropdata5)
+
+## Education ----
+individual <- read_dta("data/eth/ess5/sect1_hh_w5.dta") |> 
+  select(household_id, individual_id, s1q01, s1q02, s1q03a) |>
+  mutate(female=ifelse(s1q02==2,1,0)) |>
+  filter(female==1) |> 
+  filter(s1q03a>17)
+edu <- read_dta("data/eth/ess5/sect2_hh_w5.dta") |> 
+  select(household_id, individual_id, s2q03, s2q06) 
+individual <- left_join(individual, edu, by=c("household_id", "individual_id"))
+remove(edu)
+frq(individual$s2q03)
+individual <- individual |> 
+  mutate(s2q03= if_else(is.na(s2q03), 2, s2q03))
+# 50% have no education and some have very basic level; we will capture just if they can read and write
+individual$s2q03 <- as.numeric(individual$s2q03)
+individual <- collap(individual, s2q03 ~ household_id, FUN = fmin, na.rm = TRUE)
+frq(individual$s2q03) # 58% can read and write
+individual <- individual |> 
+  mutate(s2q03=if_else(s2q03==2,0,1))
 
 ### ### ### ### ### ### ### ###
 # Nutrition indicators ---- 
@@ -287,11 +280,16 @@ wave5max <- collap(wave5,
 wave5 <- left_join(wave5basics, wave5mean, by=join_by("household_id"))
 wave5 <- left_join(wave5, wave5sum, by=join_by("household_id"))
 wave5 <- left_join(wave5, wave5max, by=join_by("household_id"))
-wave5 <- left_join(wave5, agriasset, by=join_by("household_id"))
+wave5 <- left_join(wave5, assets, by=join_by("household_id"))
 wave5 <- left_join(wave5, hhhp5, by=c("household_id"="hh_id_merge"))
 wave5 <- left_join(wave5, rotation5, by=join_by("household_id"))
-var_label(wave5$dm_agriasset_order) <- "control over agricultural assets"
-remove(wave5basics, wave5max, wave5sum,wave5mean,rotation5, agriasset, aggregated_vars, hhhp5)
+wave5 <- left_join(wave5, individual, by=join_by("household_id"))
+wave5 <- wave5 |> 
+  mutate(female_edu=if_else(is.na(s2q03), 0, s2q03)) |> 
+  select(-s2q03)
+var_label(wave5$share_female_owned) <- "women's control over assets"
+var_label(wave5$female_edu) <- "HH has an adult female who can read and write"
+remove(wave5basics, wave5max, wave5sum,wave5mean,rotation5, assets, aggregated_vars, hhhp5, individual)
 
 ## Cleaning missing data ----
 look_for(wave5)
@@ -332,33 +330,7 @@ table(wave5$missinghh) # 14 are present in our data.
 wave5 <- wave5 |> 
   filter(missinghh!=1) |> select(-missinghh)
 look_for(wave5)
-remove(hhdata, ppdata)
-# I drop households which do not have any agricultural asset, because  the control over agricultural asset variable
-# is highly important for our analyses. 
-missing <- wave5 |> 
-  filter(is.na(dm_agriasset_order)) |>   
-  select(household_id) #109 hhs.
-agriasset <- read_dta("data/eth/ess4/sect11_hh_w4.dta") |> filter(saq14==1) |> 
-  filter(s11q00==1) |> 
-  select(household_id, asset_cd,s11q00) |>
-  filter(asset_cd %in% c(15, 16, 30, 31, 32, 33, 34)) |> 
-  distinct(household_id,.keep_all = TRUE)
-agriassetnotmissing <- semi_join(agriasset, missing, by=join_by("household_id"))
-table(agriassetnotmissing$s11q00) # 69 of the 109 hhs do have some agri asset. 
-agriassetnotmissing <- agriassetnotmissing |> 
-  mutate(notmissing=1) |> 
-  select(household_id, notmissing)
-remove(agriasset)
-wave5 <- left_join(wave5, agriassetnotmissing, by=join_by("household_id"))
-wave5 <- wave5 |> 
-  mutate(drop=case_when(is.na(notmissing) &is.na(dm_agriasset_order) ~ 1,
-                        .default = 0))
-wave5 <- wave5 |> filter(drop!=1)
-wave5 <- wave5 |> 
-  filter(!is.na(dm_agriasset_order))
-wave5 <- wave5 |> select(-notmissing, -drop)
-look_for(wave5)
-remove(missing, agriassetnotmissing, maizehh, hpdata, plotdata5)
+remove(hhdata, ppdata, maizehh, hpdata, plotdata5)
 look_for(wave5)
 wave5 <- wave5 |> mutate(wave="wave5")
 missing <- is.na(wave5$age_manager) # 1 missing
@@ -384,7 +356,7 @@ sec4 <- collap(sec4, subsistence_ag~household_id, FUN = fmin) # if some consider
 wave5 <- left_join(wave5, sec4, by="household_id")
 table(wave5$subsistence_ag)
 var_label(wave5$subsistence_ag) <- "HH does not intend to sell any crop"
-remove(maizeplots, missing, sec4)
+remove(missing, sec4)
 look_for(wave5)
 rural <- read_dta("data/eth/ess5/sect_cover_hh_w5.dta") |> 
   filter(saq14==1) # keep rural hhs.
@@ -494,6 +466,26 @@ eth5 <- left_join(wave5,tlu,by="household_id")
 remove(tlu, wave5)
 eth5$tlu[is.na(eth5$tlu)] <- 0
 
+
+### ### ### ### ### ### ### ###
+## Soil type ---- 
+### ### ### ### ### ### ### ###
+soil <- read_dta("data/eth/ess5/sect2_pp_w5.dta") |> 
+  mutate(parcel_id = paste(holder_id, parcel_id, sep = "-")) |> 
+  select("household_id", "parcel_id", "s2q16")
+soil <- semi_join(soil, maizeplots, by=c("parcel_id"="parcel_id_merge"))
+look_for(soil)
+frq(soil$s2q16)
+labels <- attributes(soil$s2q16)
+soil$s2q16 <- as.numeric(soil$s2q16)
+soil <- collap(soil, s2q16 ~ household_id, FUN = fmode, na.rm= TRUE)
+attributes(soil$s2q16) <- labels
+eth5 <- left_join(eth5, soil, by="household_id")
+eth5 <- eth5 |> 
+  rename(soil_type=s2q16)
+var_label(eth5$soil_type) <- "HH dominant soil type"
+frq(eth5$soil_type)
+remove(soil, maizeplots, labels)
 
 
 

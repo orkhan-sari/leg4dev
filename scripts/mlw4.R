@@ -98,6 +98,7 @@ var_label(plot4$count_plot) <- "number of main maize plots"
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
+## DM at plot level ----
 modd <- read_dta("data/mlw/ag_mod_d_19.dta") |> 
   select(y4_hhid, gardenid, plotid, ag_d01) |>
   mutate(plot_id = paste(y4_hhid, gardenid, plotid, sep = "-")) |> 
@@ -113,6 +114,26 @@ modd <- modd |> select(plot_id, female,hh_b05a )
 plot4 <- left_join(plot4, modd, by="plot_id")
 plot4 <- plot4 |> rename(age_manager_row=hh_b05a)
 remove(modd)
+
+## Asset ownership ---- 
+## no data available on owners
+
+## Education ----
+individual <- read_dta("data/mlw/hh_mod_b_19.dta") |> 
+  select(y4_hhid, id_code, hh_b03, hh_b04, hh_b05a, hh_b21) |> 
+  mutate(female=ifelse(hh_b03==2,1,0)) |> 
+  filter(female==1) |> 
+  filter(hh_b05a>17)
+individual <- semi_join(individual, maizehh, by=c("y4_hhid" = "hh_id_merge"))
+frq(individual$hh_b21) # pscl - primary school; junior certificate of edu; Malawi school certificate
+look_for(individual)
+individual$hh_b21 <- as.numeric(individual$hh_b21)
+individual <- collap(individual, hh_b21 ~ y4_hhid, FUN = fmax, na.rm = TRUE )
+frq(individual$hh_b21) # pscl - primary school; junior certificate of edu; Malawi school certificate
+individual <- individual |> 
+  mutate(female_edu=ifelse(hh_b21==1,0,1)) |> 
+  select(-hh_b21)
+frq(individual$female_edu)
 
 ### ### ### ### ### ### ### ###
 # Nutrition indicators ---- 
@@ -134,7 +155,6 @@ remove(hpdata)
 look_for(plot4)
 plot4 <- plot4 |> rename(hhid=y4_hhid)
 plot4 <- plot4 |> relocate(ea_id_merge,.after = hhid)
-remove(maizeplots)
 table(plot4$female_manager, plot4$female) # same information.
 plot4 <- plot4 |> select(-female)
 # manager age is missing for 15 plots.
@@ -179,7 +199,10 @@ mlw4 <- left_join(mlw4basics, wave4mean, by=join_by("hhid"))
 mlw4 <- left_join(mlw4, wave4sum, by=join_by("hhid"))
 mlw4 <- left_join(mlw4, wave4max, by=join_by("hhid"))
 mlw4 <- left_join(mlw4, hdds4, by=c("hhid"="hh_id_merge"))
-remove(mlw4basics, wave4max, wave4sum, wave4mean,aggregated_vars, hdds4, plot4)
+mlw4 <- left_join(mlw4, individual, by=c("hhid"="y4_hhid"))
+mlw4 <- mlw4 |> 
+  mutate(female_edu=if_else(is.na(female_edu), 0, female_edu))
+remove(mlw4basics, wave4max, wave4sum, wave4mean,aggregated_vars, hdds4, plot4, individual)
 mlw4 <- mlw4 |> mutate(wave="wave4")
 
 ## Cleaning missing data ----
@@ -282,6 +305,7 @@ var_label(mlw4$wage_income) <- "income from main and temporary off-farm work"
 var_label(mlw4$subsistence_ag) <- "HH did not sell any crop harvest"
 var_label(mlw4$plot_area_GPS) <- "Area (ha) of maize plots"
 var_label(mlw4$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
+var_label(mlw4$female_edu) <- "HH has an educated adult female"
 remove(wage)
 # enterprise
 enterprise <- read_dta("data/mlw/hh_mod_n2_19.dta")
@@ -378,7 +402,25 @@ remove(tlu, maizehh)
 
 ## Land tenure - not collected ----
 
-
+### ### ### ### ### ### ### ###
+## Soil type ---- 
+### ### ### ### ### ### ### ###
+modd <- read_dta("data/mlw/ag_mod_d_19.dta") |> 
+  select(y4_hhid, gardenid, plotid, ag_d01, ag_d21) |>
+  mutate(plot_id = paste(y4_hhid, gardenid, plotid, sep = "-")) |> 
+  rename(id_code=ag_d01)
+modd <- semi_join(modd, maizeplots, by="plot_id")
+look_for(modd)
+frq(modd$ag_d21)
+labels <- attributes(modd$ag_d21)
+modd$ag_d21 <- as.numeric(modd$ag_d21)
+modd <- collap(modd, ag_d21 ~ y4_hhid, FUN = fmode, na.rm= TRUE)
+attributes(modd$ag_d21) <- labels
+mlw4 <- left_join(mlw4, modd, by=c("hhid"="y4_hhid"))
+mlw4 <- mlw4 |> 
+  rename(soil_type=ag_d21)
+var_label(mlw4$soil_type) <- "HH dominant soil type"
+remove(modd, maizeplots, labels)
 
 
 

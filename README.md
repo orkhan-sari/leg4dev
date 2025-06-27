@@ -7,7 +7,7 @@ output: html_document
 
 ## This is a repository for legume-based agroecological intensification project.
 # 1. Idea:
-* impacts of legume-based intensification of maize and cassava cropping systems with main attention to gender and context-specificty of the impacts.
+* impacts of legume-based intensification of maize with main attention to gender and context-specificty of the impacts.
 
 # 2. Data:
 

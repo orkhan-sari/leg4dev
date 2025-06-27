@@ -166,7 +166,7 @@ plotdata5 <- plotdata5 |> select(-female)
 ## Asset ownership ----
 assets <- read_dta("data/eth/ess5/sect11_hh_w5.dta") |> 
   select(household_id, asset_cd, s11q00, s11q02_1, s11q02_2) |>
-  filter(asset_cd %in% c(13:18, 21:24, 29:35)) |># agricultural and other valuable assets like car, motor, refrigerator
+  filter(asset_cd %in% c(13:18, 21:24, 29:35)) |> # agricultural and other valuable assets like car, motor, refrigerator
   filter(s11q00==1)  # keep assets owned
 assets <- assets |> 
   semi_join(maizehh, by= join_by("household_id"=="hh_id_merge")) # keep maize producers. 

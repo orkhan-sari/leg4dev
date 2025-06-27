@@ -59,6 +59,9 @@ table(garden$ag_d20a) # in very rare cases other crops are listed first,
 garden <- garden |> 
   mutate(intercrop=as.integer(
     if_any(c(ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e), ~ . %in% c(11:16, 27, 34:36, 46))
+  ),
+  hybrid_maize=as.integer(
+    if_any(c(ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e), ~ . %in% c(3,4))
   ))
 
 # Also in HP data, keep only plots that have been cultivated. 
@@ -70,6 +73,7 @@ remove(plots)
 
 ### ### ### ### ### ### ### ###
 # Maize - legume rotation----
+# If legume was cultivated after the rainy season
 ### ### ### ### ### ### ### ###
 modm <- read_dta("data/mlw/ag_mod_m_13.dta") |> 
   select(y2_hhid, ag_m00, ag_m0c) |> 
@@ -95,11 +99,12 @@ garden <- left_join(garden, modm, by="plot_id")
 frq(garden$rotation) # 59 plots only.
 garden$rotation[is.na(garden$rotation)] <- 0
 plot2 <- garden |> 
-  select(y2_hhid, plot_id, count_plot, intercrop, rotation)
+  select(y2_hhid, plot_id, count_plot, intercrop, rotation, hybrid_maize)
 remove(garden,modm)
-var_label(plot2$intercrop) <- "legume intercropped maize plot"
-var_label(plot2$rotation) <- "legume is cultivated after" # ONLY AFTER CAN BE IDENTIFIED
+var_label(plot2$intercrop) <- "=1 if legume intercropped maize plot"
+var_label(plot2$rotation) <- "=1 if legume is cultivated after" # ONLY AFTER CAN BE IDENTIFIED
 var_label(plot2$count_plot) <- "number of main maize plots"
+var_label(plot2$hybrid_maize) <- " =1 if hybrid maize was cultivated"
 
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
@@ -126,6 +131,7 @@ remove(modd)
 ## no data available on owners
 
 ## Education ----
+## variable of interest: if HH has an educated adult female
 individual <- read_dta("data/mlw/hh_mod_b_13.dta") |> 
   select(y2_hhid, hh_b01,  hh_b03, hh_b04, hh_b05a, hh_b22_3) |> 
   mutate(female=ifelse(hh_b03==2,1,0)) |> 
@@ -189,7 +195,7 @@ aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_househo
 mlw2 <- mlw2 %>% select(-all_of(aggregated_vars))
 look_for(mlw2)
 mlw2 <- mlw2 |> 
-  select(1, 4:5, 10:21)
+  select(1, 4:6, 11:22)
 look_for(mlw2)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -224,7 +230,7 @@ sales <- semi_join(sales, maizehh, by=c("y2_hhid"="hh_id_merge"))
 look_for(sales)
 frq(sales$ag_i01)
 sales <- sales |> mutate(subsistence_ag=if_else(ag_i01==2,1,0))
-sales <- collap(sales, subsistence_ag~y2_hhid, FUN = fmin) # if some consider for sale then not a subsistence. 
+sales <- collap(sales, subsistence_ag~y2_hhid, FUN = fmin, na.rm = TRUE) # if some consider for sale then not a subsistence. 
 sales <- sales |> rename(hhid=y2_hhid)
 mlw2 <- left_join(mlw2, sales, by="hhid")
 frq(mlw2$subsistence_ag) # 4 still missing. no harvest? 

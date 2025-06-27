@@ -178,7 +178,7 @@ ggplot(assets, aes(x = share_female_owned)) +
   ) +
   theme_minimal()
 remove(individual, cropdata4)
-
+graphics.off()
 
 ## Education ----
 individual <- read_dta("data/eth/ess4/sect1_hh_w4.dta") |> 
@@ -439,9 +439,15 @@ frq(eth4$soil_type)
 remove(soil, maizeplots, labels)
 
 # Notes on missing data ----
-## 1023 hhs before any cleaning of missing data
-## 83 missing for manager age
-## 41 missing household size, dependency ratio, consumption and some other hh level variables
 ## 95 hhs do not have agricultural assets but still have asset index. This is because, 
 ## pca (factor) analysis still includes those with no asset and gives them a lower score. 
+## Some HHs have NA share_female owned assets, because they do not own any valuable assets. 
+## 295 missing for share_kg_sold; the reason is because of many have reported share above 100% percent. 
+## Also, some did not harvest any crops. 
 
+## Manager education ----
+eth4 |> 
+  filter(is.na(primary_education_manager)) |> 
+  select(household_id)
+# 16 households have missing education information. These are also missing in the row data, so not a hpdata issue. 
+# After close inspection of the row data, we conclude that these most likely do not have any primary education. 

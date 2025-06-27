@@ -119,6 +119,7 @@ remove(modd)
 ## no data available on owners
 
 ## Education ----
+## variable of interest: if HH has an educated adult female
 individual <- read_dta("data/mlw/hh_mod_b_16.dta") |> 
   select(y3_hhid, id_code, hh_b03, hh_b04, hh_b05a, hh_b21) |> 
   mutate(female=ifelse(hh_b03==2,1,0)) |> 
@@ -220,7 +221,7 @@ sales <- semi_join(sales, maizehh, by=c("y3_hhid"="hh_id_merge"))
 look_for(sales)
 frq(sales$ag_i01)
 sales <- sales |> mutate(subsistence_ag=if_else(ag_i01==2,1,0))
-sales <- collap(sales, subsistence_ag~y3_hhid, FUN = fmin) # if some consider for sale then not a subsistence. 
+sales <- collap(sales, subsistence_ag~y3_hhid, FUN = fmin, na.rm = TRUE) # if some consider for sale then not a subsistence. 
 sales <- sales |> rename(hhid=y3_hhid)
 mlw3 <- left_join(mlw3, sales, by="hhid")
 frq(mlw3$subsistence_ag) # 15 still missing. no harvest? 

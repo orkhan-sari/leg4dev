@@ -1,4 +1,5 @@
-# Run all scripts
+# Run all scripts an clean further
+# Ethiopia ----
 getwd()
 source("scripts/eth4.R")
 source("scripts/eth5.R")
@@ -15,6 +16,31 @@ dfeth$wave <- as.factor(dfeth$wave)
 dfeth <- dfeth |> 
   relocate(wave, .after= hh_id_obs)
 look_for(dfeth)
+dfeth |> 
+  group_by(household_id) |> 
+  filter(any(is.na(primary_education_manager))) |> 
+  select(household_id, primary_education_manager, wave) |> 
+  ungroup() |> 
+  arrange(household_id) |> 
+  print(n=50) # for all missing, we know the edu in another wave. we will assume it is the same holder. 
+dfeth <- dfeth |> 
+  group_by(household_id) |> 
+  mutate(
+    imputed_primary_edu = if_else(
+      is.na(primary_education_manager),
+      TRUE,
+      FALSE
+    ),
+    primary_education_manager = if_else(
+      is.na(primary_education_manager),
+      unique(na.omit(primary_education_manager))[1],
+      primary_education_manager
+    )
+  ) |> 
+  ungroup()
+
+
+# Malawi ----
 source("scripts/mlw2.R")
 source("scripts/mlw3.R")
 source("scripts/mlw4.R")

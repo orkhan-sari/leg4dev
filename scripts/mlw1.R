@@ -221,7 +221,7 @@ remove(mlw1basics, wave1max, wave1sum, wave1mean, aggregated_vars, hdds1, plot1,
 mlw1 <- mlw1 |> mutate(wave="wave1")
 
 ## Cleaning missing data ----
-look_for(mlw2)
+look_for(mlw1)
 ### share_kg_sold----
 ### share_kg_sold in HP data has many missing; reason: set to missing if reported share above 100% percent or
 ##  if household does not harvest any crops.
@@ -254,16 +254,203 @@ community %>%
   count(ea_id) %>%
   filter(n > 1) # distinct 
 community <- community |> distinct(ea_id,.keep_all = TRUE)
+mlw1 <- left_join(mlw1, community, by=c("ea_id_merge"="ea_id"))
+## Non-farm income ----
+wage <- read_dta("data/mlw/hh_mod_e_10.dta")
+look_for(wage, details = c("none"))
+wage <- wage[,c(2, 28:29, 33:41,  47:48, 51:59, 76:79 )]
+wage <- semi_join(wage, maizehh, by=c("case_id"="hh_id_merge"))
+look_for(wage, details = c("none"))
+mainwage <- wage[,1:12]
+mainwage <- mainwage |> filter(!is.na(hh_e19b))
+frq(mainwage$hh_e26b)
+mainwage <- mainwage |> 
+  mutate(main_income=case_when(hh_e26b==5 ~ hh_e25 * hh_e22/hh_e26a,
+                               hh_e26b==4 ~ hh_e25 * hh_e22 * hh_e23 /hh_e26a,
+                               hh_e26b==3 ~ hh_e25 * (hh_e22 * hh_e23 * hh_e24/8) / hh_e26a,
+                               .default = NA_real_)) |>  # very rough calculation 
+  mutate(main_income=as.numeric(main_income))
+# 2 missing; 18 days and one week of employment salary missing 
+mainwage$main_income[is.na(mainwage$main_income)] <- 0
+look_for(mainwage)
+frq(mainwage$hh_e28b)
+mainwage <- mainwage |> 
+  mutate(allowance=case_when(hh_e28b==5 ~ hh_e27 * hh_e22 / hh_e28a,
+                             hh_e28b==4 ~ hh_e27 * hh_e22 * hh_e23 / hh_e28a,
+                             hh_e28b==3 ~ hh_e27 * (hh_e22 * hh_e23 * hh_e24/8) / hh_e28a,
+                             .default = NA_real_)) |>  # very rough calculation 
+  mutate(allowance=as.numeric(allowance))
+mainwage <- mainwage |> mutate(income=rowSums(across(c(main_income,allowance)), na.rm=TRUE))
+mainwage <- mainwage |> select(case_id, income)
+look_for(wage, details = c("none"))
+#secondwage
+secondwage <- wage[,c(1,13:23)]
+look_for(secondwage)
+secondwage <- secondwage |> filter(!is.na(hh_e36))
+frq(secondwage$hh_e40b) # 7 obs
+secondwage <- secondwage |>
+  mutate(main_income=case_when(hh_e40b==5 ~ hh_e39 * hh_e36/hh_e40a,
+                               hh_e40b==4 ~ hh_e39 * hh_e36 * hh_e37 /hh_e40a,
+                               hh_e40b==3 ~ hh_e39 * (hh_e36 * hh_e37 * hh_e38/8) /hh_e40a,
+                               .default = NA_real_)) |> 
+  mutate(main_income=as.numeric(main_income))
+frq(secondwage$hh_e42b) # 1 obs
+secondwage <- secondwage |> 
+  mutate(allowance=case_when(hh_e42b==4 ~ hh_e41 * hh_e36 * hh_e37 / hh_e40a,
+                             .default = NA_real_))  # very rough calculation 
+secondwage <- secondwage |> mutate(income=rowSums(across(c(main_income,allowance)), na.rm=TRUE)) |> 
+  select(case_id, income)
+look_for(wage, details = c("none"))
+#ganyu
+ganyu <- wage[,c(1,24:27)]
+look_for(ganyu)
+ganyu <- ganyu |> filter(!is.na(hh_e56))
+ganyu <- ganyu |> 
+  mutate(income=hh_e56*hh_e57*hh_e58*hh_e59) # some missing becuase weeks are missing
+# will just adopt e59
+ganyu <- ganyu |> 
+  mutate(income=case_when(is.na(income) ~ hh_e59,
+                          .default = income))
+ganyu <- ganyu |> filter(!is.na(ganyu$income))
+ganyu <- collap(ganyu,income~case_id, FUN=fsum)
+wage <- rbind(ganyu, mainwage, secondwage)
+remove(ganyu, mainwage, secondwage)
+wage <- collap(wage,income~case_id, FUN=fsum)
+mlw1 <- left_join(mlw1, wage, by=c("hhid"="case_id"))
+mlw1 <- mlw1 |> 
+  tidyr::replace_na(list(income = 0)) |> 
+  rename(wage_income=income)
+var_label(mlw1$wage_income) <- "income from main and temporary off-farm work"
+var_label(mlw1$subsistence_ag) <- "HH did not sell any crop harvest"
+var_label(mlw1$plot_area_GPS) <- "Area (ha) of maize plots"
+var_label(mlw1$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
+var_label(mlw1$female_edu) <- "HH has an educated adult female"
+remove(wage)
 
+# enterprise
+enterprise <- read_dta("data/mlw/hh_mod_n2_10.dta")
+look_for(enterprise, details=c("none"))
+enterprise <- semi_join(enterprise,  maizehh, by=c("case_id"="hh_id_merge"))
+# It is not possible to calculate monthly profits from the enterprise.
+# We will take the last month's profit. 
+# Enterprise data is better calculated for the last month's profit. An annual income cannot be precisely calculated.
+# Thus, to sum all other income, we must consider average monthly income for the wage income as well 
+# (unlike in ETH where yearly is calculated). 
+enterprise <- enterprise |> 
+  filter(!is.na(hh_n40)) |> 
+  rename(enterprise_income=hh_n40)
+enterprise <- collap(enterprise, enterprise_income ~ case_id, FUN=fsum)  
 
+# other income
+other_income <- read_dta("data/mlw/hh_mod_p_10.dta") |> 
+  filter(hh_p01==1)
+other_income <- semi_join(other_income,  maizehh, by=c("case_id"="hh_id_merge"))
+look_for(other_income, details = c("none"))
+other_income <- other_income |> 
+  mutate(other_income=rowSums(across(c(hh_p02, hh_p03a, hh_p03b, hh_p03c)), na.rm=TRUE))
+other_income <- collap(other_income, other_income ~ case_id, FUN=fsum)
+# other income is yearly,
+# wage_income is yearly,
+# enterprise is but last month. 
+mlw1 <- left_join(mlw1, other_income, by=c("hhid"="case_id"))
+mlw1 <- mlw1 |> 
+  tidyr::replace_na(list(other_income = 0))
+mlw1 <- left_join(mlw1, enterprise, by=c("hhid"="case_id"))
+mlw1 <- mlw1 |> 
+  tidyr::replace_na(list(enterprise_income = 0))
+mlw1 <- mlw1 |> 
+  mutate(other_income=other_income / 12,
+         wage_income=wage_income / 12,
+         tot_other_income=wage_income+other_income+enterprise_income)
+var_label(mlw1$tot_other_income) <- "Average monthly total other income"
+remove(enterprise, other_income, community)
+look_for(mlw1)
 
+##  Extension, advisory, credit----
+# We will consider most important sources like government and private ag. extension.
+extension <- read_dta("data/mlw/ag_mod_t1_10.dta") |> 
+  select(case_id, ag_t0a, ag_t01, ag_t02) |> 
+  filter(ag_t01==1)
+frq(extension$ag_t0a)
+frq(extension$ag_t02)
+# Many report to have received extension from electronic media like tv and radio and other farmers. 
+# We will consider those extension services that have been provided by gov, private and cooperative type institutions. 
+extension <- extension |> 
+  mutate(extension_service=case_when(ag_t0a %in% c(301:307, 309) &
+                                       ag_t02 %in% c(1:10) ~ 1,
+                                     .default = 0))
+extension <- collap(extension, extension_service~case_id, FUN = fmax)
+frq(extension$extension_service)
+mlw1 <- left_join(mlw1, extension, by=c("hhid"="case_id"))
+mlw1$extension_service[is.na(mlw1$extension_service)] <- 0
+var_label(mlw1$extension_service) <- "received extension from institutions" 
+remove(extension)
 
+## TLU ----
+## page 10: https://appec-h.com/wp-content/uploads/2023/02/Livestock-production-systems.pdf
+## Large ruminants = 0.7 TLU, small ruminants = 0.1, pigs = 0.2, poultry = 0.01, horses = 0.8,
+## mules=  0.7, camels= 1
+tlu <- read_dta("data/mlw/ag_mod_r1_10.dta") |> 
+  select(case_id, ag_r00, ag_r0a, ag_r01, ag_r02) |> 
+  filter(ag_r01==1)
+frq(tlu$ag_r0a)
+tlu <- tlu |> 
+  mutate(tlu=case_when(ag_r0a %in% c(301:304) ~ ag_r02 * 0.7,
+                       ag_r0a %in% c(305:306) ~ ag_r02 * 0.7,
+                       ag_r0a %in% c(307:308) ~ ag_r02 * 0.1,
+                       ag_r0a==309 ~ ag_r02 * 0.2,
+                       ag_r0a %in% c(310:316) ~ ag_r02 * 0.01,
+                       .default = 0))
+tlu <- collap(tlu, tlu ~ case_id, FUN = fsum)
+mlw1 <- left_join(mlw1, tlu, by=c("hhid"="case_id"))
+remove(tlu, maizehh)
+mlw1 <- mlw1 |> 
+  rename(ea_id=ea_id_merge)
 
+## Land tenure - not collected ----
+## We will use information about recent disputes from 2016 data. 
+tenure <- read_dta("data/mlw/ag_mod_v_16.dta") |> 
+  select(y3_hhid, ag_v02_1) |> 
+  filter(!is.na(ag_v02_1))
+tenure <- collap(tenure, ag_v02_1 ~y3_hhid, FUN = fmax, na.rm=TRUE)
+maizehh16 <- read_dta("data/hp/Plot_dataset.dta") |>
+  filter(country=="Malawi", wave==3) |> 
+  filter(main_crop=="MAIZE") |> 
+  select(hh_id_merge, hh_id_obs)
+tenure16 <- left_join(maizehh16, tenure, by=c("hh_id_merge"="y3_hhid"))
+remove(tenure, maizehh16)
+tenure16 <- tenure16 |> select(hh_id_obs, ag_v02_1)
+mlw1 <- left_join(mlw1, tenure16, by="hh_id_obs")
+# If hhs did not have any disputes before 2010, we will assume that these hhs are very likely to possess land in 10 years too.
+mlw1 <- mlw1 |>
+  mutate(tenure_security=(case_when(is.na(ag_v02_1) ~ 1,
+                                    ag_v02_1<2011 ~ 0,
+                                    .default = 1))) |> 
+  select(-ag_v02_1)
+var_label(mlw1$tenure_security) <- "very likely to still possess land in ten years"  
+remove(tenure16)
+### ### ### ### ### ### ### ###
+## Soil type ---- 
+### ### ### ### ### ### ### ###
+modd <-  read_dta("data/mlw/ag_mod_d_10.dta") |>   # plot level 
+  select(case_id, ag_d00, ag_d01, ag_d21) |> 
+  mutate(plot_id = paste(case_id, ag_d00, sep = "-")) |> 
+  rename(id_code=ag_d01)
+modd <- semi_join(modd, maizeplots, by="plot_id")
+look_for(modd)
+frq(modd$ag_d21)
+labels <- attributes(modd$ag_d21)
+modd$ag_d21 <- as.numeric(modd$ag_d21)
+modd <- collap(modd, ag_d21 ~ case_id, FUN = fmode, na.rm= TRUE)
+attributes(modd$ag_d21) <- labels
+mlw1 <- left_join(mlw1, modd, by=c("hhid"="case_id"))
+mlw1 <- mlw1 |> 
+  rename(soil_type=ag_d21)
+var_label(mlw1$soil_type) <- "HH dominant soil type"
+remove(modd, maizeplots, labels)
 
-
-
-
-
+## Some do not have agricultural assets but still have asset index. This is because, pca (factor) analysis still includes those with 
+## no asset and gives them a lower score.
 
 
 

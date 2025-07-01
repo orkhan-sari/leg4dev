@@ -432,8 +432,8 @@ frq(tenure$ag_v0a)
 tenure <- tenure |> 
   mutate(parcel_owned=case_when(ag_v0a==1~1,
                                 .default = 0)) |> 
-  select(y3_hhid, parcel_owned, ag_v11, ag_v14) 
-frq(tenure$ag_v11)
+  select(y3_hhid, parcel_owned, ag_v02_1, ag_v11, ag_v14) 
+frq(tenure$ag_v11) # when there are recent disputes, hh is more likely to expect disagreement over ownership in the future too.
 frq(tenure$ag_v14)
 # Interestingly, many who do not expect to have any disagreements in the next 5 years, are not so sure
 # about the possession of the land in 10 years. This is an indicator of long term perspectives and expectations
@@ -474,13 +474,7 @@ mlw3 <- mlw3 |>
 var_label(mlw3$soil_type) <- "HH dominant soil type"
 remove(modd, maizeplots, labels)
 
-
-## Notes on missing data ----
-## 1023 hhs before any cleaning of missing data
-## 83 missing for manager age
-## 41 missing household size, dependency ratio, consumption and some other hh level variables
-## 95 hhs do not have agricultural assets but still have asset index. This is becuase, pca (factor) analysis still includes those with 
-## no asset and gives them a lower score. 
+ 
 
 
 

@@ -241,6 +241,7 @@ remove(sales)
 ### ### ### ### ### ### ### ###
 ## Distance ----
 # No wave 2 data 
+# market_distance from community is missing in this wave
 
 ## Non-farm income ----
 wage <- read_dta("data/mlw/hh_mod_e_13.dta")
@@ -259,7 +260,7 @@ mainwage <- mainwage |>
   mutate(main_income=as.numeric(main_income))
 # 4 missing; one teacher probably gave total year. 
 mainwage |> filter(y2_hhid=="1738-001")
-# difficult ot decide if this is an enumerator error or there is another person who earned much less. ignore
+# difficult to decide if this is an enumerator error or there is another person who earned much less. ignore
 mainwage$main_income[is.na(mainwage$main_income)] <- 0
 look_for(mainwage)
 frq(mainwage$hh_e28b)
@@ -347,7 +348,6 @@ mlw2 <- mlw2 |>
 var_label(mlw2$tot_other_income) <- "Average monthly total other income"
 remove(enterprise,other_income)
 look_for(mlw2)
-# market_distance from community is missing in this wave
 
 ##  Extension, advisory, credit----
 # We will consider most important sources like government and private ag. extension.

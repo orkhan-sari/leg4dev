@@ -146,7 +146,7 @@ remove(LRseason, SRseason)
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
-
+## DM at plot level ----
 modd <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |> 
   select(y4_hhid, plotnum, ag3a_08_1) |>
   mutate(plot_id = paste(y4_hhid, plotnum, sep = "-")) |> 
@@ -163,7 +163,7 @@ individual <- individual |>
 modd <- left_join(modd,individual, by=c("y4_hhid", "id_code"))
 summary(modd)
 remove(individual)
-var_label(modd$female) <- "female primary dm concern. activities on maize plots" # also on crops to be planted
+var_label(modd$female) <- "female primary dm concern. crops selection" # on crops to be planted
 
 modd <- modd |> select(plot_id, female,hh_b04 )  
 plot4 <- left_join(maizeplots, modd, by="plot_id")
@@ -220,6 +220,8 @@ individual <- collap(individual, hh_c07 ~ y4_hhid, FUN = fmax, na.rm = TRUE)
 #
 # Please let me know if this classification makes sense, or if you'd suggest using 
 # a different threshold.
+# 
+# primary edu is 7 years in TZ; so let's do >16
 # ---------------------------------------------------------------------------- #
 
 
@@ -241,8 +243,8 @@ hdds4 <- hdds4|>
 ### ### ### ### ### ### ### ###
 plot4 <- left_join(plot4, hpdata, by = "plot_id")
 look_for(plot4)
-
-all_identical <- all(plot4$hh_id_merge.x == plot4$hh_id_merge.y)
+# PLOT4 SHOULD NOT HAVE HH_ID_MERGE BEFORE MERGING. WHY DOES THIS HAPPEN? MUST CHECK  
+all_identical <- all(plot4$hh_id_merge.x == plot4$hh_id_merge.y) 
 print(all_identical)
 plot4 <- plot4[, !names(plot4) %in% c("hh_id_merge.y", "plot_id_merge.y")]
 names(plot4) <- gsub("\\.x$", "", names(plot4))
@@ -263,9 +265,9 @@ View(mismatched_rows)
 # --------------------------DOUBT--------------------------------------------- #
 # Checking consistency between 'female_manager' and 'female' after merging
 # Found 8 mismatches:
-# - 1 case where female_manager = 0 but female = 1
-# - 7 cases where female_manager = 1 but female = 0
-# Couldn’t identify what went wrong 
+# - 1 case where female_manager = 0 but female = 1 - would mean that male is the manager but female decided the crop
+# - 7 cases where female_manager = 1 but female = 0 ; female is the manager but male decided the crop.
+# Couldn’t identify what went wrong - keep both. 
 # ---------------------------------------------------------------------------- #
 
 plot4 <- plot4 |> select(-female)
@@ -297,6 +299,7 @@ look_for(tza4)
 
 # --------------------------DOUBT--------------------------------------------- #
 #Not sure why only columns 1, 6–7, and 12–23 are being selected here — unclear which variables are intended or why others are dropped
+# YES, I WAS SELECTING THE VARIABLES. I WILL DO THIS PART.
 tza4 <- tza4 |> 
   select(1, 6:7, 12:23)
 # ---------------------------------------------------------------------------- #

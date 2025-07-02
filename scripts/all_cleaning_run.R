@@ -41,6 +41,7 @@ dfeth <- dfeth |>
 
 
 # Malawi ----
+source("scripts/mlw1.R")
 source("scripts/mlw2.R")
 source("scripts/mlw3.R")
 source("scripts/mlw4.R")

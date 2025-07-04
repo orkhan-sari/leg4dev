@@ -63,7 +63,27 @@ garden <- garden |>
   hybrid_maize=as.integer(
     if_any(c(ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e), ~ . %in% c(3,4))
   ))
-
+## improved maize  ----
+seed <- read_dta("data/mlw/ag_mod_g_13.dta") |> 
+  mutate(plot_id = paste(y2_hhid, ag_g00, sep = "-")) |> 
+  filter(ag_g0a==1) |> 
+  select(y2_hhid, plot_id, ag_g0b)
+seed <- semi_join(seed, maizeplots, by="plot_id")
+frq(seed$ag_g0b)
+seed <- seed |> filter(ag_g0b %in% c(1:4))
+#-------------------------------------------------# 
+# Unlike mlw3 and 4, here the question on type was not directly asked.
+# Thus will generate from the crop code ag_g0b
+seed <- seed |> 
+  mutate(hybrid_maize1= case_when(ag_g0b %in% c(3,4) ~ 1,
+                                  .default = 0)) |> 
+  select(plot_id, hybrid_maize1)
+frq(seed$hybrid_maize1)
+garden <- left_join(garden, seed, by= "plot_id")
+frq(garden$hybrid_maize1)
+garden$hybrid_maize1[is.na(garden$hybrid_maize1)] <- 0
+table(garden$hybrid_maize,garden$hybrid_maize1) # many differences. 
+remove(seed)
 # Also in HP data, keep only plots that have been cultivated. 
 plots <- garden |> select(plot_id)
 maizeplots <- semi_join(maizeplots, plots, by="plot_id")
@@ -99,12 +119,12 @@ garden <- left_join(garden, modm, by="plot_id")
 frq(garden$rotation) # 59 plots only.
 garden$rotation[is.na(garden$rotation)] <- 0
 plot2 <- garden |> 
-  select(y2_hhid, plot_id, count_plot, intercrop, rotation, hybrid_maize)
+  select(y2_hhid, plot_id, count_plot, intercrop, rotation, hybrid_maize, hybrid_maize1)
 remove(garden,modm)
 var_label(plot2$intercrop) <- "=1 if legume intercropped maize plot"
 var_label(plot2$rotation) <- "=1 if legume is cultivated after" # ONLY AFTER CAN BE IDENTIFIED
 var_label(plot2$count_plot) <- "number of main maize plots"
-var_label(plot2$hybrid_maize) <- " =1 if hybrid maize was cultivated"
+var_label(plot2$hybrid_maize) <- " =1 if hybrid maize was cultivated plot section"
 
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
@@ -195,7 +215,7 @@ aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_househo
 mlw2 <- mlw2 %>% select(-all_of(aggregated_vars))
 look_for(mlw2)
 mlw2 <- mlw2 |> 
-  select(1, 4:6, 11:22)
+  select(1, 4:7, 12:23)
 look_for(mlw2)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -308,6 +328,7 @@ var_label(mlw2$subsistence_ag) <- "HH did not sell any crop harvest"
 var_label(mlw2$plot_area_GPS) <- "Area (ha) of maize plots"
 var_label(mlw2$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
 var_label(mlw2$female_edu) <- "HH has an educated adult female"
+var_label(mlw2$hybrid_maize1) <- " =1 if hybrid maize was cultivated crop section"
 remove(wage)
 
 # enterprise
@@ -387,6 +408,7 @@ tlu <- tlu |>
 tlu <- collap(tlu, tlu ~ y2_hhid, FUN = fsum)
 mlw2 <- left_join(mlw2, tlu, by=c("hhid"="y2_hhid"))
 remove(tlu, maizehh)
+look_for(mlw2)
 mlw2 <- mlw2 |> 
   rename(ea_id=ea_id_merge)
 ## Land tenure - not collected ----

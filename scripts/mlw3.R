@@ -74,6 +74,30 @@ maizehh <- maizeplots |>  distinct(hh_id_merge)
 hpdata <- semi_join(hpdata, maizeplots, by="plot_id")
 remove(plots)
 
+## improved maize  ----
+seed <- read_dta("data/mlw/ag_mod_g_16.dta") |> 
+  mutate(plot_id = paste(y3_hhid, gardenid, plotid, sep = "-")) |> 
+  filter(ag_g0a==1) |> 
+  select(y3_hhid, plot_id, crop_code, ag_g0e, local_vs_improved, ag_g0f)
+seed <- semi_join(seed, maizeplots, by="plot_id")
+frq(seed$crop_code)
+seed <- seed |> filter(crop_code %in% c(1:4))
+frq(seed$ag_g0f)
+frq(seed$local_vs_improved) # what is this local vs improved?
+#-------------------------------------------------# 
+# there is a mismatch between crop code and ag_g0f;
+# crop code reports 1350 hybrid while ag_g0f reports 1421 improved. 
+# will refer  to ag_g0f as this was a separate question.
+seed <- seed |> 
+  mutate(hybrid_maize= case_when(ag_g0f==2 ~ 1,
+                                 .default = 0)) |> 
+  select(plot_id, hybrid_maize)
+frq(seed$hybrid_maize)
+garden <- left_join(garden, seed, by= "plot_id")
+frq(garden$hybrid_maize)
+garden$hybrid_maize[is.na(garden$hybrid_maize)] <- 0
+remove(seed)
+
 ### ### ### ### ### ### ### ###
 # Maize - legume rotation----
 ### ### ### ### ### ### ### ###
@@ -185,7 +209,7 @@ aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_househo
 mlw3 <- mlw3 %>% select(-all_of(aggregated_vars))
 look_for(mlw3)
 mlw3 <- mlw3 |> 
-  select(1, 6:7, 12:23)
+  select(1, 6:8, 13:24)
 look_for(mlw3)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -308,6 +332,7 @@ var_label(mlw3$subsistence_ag) <- "HH did not sell any crop harvest"
 var_label(mlw3$plot_area_GPS) <- "Area (ha) of maize plots"
 var_label(mlw3$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
 var_label(mlw3$female_edu) <- "HH has an educated adult female"
+var_label(mlw3$hybrid_maize) <- "Improved maize adoption"
 remove(wage)
 # enterprise
 enterprise <- read_dta("data/mlw/hh_mod_n2_16.dta")
@@ -358,8 +383,7 @@ var_label(mlw3$tot_other_income) <- "Average monthly total other income"
 mlw3 <- left_join(mlw3, community, by="ea_id")
 remove(enterprise,other_income, community)
 look_for(mlw3)
-# market_distance still missing for 605 observations. No data on market distance can be used. 
-mlw3 <- mlw3 |> select(-market_distance)
+# market_distance still missing for 605 observations. No data on market distance can be used?! decide later 
 
 ##  Extension, advisory, credit----
 extension <- read_dta("data/mlw/ag_mod_t1_16.dta") |> 

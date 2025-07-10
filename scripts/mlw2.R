@@ -153,20 +153,24 @@ remove(modd)
 ## Education ----
 ## variable of interest: if HH has an educated adult female
 individual <- read_dta("data/mlw/hh_mod_b_13.dta") |> 
-  select(y2_hhid, hh_b01,  hh_b03, hh_b04, hh_b05a, hh_b22_3) |> 
+  select(y2_hhid, hh_b01, hh_b03, hh_b05a, hh_b22_3) |> 
   mutate(female=ifelse(hh_b03==2,1,0)) |> 
   filter(female==1) |> 
-  filter(hh_b05a>17)
+  filter(hh_b05a>17) |> 
+  rename(id_code=hh_b01)
 individual <- semi_join(individual, maizehh, by=c("y2_hhid" = "hh_id_merge"))
-frq(individual$hh_b22_3) # pscl - primary school; junior certificate of edu; Malawi school certificate
-look_for(individual)
-individual$hh_b22_3 <- as.numeric(individual$hh_b22_3)
-individual <- collap(individual, hh_b22_3 ~ y2_hhid, FUN = fmax, na.rm = TRUE)
-frq(individual$hh_b22_3)
+edu <- read_dta("data/mlw/hh_mod_c_13.dta") |> 
+  select(y2_hhid, hh_c01, hh_c08 ) |> 
+  rename(id_code=hh_c01)
+individual <- left_join(individual, edu, by=c("y2_hhid", "id_code"))
+individual$hh_c08 <- as.numeric(individual$hh_c08)
 individual <- individual |> 
-  mutate(female_edu=ifelse(hh_b22_3==1,0,1)) |> 
-  select(-hh_b22_3)
+  filter(!is.na(hh_c08)) |> 
+  mutate(female_edu=ifelse(hh_c08 > 7,1,0)) |> # =1 if hh has educated female with at least primary education completed. 
+  select(y2_hhid, female_edu)
+individual <- collap(individual, female_edu ~ y2_hhid, FUN = fmax)
 frq(individual$female_edu)
+remove(edu)
 
 ### ### ### ### ### ### ### ###
 # Nutrition indicators ---- 
@@ -200,6 +204,7 @@ look_for(mlw2)
 mlw2basics <- mlw2 |> 
   select(hhid, hh_id_obs, ea_id_merge) |> 
   distinct()
+n_distinct(mlw2basics$hh_id_obs) # 1252 observations
 wave2mean <- collap(mlw2,
                     farm_size + age_manager + elevation + plot_dist_household + ag_asset_index + count_plot + 
                       soil_fertility_index  ~ hhid,
@@ -390,6 +395,23 @@ mlw2$extension_service[is.na(mlw2$extension_service)] <- 0
 var_label(mlw2$extension_service) <- "received extension from institutions" 
 remove(extension)
 
+### Credit ----
+credit <- read_dta("data/mlw/hh_mod_s2_13.dta") |> 
+  select(y2_hhid, hh_s12, hh_s19a, hh_s19b)
+credit <- credit |> 
+  mutate(no_credit_access=case_when(
+    hh_s19a==7 | hh_s19b==7 ~ 1,
+    !is.na(hh_s19a) | !is.na(hh_s19b) ~ 0,
+    .default = NA_integer_)) # HH does not know any lender
+credit <- credit |> 
+  filter(!is.na(no_credit_access)) |> 
+  select(y2_hhid, no_credit_access)
+mlw2 <- left_join(mlw2, credit, by=c("hhid"="y2_hhid"))
+mlw2$no_credit_access[is.na(mlw2$no_credit_access)] <- 0
+frq(mlw2$no_credit_access)
+var_label(mlw2$no_credit_access) <- "HH does not know any lender"
+remove(credit)
+
 ## TLU ----
 ## page 10: https://appec-h.com/wp-content/uploads/2023/02/Livestock-production-systems.pdf
 ## Large ruminants = 0.7 TLU, small ruminants = 0.1, pigs = 0.2, poultry = 0.01, horses = 0.8,
@@ -411,11 +433,36 @@ remove(tlu, maizehh)
 look_for(mlw2)
 mlw2 <- mlw2 |> 
   rename(ea_id=ea_id_merge)
-## Land tenure - not collected ----
 
-### ### ### ### ### ### ### ###
+## Land tenure - not collected ----
+## We will use information about MOST recent disputes from 2016 data. 
+## This is not perfect and likely has a measurement error, because the question in 2016 asks about the most recent dispute.
+## Thus hh's with consistent disputes or multiple disputes may not be correctly captured with below approach. 
+## However, this is the only available data we have. 
+tenure <- read_dta("data/mlw/ag_mod_v_16.dta") |> 
+  select(y3_hhid, ag_v02_1) |> 
+  filter(!is.na(ag_v02_1)) |> 
+  filter(ag_v02_1<2014) # keep those disputes before 2011 for first wave
+tenure <- collap(tenure, ag_v02_1 ~ y3_hhid, FUN = fmax, na.rm=TRUE)
+maizehh16 <- read_dta("data/hp/Plot_dataset.dta") |>
+  filter(country=="Malawi", wave==3) |> 
+  filter(main_crop=="MAIZE") |> 
+  distinct(hh_id_merge, hh_id_obs)
+tenure16 <- left_join(maizehh16, tenure, by=c("hh_id_merge"="y3_hhid"))
+remove(tenure, maizehh16)
+tenure16 <- tenure16 |> select(hh_id_obs, ag_v02_1)
+mlw2 <- left_join(mlw2, tenure16, by="hh_id_obs")
+# If hhs did not have any disputes before 2013, we will assume that these hhs are very likely to possess land in 10 years too.
+mlw2 <- mlw2 |>
+  mutate(tenure_security=(case_when(is.na(ag_v02_1) ~ 1,
+                                    ag_v02_1<2014 ~ 0,
+                                    .default = 1))) |> 
+  select(-ag_v02_1)
+var_label(mlw2$tenure_security) <- "very likely to still possess land in ten years"  
+remove(tenure16)
+
 ## Soil type ---- 
-### ### ### ### ### ### ### ###
+
 modd <-  read_dta("data/mlw/ag_mod_d_13.dta") |>   # plot level 
   select(y2_hhid, ag_d00, ag_d01, ag_d21) |> 
   mutate(plot_id = paste(y2_hhid, ag_d00, sep = "-")) |> 
@@ -433,7 +480,30 @@ mlw2 <- mlw2 |>
 var_label(mlw2$soil_type) <- "HH dominant soil type"
 remove(modd, maizeplots, labels)
 
-
+## Input coupon ---- 
+coupon <- read_dta("data/mlw/ag_mod_e2_13.dta") |> 
+  filter(ag_e0a==1) |>  # obtained coupon
+  select(y2_hhid, ag_e01_1, ag_e07)
+frq(coupon$ag_e01_1)
+frq(coupon$ag_e07)
+look_for(coupon)
+coupon <- coupon |>
+  mutate(fert_voucher=if_else(as.integer(ag_e07) %in% c(1:6), 1, 0),
+         maize_voucher=if_else(as.integer(ag_e07) %in% c(12, 15), 1, 0),
+         bean_voucher=if_else(as.integer(ag_e07) %in% c(16:19), 1, 0) 
+         )
+coupon <- collap(coupon, maize_voucher + fert_voucher + bean_voucher ~ y2_hhid, FUN = fmax, na.rm=TRUE)
+mlw2 <- left_join(mlw2, coupon, by=c("hhid"="y2_hhid"))
+mlw2$maize_voucher[is.na(mlw2$maize_voucher)] <- 0
+mlw2$fert_voucher[is.na(mlw2$fert_voucher)] <- 0
+mlw2$bean_voucher[is.na(mlw2$bean_voucher)] <- 0
+frq(mlw2$maize_voucher)
+frq(mlw2$fert_voucher)
+frq(mlw2$bean_voucher)
+var_label(mlw2$maize_voucher) <- "HH had obtained voucher for maize seed"
+var_label(mlw2$fert_voucher) <- "HH had obtained voucher for inorganic fertilizer"
+var_label(mlw2$bean_voucher) <- "HH had obtained voucher for bean seeds"
+remove(coupon)
 
 
 

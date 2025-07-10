@@ -153,22 +153,22 @@ remove(modd)
 sex <- read_dta("data/mlw/hh_mod_b_10.dta") |> 
   select(case_id, id_code, hh_b03, hh_b05a)
 individual <- read_dta("data/mlw/hh_mod_c_10.dta") |> 
-  select(case_id, id_code, hh_c05a, hh_c05b, hh_c09)
+  select(case_id, id_code, hh_c05a, hh_c05b, hh_c08)
 individual <- left_join(individual, sex, by=c("case_id", "id_code"))
 individual <- individual |> 
   mutate(female=ifelse(hh_b03==2,1,0)) |> 
   filter(female==1) |> 
   filter(hh_b05a>17)
 individual <- semi_join(individual, maizehh, by=c("case_id" = "hh_id_merge"))
-frq(individual$hh_c09) # pscl - primary school; junior certificate of edu; Malawi school certificate
+frq(individual$hh_c08) # >7
 look_for(individual)
-individual$hh_c09 <- as.numeric(individual$hh_c09)
-individual <- collap(individual, hh_c09 ~ case_id, FUN = fmax, na.rm = TRUE)
-frq(individual$hh_c09)
+individual$hh_c08 <- as.numeric(individual$hh_c08)
 individual <- individual |> 
-  mutate(female_edu=ifelse(hh_c09==1,0,1)) |> 
-  select(-hh_c09)
+  filter(!is.na(hh_c08)) |> 
+  mutate(female_edu=ifelse(hh_c08 > 7,1,0)) |> # =1 if hh has educated female with at least primary education completed. 
+  select(case_id, female_edu)
 frq(individual$female_edu)
+individual <- collap(individual, female_edu ~ case_id, FUN = fmax)
 remove(sex)
 
 ### ### ### ### ### ### ### ###
@@ -203,6 +203,7 @@ look_for(mlw1)
 mlw1basics <- mlw1 |> 
   select(hhid, hh_id_obs, ea_id_merge) |> 
   distinct()
+n_distinct(mlw1basics$hh_id_obs) # 1009 observations
 wave1mean <- collap(mlw1,
                    farm_size + age_manager + elevation + plot_dist_household + ag_asset_index + count_plot + 
                      soil_fertility_index  ~ hhid,
@@ -408,6 +409,24 @@ mlw1$extension_service[is.na(mlw1$extension_service)] <- 0
 var_label(mlw1$extension_service) <- "received extension from institutions" 
 remove(extension)
 
+### Credit ----
+credit <- read_dta("data/mlw/hh_mod_s2_10.dta") |> 
+  select(case_id, hh_s12, hh_s19a, hh_s19b)
+frq(credit$hh_s19a) # do not know any lender; this is what we can capture
+credit <- credit |> 
+  mutate(no_credit_access=case_when(
+    hh_s19a==7 | hh_s19b==7 ~ 1,
+    !is.na(hh_s19a) | !is.na(hh_s19b) ~ 0,
+    .default = NA_integer_)) # HH does not know any lender
+credit <- credit |> 
+  filter(!is.na(no_credit_access)) |> 
+  select(case_id, no_credit_access)
+mlw1 <- left_join(mlw1, credit, by=c("hhid"="case_id"))
+mlw1$no_credit_access[is.na(mlw1$no_credit_access)] <- 0
+frq(mlw1$no_credit_access)
+remove(credit)
+var_label(mlw1$no_credit_access) <- "HH does not know any lender"
+
 ## TLU ----
 ## page 10: https://appec-h.com/wp-content/uploads/2023/02/Livestock-production-systems.pdf
 ## Large ruminants = 0.7 TLU, small ruminants = 0.1, pigs = 0.2, poultry = 0.01, horses = 0.8,
@@ -430,15 +449,21 @@ mlw1 <- mlw1 |>
   rename(ea_id=ea_id_merge)
 
 ## Land tenure - not collected ----
-## We will use information about recent disputes from 2016 data. 
+## We will use information about MOST recent disputes from 2016 data. 
+## This is not perfect and likely has a measurement error, because the question in 2016 asks about the most recent dispute.
+## Thus hh's with consistent disputes or multiple disputes may not be correctly captured with below approach. 
+## However, this is the only available data we have. 
 tenure <- read_dta("data/mlw/ag_mod_v_16.dta") |> 
   select(y3_hhid, ag_v02_1) |> 
-  filter(!is.na(ag_v02_1))
+  filter(!is.na(ag_v02_1)) |> 
+  filter(ag_v02_1<2011) # keep those disputes before 2011 for first wave
+n_distinct(tenure$y3_hhid)
+look_for(tenure)
 tenure <- collap(tenure, ag_v02_1 ~y3_hhid, FUN = fmax, na.rm=TRUE)
 maizehh16 <- read_dta("data/hp/Plot_dataset.dta") |>
   filter(country=="Malawi", wave==3) |> 
   filter(main_crop=="MAIZE") |> 
-  select(hh_id_merge, hh_id_obs)
+  distinct(hh_id_merge, hh_id_obs)
 tenure16 <- left_join(maizehh16, tenure, by=c("hh_id_merge"="y3_hhid"))
 remove(tenure, maizehh16)
 tenure16 <- tenure16 |> select(hh_id_obs, ag_v02_1)
@@ -446,14 +471,12 @@ mlw1 <- left_join(mlw1, tenure16, by="hh_id_obs")
 # If hhs did not have any disputes before 2010, we will assume that these hhs are very likely to possess land in 10 years too.
 mlw1 <- mlw1 |>
   mutate(tenure_security=(case_when(is.na(ag_v02_1) ~ 1,
-                                    ag_v02_1<2011 ~ 0,
-                                    .default = 1))) |> 
+                                     .default = 0))) |> 
   select(-ag_v02_1)
 var_label(mlw1$tenure_security) <- "very likely to still possess land in ten years"  
 remove(tenure16)
-### ### ### ### ### ### ### ###
+
 ## Soil type ---- 
-### ### ### ### ### ### ### ###
 modd <-  read_dta("data/mlw/ag_mod_d_10.dta") |>   # plot level 
   select(case_id, ag_d00, ag_d01, ag_d21) |> 
   mutate(plot_id = paste(case_id, ag_d00, sep = "-")) |> 
@@ -470,6 +493,32 @@ mlw1 <- mlw1 |>
   rename(soil_type=ag_d21)
 var_label(mlw1$soil_type) <- "HH dominant soil type"
 remove(modd, maizeplots, labels)
+
+## Input coupon ---- 
+coupon <- read_dta("data/mlw/ag_mod_e_10.dta") |> 
+  filter(ag_e0a==1) |>  # obtained coupon
+  select(case_id, ag_e0d, ag_e07)
+look_for(coupon)
+frq(coupon$ag_e0d) 
+# 23:21:0+4S/Chitowe is a government-issued voucher that entitles the holder to purchase NPK
+frq(coupon$ag_e07)
+#  coupon |> 
+#   filter(ag_e0d==11) |> 
+#   select(ag_e07) |> 
+#   print(n=40) # other chemical
+coupon <- coupon |>
+  mutate(fert_voucher=if_else(as.integer(ag_e07) %in% c(1:6), 1, 0),
+         maize_voucher=if_else(as.integer(ag_e07)==12, 1, 0))
+n_distinct(coupon$case_id)  
+coupon <- collap(coupon, maize_voucher + fert_voucher ~ case_id, FUN = fmax, na.rm=TRUE)
+mlw1 <- left_join(mlw1, coupon, by=c("hhid"="case_id"))
+mlw1$maize_voucher[is.na(mlw1$maize_voucher)] <- 0
+mlw1$fert_voucher[is.na(mlw1$fert_voucher)] <- 0
+frq(mlw1$maize_voucher)
+frq(mlw1$fert_voucher)
+var_label(mlw1$maize_voucher) <- "HH had obtained vaicher for maize seed"
+var_label(mlw1$fert_voucher) <- "HH had obtained vaicher for inorganic fertilizer"
+remove(coupon)
 
 ## Some do not have agricultural assets but still have asset index. This is because, pca (factor) analysis still includes those with 
 ## no asset and gives them a lower score.

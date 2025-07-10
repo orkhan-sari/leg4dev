@@ -147,20 +147,22 @@ remove(modd)
 ## Education ----
 ## variable of interest: if HH has an educated adult female
 individual <- read_dta("data/mlw/hh_mod_b_19.dta") |> 
-  select(y4_hhid, id_code, hh_b03, hh_b04, hh_b05a, hh_b21) |> 
+  select(y4_hhid, id_code, hh_b03, hh_b04, hh_b05a) |> 
   mutate(female=ifelse(hh_b03==2,1,0)) |> 
   filter(female==1) |> 
   filter(hh_b05a>17)
 individual <- semi_join(individual, maizehh, by=c("y4_hhid" = "hh_id_merge"))
-frq(individual$hh_b21) # pscl - primary school; junior certificate of edu; Malawi school certificate
-look_for(individual)
-individual$hh_b21 <- as.numeric(individual$hh_b21)
-individual <- collap(individual, hh_b21 ~ y4_hhid, FUN = fmax, na.rm = TRUE )
-frq(individual$hh_b21) # pscl - primary school; junior certificate of edu; Malawi school certificate
+edu <- read_dta("data/mlw/hh_mod_c_19.dta") |> 
+  select(y4_hhid, id_code, hh_c08 )
+individual <- left_join(individual, edu, by=c("y4_hhid", "id_code"))
+individual$hh_c08 <- as.numeric(individual$hh_c08)
 individual <- individual |> 
-  mutate(female_edu=ifelse(hh_b21==1,0,1)) |> 
-  select(-hh_b21)
+  filter(!is.na(hh_c08)) |> 
+  mutate(female_edu=ifelse(hh_c08 > 7,1,0)) |> # =1 if hh has educated female with at least primary education completed. 
+  select(y4_hhid, female_edu)
+individual <- collap(individual, female_edu ~ y4_hhid, FUN = fmax)
 frq(individual$female_edu)
+remove(edu)
 
 ### ### ### ### ### ### ### ###
 # Nutrition indicators ---- 
@@ -194,6 +196,7 @@ look_for(mlw4)
 mlw4basics <- mlw4 |> 
   select(hhid, ea_id_merge, hh_id_obs) |> 
   distinct()
+n_distinct(mlw4basics$hh_id_obs) # 2085 observations
 wave4mean <- collap(mlw4,
                     farm_size + age_manager + elevation + plot_dist_household + ag_asset_index + count_plot + 
                       soil_fertility_index  ~ hhid,
@@ -382,8 +385,6 @@ var_label(mlw4$tot_other_income) <- "Average monthly total other income"
 mlw4 <- left_join(mlw4, community, by="ea_id")
 remove(enterprise,other_income, community)
 look_for(mlw4)
-# market_distance is still missing for half of the observations. No data on market distance can be used. 
-mlw4 <- mlw4 |> select(-market_distance)
 
 ##  Extension, advisory, credit----
 # We will consider most important sources like government and private ag. extension.
@@ -409,6 +410,23 @@ mlw4$extension_service[is.na(mlw4$extension_service)] <- 0
 var_label(mlw4$extension_service) <- "received extension from institutions" 
 remove(extension)
 
+### Credit ----
+credit <- read_dta("data/mlw/hh_mod_s2_19.dta") |> 
+  select(y4_hhid, hh_s12, hh_s19a, hh_s19b)
+credit <- credit |> 
+  mutate(no_credit_access=case_when(
+    hh_s19a==7 | hh_s19b==7 ~ 1,
+    !is.na(hh_s19a) | !is.na(hh_s19b) ~ 0,
+    .default = NA_integer_)) # HH does not know any lender
+credit <- credit |> 
+  filter(!is.na(no_credit_access)) |> 
+  select(y4_hhid, no_credit_access)
+mlw4 <- left_join(mlw4, credit, by=c("hhid"="y4_hhid"))
+mlw4$no_credit_access[is.na(mlw4$no_credit_access)] <- 0
+frq(mlw4$no_credit_access)
+var_label(mlw4$no_credit_access) <- "HH does not know any lender"
+remove(credit)
+
 ## TLU ----
 ## page 10: https://appec-h.com/wp-content/uploads/2023/02/Livestock-production-systems.pdf
 ## Large ruminants = 0.7 TLU, small ruminants = 0.1, pigs = 0.2, poultry = 0.01, horses = 0.8,
@@ -432,7 +450,6 @@ remove(tlu, maizehh)
 
 ### ### ### ### ### ### ### ###
 ## Soil type ---- 
-### ### ### ### ### ### ### ###
 modd <- read_dta("data/mlw/ag_mod_d_19.dta") |> 
   select(y4_hhid, gardenid, plotid, ag_d01, ag_d21) |>
   mutate(plot_id = paste(y4_hhid, gardenid, plotid, sep = "-")) |> 
@@ -450,8 +467,30 @@ mlw4 <- mlw4 |>
 var_label(mlw4$soil_type) <- "HH dominant soil type"
 remove(modd, maizeplots, labels)
 
-
-
+## Input coupon ---- 
+coupon <- read_dta("data/mlw/ag_mod_e2_19.dta") |> 
+  filter(ag_e01==1) |>  # obtained coupon
+  select(y4_hhid, ag_e01_1, ag_e07)
+frq(coupon$ag_e01_1)
+frq(coupon$ag_e07)
+look_for(coupon)
+coupon <- coupon |>
+  mutate(fert_voucher=if_else(as.integer(ag_e07) %in% c(1:6), 1, 0),
+         maize_voucher=if_else(as.integer(ag_e07) %in% c(12, 15), 1, 0),
+         bean_voucher=if_else(as.integer(ag_e07) %in% c(16:19), 1, 0) 
+  )
+coupon <- collap(coupon, maize_voucher + fert_voucher + bean_voucher ~ y4_hhid, FUN = fmax, na.rm=TRUE)
+mlw4 <- left_join(mlw4, coupon, by=c("hhid"="y4_hhid"))
+mlw4$maize_voucher[is.na(mlw4$maize_voucher)] <- 0
+mlw4$fert_voucher[is.na(mlw4$fert_voucher)] <- 0
+mlw4$bean_voucher[is.na(mlw4$bean_voucher)] <- 0
+frq(mlw4$maize_voucher)
+frq(mlw4$fert_voucher)
+frq(mlw4$bean_voucher)
+var_label(mlw4$maize_voucher) <- "HH had obtained voucher for maize seed"
+var_label(mlw4$fert_voucher) <- "HH had obtained voucher for inorganic fertilizer"
+var_label(mlw4$bean_voucher) <- "HH had obtained voucher for bean seeds"
+remove(coupon)
 
 
 

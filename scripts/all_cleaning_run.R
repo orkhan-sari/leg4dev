@@ -41,10 +41,10 @@ dfeth <- dfeth |>
 
 
 # Malawi ----
-source("scripts/mlw1.R")
-source("scripts/mlw2.R")
-source("scripts/mlw3.R")
-source("scripts/mlw4.R")
+source("scripts/mlw1.R") # 1009 obs
+source("scripts/mlw2.R") # 1252 obs
+source("scripts/mlw3.R") # 1707 obs
+source("scripts/mlw4.R") # 2085 obs
 setdiff(names(mlw1), names(mlw2))
 setdiff(names(mlw2), names(mlw1))
 setdiff(names(mlw1), names(mlw3))
@@ -53,8 +53,9 @@ setdiff(names(mlw1), names(mlw4))
 setdiff(names(mlw4), names(mlw1))
 setdiff(names(mlw4), names(mlw3))
 setdiff(names(mlw3), names(mlw4))
-names(mlw3) # land tenure data is only collected in this round. 
-dfmlw <-bind_rows(mlw2, mlw3) 
+# "y2_hhid" "parcel_owned" "tenure_security"; land tenure data is only collected in 3 and adapted to 1 and 2. 
+dfmlw <-bind_rows(mlw1, mlw2) 
+dfmlw <-bind_rows(dfmlw, mlw3)
 dfmlw <-bind_rows(dfmlw, mlw4)
 dfmlw <- dfmlw |> 
   group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 

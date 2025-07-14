@@ -444,6 +444,7 @@ tlu <- tlu |>
                        .default = 0))
 tlu <- collap(tlu, tlu ~ case_id, FUN = fsum)
 mlw1 <- left_join(mlw1, tlu, by=c("hhid"="case_id"))
+mlw1$tlu[is.na(mlw1$tlu)] <- 0
 remove(tlu, maizehh)
 mlw1 <- mlw1 |> 
   rename(ea_id=ea_id_merge)
@@ -520,8 +521,10 @@ var_label(mlw1$maize_voucher) <- "HH had obtained vaicher for maize seed"
 var_label(mlw1$fert_voucher) <- "HH had obtained vaicher for inorganic fertilizer"
 remove(coupon)
 
+## Missing data and notes ----
 ## Some do not have agricultural assets but still have asset index. This is because, pca (factor) analysis still includes those with 
 ## no asset and gives them a lower score.
+## Flood shock is absent in mlw1, some missing in other waves are assumed no shock. 
 
 
 

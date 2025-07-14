@@ -194,7 +194,7 @@ mlw3 <- plot3 |>
          -respondent_id_obs, -respondent_id_merge,-age_manager_row)
 look_for(mlw3)
 mlw3basics <- mlw3 |> 
-  select(hhid, hh_id_obs, ea_id, y2_hhid) |> 
+  select(hhid, hh_id_obs, ea_id) |> 
   distinct()
 n_distinct(mlw3basics$hh_id_obs) # 1707 observations
 wave3mean <- collap(mlw3,
@@ -467,6 +467,7 @@ tlu <- tlu |>
                        .default = 0))
 tlu <- collap(tlu, tlu ~ y3_hhid, FUN = fsum)
 mlw3 <- left_join(mlw3, tlu, by=c("hhid"="y3_hhid"))
+mlw3$tlu[is.na(mlw3$tlu)] <- 0
 remove(tlu)
 
 ## Land tenure ----
@@ -541,7 +542,8 @@ var_label(mlw3$fert_voucher) <- "HH had obtained voucher for inorganic fertilize
 var_label(mlw3$bean_voucher) <- "HH had obtained voucher for bean seeds"
 remove(coupon)
  
-
+## Missing data and notes ----
+## shocks missing for 16 hhs
 
 
 

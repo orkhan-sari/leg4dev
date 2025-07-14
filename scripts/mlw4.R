@@ -444,6 +444,7 @@ tlu <- tlu |>
                        .default = 0))
 tlu <- collap(tlu, tlu ~ y4_hhid, FUN = fsum)
 mlw4 <- left_join(mlw4, tlu, by=c("hhid"="y4_hhid"))
+mlw4$tlu[is.na(mlw4$tlu)] <- 0
 remove(tlu, maizehh)
 
 ## Land tenure - not collected ----
@@ -492,7 +493,8 @@ var_label(mlw4$fert_voucher) <- "HH had obtained voucher for inorganic fertilize
 var_label(mlw4$bean_voucher) <- "HH had obtained voucher for bean seeds"
 remove(coupon)
 
-
+## Missing data and notes ----
+## shocks missing for 22 hhs
 
 
 

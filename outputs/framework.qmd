@@ -74,3 +74,37 @@ flowchart TD
     T --> |append|S
 
 ```
+
+```{r}
+#| echo: false
+#| warning: false
+survey_data <- tribble(
+  ~Country,      ~Wave, ~StartYear, ~EndYear,
+  "Ethiopia",    "Wave 4", 2018, 2018,
+  "Ethiopia",    "Wave 5", 2021, 2021,
+  "Malawi",      "Wave 1", 2010, 2010,
+  "Malawi",      "Wave 2", 2013, 2013,
+  "Malawi",      "Wave 3", 2016, 2016,
+  "Malawi",      "Wave 4", 2019, 2019,
+  "Tanzania",    "Wave 4", 2014, 2014,
+  "Tanzania",    "Wave 5", 2020, 2021
+)
+
+library(ggplot2)
+
+# Gantt-style plot
+ggplot(survey_data, aes(x = StartYear, xend = EndYear, 
+                        y = fct_rev(factor(Country)), 
+                        yend = fct_rev(factor(Country)))) +
+  geom_label(aes(x = StartYear, label = Wave), 
+            size = 5, fill="#D4FF1D", color="blue") +
+  scale_x_continuous(breaks = seq(2009, 2021, by = 1),
+                     limits = c(2008, 2022) ) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.y = element_text(size = 12, color = "blue"),
+        axis.text.x = element_text(angle = 45, hjust = 1, color = "blue"))
+```
+

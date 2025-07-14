@@ -429,6 +429,8 @@ tlu <- tlu |>
                        .default = 0))
 tlu <- collap(tlu, tlu ~ y2_hhid, FUN = fsum)
 mlw2 <- left_join(mlw2, tlu, by=c("hhid"="y2_hhid"))
+mlw2$tlu[is.na(mlw2$tlu)] <- 0
+var_label(mlw2$tlu) <- "Tropical livestock units"
 remove(tlu, maizehh)
 look_for(mlw2)
 mlw2 <- mlw2 |> 
@@ -505,7 +507,8 @@ var_label(mlw2$fert_voucher) <- "HH had obtained voucher for inorganic fertilize
 var_label(mlw2$bean_voucher) <- "HH had obtained voucher for bean seeds"
 remove(coupon)
 
-
+## Missing data and notes ----
+## shocks missing for 13 hhs. 
 
 
 

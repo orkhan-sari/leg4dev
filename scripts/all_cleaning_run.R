@@ -32,8 +32,17 @@ dfeth <- dfeth |>
                                              .default = primary_education_manager)
          )
 look_for(dfeth)
+table(dfeth$rotation, dfeth$wave) # 174 and 201 adopters
+table(dfeth$improved_maize, dfeth$wave) # 201 and 269 adopters 
+library(knitr)
+dfeth |> 
+  count(wave, improved_maize, rotation) |> 
+  pivot_wider(names_from = rotation, values_from = n, values_fill = 0) |> 
+  kable()
 # dir.create("data/est") # create the folder for estimation STATA datasets
 write_dta(dfeth, "data/est/dfeth.dta", version = 15)
+saveRDS(dfeth, file = "data/est/dfeth.rds")
+
 # Malawi ----
 source("scripts/mlw1.R") # 1009 obs
 source("scripts/mlw2.R") # 1252 obs

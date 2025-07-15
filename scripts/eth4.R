@@ -122,6 +122,27 @@ var_label(rotation4$rotation) <- "If household rotated at least one maize field 
 var_label(rotation4$count_plot) <- "number of main maize plots"
 plotdata4 <- left_join(cropdata4, hpdata, by=c("plot_id")) |>
   select(-s3q03, -s3q34, -s4q02)
+
+## improved maize  ----
+## here we don't have the info at parcel level but only at hh level. all seeds were asked. We concentrate on maize. 
+seed <- read_dta("data/eth/ess4/sect5_pp_w4.dta") |> 
+  select(household_id, holder_id, s5q0B, s5q01a, s5q01b ) |> 
+  filter(s5q0B==2)
+look_for(seed)
+seed |> group_by(household_id) |> 
+  filter(n()>1) |>
+  ungroup() # improved varieties in some fields of HHs. 
+# HHs have several maize fields,and it is not possible to identify 
+# in which parcel the improved seed was cultivated, i.e., rotated parcel or not.** 
+seed <- seed |>
+  mutate(s5q01a=as.numeric(s5q01a),
+         improved_maize=if_else(s5q01a==2,1,0))
+seed <- collap(seed, improved_maize ~ household_id, FUN = fmax)
+plotdata4 <- left_join(plotdata4, seed, by="household_id")
+frq(plotdata4$improved_maize) # 6 missing
+plotdata4$improved_maize[is.na(plotdata4$improved_maize)] <- 0
+remove(seed)
+
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
@@ -135,7 +156,7 @@ field <- semi_join(field, maizeplots, by="plot_id") # keep only main maize plots
 field4 <- left_join(field, individual, by=c("household_id", "s3q13"))
 remove(field)
 var_label(field4$female) <- "female primary dm concern. activities on maize plot" # also on crops to be planted
-field4 <- field4 |>select(household_id, parcel_id, field_id, plot_id, female)
+field4 <- field4 |> select(household_id, parcel_id, field_id, plot_id, female)
 plotdata4 <- left_join(plotdata4,field4, by=c("household_id", "parcel_id", "field_id", "plot_id"))
 look_for(plotdata4)
 remove(field4)
@@ -225,7 +246,7 @@ plotdata4 <- plotdata4 |>
   select(-s3q13, -s4q03,-s4q01b)
 look_for(plotdata4)
 wave4 <- plotdata4 |> 
-  select(1, 10, 15:43)
+  select(1, 10, 15:44)
 look_for(wave4)  
 wave4basics <- wave4 |> 
   select(household_id, hh_id_obs) |> 
@@ -244,7 +265,7 @@ aggregated_vars <- c("farm_size", "age_manager", "dist_market", "elevation", "pl
 wave4 <- wave4 %>% select(-all_of(aggregated_vars))
 look_for(wave4)
 wave4 <- wave4 |> 
-  select(1, 6:8, 11:20)
+  select(1, 6:8, 11:21)
 look_for(wave4)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -272,6 +293,7 @@ wave4 <- wave4 |>
   select(-s2q03)
 var_label(wave4$share_female_owned) <- "women's control over assets"
 var_label(wave4$female_edu) <- "HH has an adult female who can read and write"
+var_label(wave4$improved_maize) <- "HH has cultivated imporved maize in at least one field"
 remove(wave4basics, wave4max, wave4sum,wave4mean,rotation4, assets, aggregated_vars, hhhp4, individual)
 
 ## Cleaning missing data ----
@@ -427,16 +449,34 @@ soil <- read_dta("data/eth/ess4/sect2_pp_w4.dta") |>
 soil <- semi_join(soil, maizeplots, by=c("parcel_id"="parcel_id_merge"))
 look_for(soil)
 frq(soil$s2q16)
-labels <- attributes(soil$s2q16)
-soil$s2q16 <- as.numeric(soil$s2q16)
-soil <- collap(soil, s2q16 ~ household_id, FUN = fmode, na.rm= TRUE)
-attributes(soil$s2q16) <- labels
+# Vertisol and Luvisol are generally considered much better for crop production. Overall luvisol often better.
+soil <- soil |> 
+  mutate(s2q16 = as.numeric(soil$s2q16),
+         soil_type=case_when(s2q16==4 ~ 2,
+                             s2q16==3 ~ 1,
+                             .default = 0))
+mode_or_max <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) return(NA)
+  
+  tab <- table(x)
+  most_common <- which(tab == max(tab))
+  
+  if (length(most_common) == 1) {
+    return(as.numeric(names(most_common)))
+  } else {
+    return(max(as.numeric(names(most_common))))
+  }
+} 
+soil <- collap(soil, soil_type ~ household_id, FUN =mode_or_max) # select dominant otherwise Luvisol. 
+rm(mode_or_max)
+soil <- soil |> 
+  mutate(soil_type= factor(soil_type, levels = c(0,1,2), labels = c("Other", "Vertisol", "Luvisol")))
+frq(soil$soil_type)
 eth4 <- left_join(eth4, soil, by="household_id")
-eth4 <- eth4 |> 
-  rename(soil_type=s2q16)
 var_label(eth4$soil_type) <- "HH dominant soil type"
 frq(eth4$soil_type)
-remove(soil, maizeplots, labels)
+remove(soil, maizeplots)
 
 # Notes on missing data ----
 ## 95 hhs do not have agricultural assets but still have asset index. This is because, 

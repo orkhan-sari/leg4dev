@@ -316,19 +316,14 @@ plot_hh_dist <- read_dta(distance_from_plot) |>
   rename(plot_hh_distance = ag3a_02_1) |>  
   mutate(plot_id = paste(y4_hhid, plotnum, sep = "-")) |>  
   semi_join(maizeplots, by = "plot_id")
-
 attr(plot_hh_dist$plot_hh_distance, "label") <- "Distance from plot to home (in KMs), self-reported"
-
 look_for(plot_hh_dist)
-
 plot_hh_dist |>
   count(y4_hhid) |>
   filter(n > 1)
-
 plot_hh_dist<- plot_hh_dist |>
   group_by(y4_hhid) |>
   summarise(plot_hh_dist_mean = mean(plot_hh_distance, na.rm = TRUE))
-
 tza4 <- left_join(tza4, plot_hh_dist, by = c("hhid" = "y4_hhid"))
 
 # ───── Plot-to-road distance ─────
@@ -337,19 +332,14 @@ plot_road_dist <- read_dta(distance_from_plot) |>
   rename(plot_road_distance = ag3a_02_2) |>  
   mutate(plot_id = paste(y4_hhid, plotnum, sep = "-")) |>  
   semi_join(maizeplots, by = "plot_id")
-
 attr(plot_road_dist$plot_road_distance, "label") <- "Distance from plot to road (in KMs), self-reported"
-
 look_for(plot_road_dist)
-
 plot_road_dist |>
   count(y4_hhid) |>
   filter(n > 1)
-
 plot_road_dist<- plot_road_dist |>
   group_by(y4_hhid) |>
   summarise(plot_road_dist_mean = mean(plot_road_distance, na.rm = TRUE))
-
 tza4 <- left_join(tza4, plot_road_dist, by = c("hhid" = "y4_hhid"))
 
 # ───── Plot-to-market distance ─────
@@ -358,22 +348,16 @@ plot_market_dist <- read_dta(distance_from_plot) |>
   rename(plot_market_distance = ag3a_02_3) |>  
   mutate(plot_id = paste(y4_hhid, plotnum, sep = "-")) |>  
   semi_join(maizeplots, by = "plot_id")
-
 attr(plot_market_dist$plot_market_distance, "label") <- "Distance from plot to market (in KMs), self-reported"
-
 look_for(plot_market_dist)
-
 plot_market_dist |>
   count(y4_hhid) |>
   filter(n > 1)
-
 plot_market_dist<- plot_market_dist |>
   group_by(y4_hhid) |>
   summarise(plot_market_dist_mean = mean(plot_market_distance, na.rm = TRUE))
-
 tza4 <- left_join(tza4, plot_market_dist, by = c("hhid" = "y4_hhid"))
-
-remove(plot_hh_dist, plot_market_dist, plot_road_dist)
+remove(plot_hh_dist, plot_market_dist, plot_road_dist, distance_from_plot)
 
 ## Non-farm income ----
 
@@ -382,8 +366,10 @@ look_for(wage, details = "none")
 wage <- wage[, c(1:3, 5:7, 9:10, 28, 35:45, 51, 57:64)]
 wage <- semi_join(wage, maizehh, by = c("y4_hhid" = "hh_id_merge"))
 look_for(wage, details = "none")
-mainwage <- wage[, c(1:5, 7, 10:20)]
-mainwage <- mainwage |> filter(!is.na(hh_e06_1))
+mainwage <- wage[, c(2, 7, 10:20)]
+mainwage <- mainwage |> filter(hh_e24==1)
+look_for(mainwage, details = "none")
+frq(mainwage$hh_e26_2)
 mainwage <- mainwage |>
   mutate(
     hh_e26_1 = as.numeric(hh_e26_1),   # cash wage amount
@@ -396,49 +382,39 @@ mainwage <- mainwage |>
   )
 frq(mainwage$hh_e26_2)
 
-# Convert cash payment to hourly rate
-mainwage$hourly_rate_cash <- with(mainwage, case_when(
-  hh_e26_2 == 1 ~ hh_e26_1 / 1,     # Hour
-  hh_e26_2 == 2 ~ hh_e26_1 / 8,     # Day (8 hours)
-  hh_e26_2 == 3 ~ hh_e26_1 / 40,    # Week (40 hours)
-  hh_e26_2 == 4 ~ hh_e26_1 / 80,    # Fortnight (80 hours)
-  hh_e26_2 == 5 ~ hh_e26_1 / 160,   # Month (160 hours)
-  hh_e26_2 == 6 ~ hh_e26_1 / 480,   # Quarter (3 months)
-  hh_e26_2 == 7 ~ hh_e26_1 / 960,   # Half-year
-  hh_e26_2 == 8 ~ hh_e26_1 / 1920,  # Year (160*12)
-  TRUE ~ NA_real_
-))
+# If the individual's last payment covers last month and , let's say he worked for 4 months during past year,
+# we can assume his yearly income is last month payment amount multiplied by 4 (months worked). Conversion to
+# hourly rates is not necessary if the payment covers a different period than a day or hour. The difference
+# between mlw and tzn is that in mlw, individual could say that the last payment covered for example past two 
+# months or weeks or etc, but in tnz it is just a month - no amount but just unit question - hh_e26_2. 
+# Moreover, for example if the individual's last payment was reported for a day and he worked 2 month, 2 weeks
+# each month and 40 hours per week. His total hours worked would be 2*2*40/8 expressed in days. 
 
-# Calculate total_hours worked in the last 12 months
-mainwage$total_hours <- with(mainwage, hh_e29 * hh_e30 * hh_e31)
-# Calculate annual_cash_income
-mainwage$annual_cash_income <- with(mainwage, hourly_rate_cash * total_hours)
-
-# Calculate hourly_rate_inkind
-mainwage$hourly_rate_inkind <- with(mainwage, case_when(
-  hh_e28_2 == 1 ~ hh_e28_1 / 1,     
-  hh_e28_2 == 2 ~ hh_e28_1 / 8,     
-  hh_e28_2 == 3 ~ hh_e28_1 / 40,    
-  hh_e28_2 == 4 ~ hh_e28_1 / 80,    
-  hh_e28_2 == 5 ~ hh_e28_1 / 160,   
-  hh_e28_2 == 6 ~ hh_e28_1 / 480,   
-  hh_e28_2 == 7 ~ hh_e28_1 / 960,   
-  hh_e28_2 == 8 ~ hh_e28_1 / 1920,  
-  TRUE ~ NA_real_
-))
-
-# Calculate annual_inkind_income
-mainwage$annual_inkind_income <- with(mainwage, hourly_rate_inkind * total_hours)
-
-# Calculate total wage income (cash + in-kind)
-mainwage$annual_total_income <- with(mainwage, annual_cash_income + annual_inkind_income)
-
-summary(mainwage$hourly_rate_inkind)
-summary(mainwage$annual_inkind_income)
-summary(mainwage$annual_total_income)
-
-##### Note: Extreme in-kind and total income values observed, likely due to calculation errors!? 
-##### Secondary wage calculations & income from enterprises pending ###
+mainwage <- mainwage |> 
+  mutate(main_income=case_when(hh_e26_2==5 ~ hh_e26_1 * hh_e29,
+                               hh_e26_2==8 ~ hh_e26_1,
+                               hh_e26_2==6 ~ hh_e26_1 * hh_e29/4, #some worked only three month but got paid for quarter?!
+                               hh_e26_2==4 ~ hh_e26_1 * hh_e29 * hh_e30 / 2, # total worked weeks divided by 2
+                               hh_e26_2==3 ~ hh_e26_1 * hh_e29 * hh_e30, 
+                               hh_e26_2==2 ~ hh_e26_1 * hh_e29 * hh_e30 * hh_e31/8,
+                               hh_e26_2==1 ~ hh_e26_1 * hh_e29 * hh_e30 * hh_e31,
+                               .default = NA_real_)
+         ) # very rough calculation 
+frq(mainwage$hh_e28_2)
+mainwage <- mainwage |> 
+  mutate(in_kind=case_when(hh_e28_2==5 ~ hh_e28_1 * hh_e29,
+                           hh_e28_2==8 ~ hh_e28_1,
+                           hh_e28_2==6 ~ hh_e28_1 * hh_e29/4,
+                           hh_e28_2==4 ~ hh_e28_1 * hh_e29 * hh_e30 / 2, # total worked weeks divided by 2
+                           hh_e28_2==3 ~ hh_e28_1 * hh_e29 * hh_e30, 
+                           hh_e28_2==2 ~ hh_e28_1 * hh_e29 * hh_e30 * hh_e31/8,
+                           .default = NA_real_)
+         )
+summary(mainwage$main_income)
+summary(mainwage$in_kind)
+# This data is likely to have enumerator or respondent errors. Unfortunately, we cannot know how and where the 
+# error could be. For, now we will take the data as it is and think further during the model specification.
+mainwage <- mainwage |>  mutate(income=rowSums(across(c(main_income,in_kind)), na.rm=TRUE))
 
 ##  Extension, advisory, credit----
 
@@ -461,12 +437,13 @@ tza4$extension_service[is.na(tza4$extension_service)] <- 0
 var_label(tza4$extension_service) <- "received extension from institutions" 
 remove(extension)
 
-
 ### Credit ----
 credit <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/hh_sec_p.dta") |> 
   select(y4_hhid, loancode, hh_p03, hh_p10_1, hh_p10_2, hh_p10_3)
 # Note: there is no variable to capture "no_credit_access"; only the details of 
 # respondents who has a credit has been asked
+# OKAY. IN THIS CASE, PLEASE JUST CREATE A VARIABLE THAT INDICATES IF HH GOT FORMAL CREDIT FROM INSTITUTIONS, OR 
+# NON-FORMAL FROM LENDER FRIEND ETC, OR DID NOT GET CREDIT. 
 
 frq(credit$loancode) 
 
@@ -491,7 +468,7 @@ tlu <- collap(tlu, tlu ~ y4_hhid, FUN = fsum)
 tza4 <- left_join(tza4, tlu, by=c("hhid"="y4_hhid"))
 remove(tlu)
 
-## Land tenure - ----
+## Land tenure ----
 
 tenure <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |>  
   select(
@@ -503,9 +480,17 @@ tenure <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_
     ag3a_38a    # Land dispute
   ) |> 
   rename(land_dispute = ag3a_38a)
+look_for(tenure, details = "none")
+frq(tenure$ag3a_38a) # most answer no. not a good variable. 
+frq(tenure$ag3a_25)
+frq(tenure$ag3a_28a)
+frq(tenure$ag3a_28d)
 tenure <- tenure |> 
   filter(!is.na(land_dispute))
 n_distinct(tenure$y4_hhid)
+frq(tenure$land_dispute)
+tenure <- tenure |> 
+  mutate(land_dispute=as.numeric(land_dispute))
 tenure <- collap(tenure, land_dispute ~ y4_hhid, FUN = fmax, na.rm = TRUE)
 
 tenure <- left_join(maizehh, tenure, by = c("hh_id_merge" = "y4_hhid"))
@@ -525,62 +510,56 @@ rm(tenure)
 # Should we consider constructing a more robust indicator by incorporating 
 # additional variables such as plot acquisition type (ag3a_25) and legal 
 # documentation (ag3a_28a, ag3a_28d)?
-
+# OKAY, THEN INSTEAD LET US CAPTURE OWNERSHIP. THOSE WHO HAVE INHERITED, GOT GIFT, PURCHASED, OR LAND WAS ALLOCATED TO THEM
+# HAVE MORE SAY ON THE LAND THAN THOSE OTHERWISE. THE VARIABLE CAN BE CALLED TENURE_SECURITY, AND LABEL SHOULD EXPLAIN THAT
+# THE VARAIBLE CAPTURES IF THE HH OWNES THE LAND AS PUCHASED, INHERITED OR ALLOCATED. 
 
 
 ## Soil Type ----
 
 soil_type <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |>  
-  select(y4_hhid, plotnum, ag3a_10) |>  
+  select(y4_hhid, plotnum, ag3a_10, ag3a_11, ag3a_12) |>
   rename(soil_type = ag3a_10) |>  
   mutate(plot_id = paste(y4_hhid, plotnum, sep = "-"))
 soil_type <- semi_join(soil_type, maizeplots, by = "plot_id")
 look_for(soil_type)  # No missing values in soil_type
-
 soil_type |>
   count(y4_hhid) |>
   filter(n > 1)
-
-# Identify households with more than one soil type
-multi_soil_hhids <- soil_type |>
-  group_by(y4_hhid) |>
-  summarise(unique_soil_types = n_distinct(soil_type)) |>
-  filter(unique_soil_types > 1) |>
-  pull(y4_hhid)
-
-# View plots with multiple soil types within the same household
-soil_type |>
-  filter(y4_hhid %in% multi_soil_hhids) |>
-  arrange(y4_hhid, plotnum)
-
-# Note: There are 124 maize plots belonging to households with more than one soil type.
-# How can we aggregate soil type information at the household level to merge it with tza4?
-
+frq(soil_type$soil_type) # not clear what other types would be. this is always a problem
+frq(soil_type$ag3a_11) # very subjective of course
+frq(soil_type$ag3a_12)
+# loam is more dominant, sandy is less fertile, clay is suitable for some crops like rice. let's take loam as main.
+soil_type <- soil_type |> 
+  mutate(soil_type=as.numeric(soil_type),
+         loam_soil=if_else(soil_type==2,1,0))
+soil_type <- collap(soil_type, loam_soil ~ y4_hhid, FUN = fmax, na.rm= TRUE)
 
 ## Input coupon & improved variety use---- 
 fertcoupon <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |> 
-  select(y4_hhid,plotnum,ag3a_50, ag3a_57)
+  select(y4_hhid, plotnum, ag3a_50, ag3a_57)
 look_for(fertcoupon)
 fertcoupon <- fertcoupon |> 
-  mutate(fert_voucher = if_else(ag3a_50 == 1 | ag3a_57 == 1, 1, 0))
-
+  mutate(ag3a_50=as.numeric(ag3a_50),
+         ag3a_57=as.numeric(ag3a_57),
+         fert_voucher = if_else(ag3a_50 == 1 | ag3a_57 == 1, 1, 0))
+frq(fertcoupon$fert_voucher)
 seedcoupon<- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4a.dta") |> 
-  select(y4_hhid,plotnum,ag4a_06,ag4a_08, ag4a_13a)
+  select(y4_hhid, plotnum, ag4a_06, ag4a_08, ag4a_13a)
 seedcoupon <- seedcoupon |> 
-  mutate(seed_voucher = if_else(ag4a_13a == 1, 1, 0))
+  mutate(ag4a_13a=as.numeric(ag4a_13a),
+         seed_voucher = if_else(ag4a_13a == 1, 1, 0))
 look_for(seedcoupon)
-
+frq(seedcoupon$seed_voucher)
 coupon <- left_join(
   fertcoupon |> select(y4_hhid, plotnum, fert_voucher),
   seedcoupon |> select(y4_hhid, plotnum, ag4a_06, ag4a_08, seed_voucher),
   by = c("y4_hhid", "plotnum"))
-
 coupon <- coupon |>
   rename(mainseed_variety_name = ag4a_06,
-    seed_type = ag4a_08 ) |>
-  mutate(improved_seed = if_else(seed_type == 1, 1, 0))
-
-
+         seed_type = ag4a_08 ) |>
+  mutate(seed_type=as.numeric(seed_type),
+         improved_seed = if_else(seed_type %in% c(1,3), 1, 0)) # 3 is also improved but recycled.
 coupon <- collap(coupon, seed_voucher + fert_voucher + improved_seed ~ y4_hhid, FUN = fmax, na.rm = TRUE)
 tza4 <- left_join(tza4, coupon, by=c("hhid"="y4_hhid"))
 tza4$seed_voucher[is.na(tza4$seed_voucher)] <- 0

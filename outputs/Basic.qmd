@@ -1,0 +1,28 @@
+---
+title: "Legume intensification"
+author: "Dr. Orkhan Sariyev"
+format: 
+  html:
+    toc: true
+    code-fold: true
+editor: source
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+## Basic prelimenary data
+
+Some basic statistics here
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(knitr)
+dfeth <- readRDS("C:/Users/490A/Nextcloud/Research/leg4dev/data/est/dfeth.rds")
+dfeth |> 
+  count(wave, improved_maize, rotation) |> 
+  pivot_wider(names_from = rotation, values_from = n, values_fill = 0) |> 
+  kable()
+```

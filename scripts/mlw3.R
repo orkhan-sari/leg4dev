@@ -507,15 +507,30 @@ modd <- read_dta("data/mlw/ag_mod_d_16.dta") |>
 modd <- semi_join(modd, maizeplots, by="plot_id")
 look_for(modd)
 frq(modd$ag_d21)
-labels <- attributes(modd$ag_d21)
-modd$ag_d21 <- as.numeric(modd$ag_d21)
-modd <- collap(modd, ag_d21 ~ y3_hhid, FUN = fmode, na.rm= TRUE)
-attributes(modd$ag_d21) <- labels
+modd <- modd |> 
+  mutate(ag_d21 = as.numeric(modd$ag_d21),
+         soil_type=case_when(ag_d21==3 ~ 2,
+                             ag_d21==1 ~ 1,
+                             .default = 0))
+mode_or_max <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) return(NA)
+  
+  tab <- table(x)
+  most_common <- which(tab == max(tab))
+  
+  if (length(most_common) == 1) {
+    return(as.numeric(names(most_common)))
+  } else {
+    return(max(as.numeric(names(most_common))))
+  }
+} 
+modd <- collap(modd, soil_type ~ y3_hhid, FUN =mode_or_max) # select dominant otherwise clay 
+modd <- modd |> 
+  mutate(soil_type= factor(soil_type, levels = c(0,1,2), labels = c("Other or mix", "Sandy", "Clay")))
 mlw3 <- left_join(mlw3, modd, by=c("hhid"="y3_hhid"))
-mlw3 <- mlw3 |> 
-  rename(soil_type=ag_d21)
 var_label(mlw3$soil_type) <- "HH dominant soil type"
-remove(modd, maizeplots, labels)
+remove(modd, maizeplots, mode_or_max)
 
 ## Input coupon ---- 
 coupon <- read_dta("data/mlw/ag_mod_e2_16.dta") |> 

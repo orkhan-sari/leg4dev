@@ -487,10 +487,7 @@ eth5 <- left_join(wave5,tlu,by="household_id")
 remove(tlu, wave5)
 eth5$tlu[is.na(eth5$tlu)] <- 0
 
-
-### ### ### ### ### ### ### ###
 ## Soil type ---- 
-### ### ### ### ### ### ### ###
 soil <- read_dta("data/eth/ess5/sect2_pp_w5.dta") |> 
   mutate(parcel_id = paste(holder_id, parcel_id, sep = "-")) |> 
   select("household_id", "parcel_id", "s2q16")
@@ -524,7 +521,12 @@ var_label(eth5$soil_type) <- "HH dominant soil type"
 frq(eth5$soil_type)
 remove(soil, maizeplots)
 
-
+## Consumption ----
+cons <- read_dta("data/eth/ess5/cons_agg_w5.dta") |> 
+  select(household_id, nom_foodcons_aeq, nom_totcons_aeq)
+look_for(cons)
+eth5 <- left_join(eth5, cons, by="household_id")
+rm(cons)
 
 
 

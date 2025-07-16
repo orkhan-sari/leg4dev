@@ -11,7 +11,6 @@ dfeth <- dfeth |>
 table(dfeth$dupl) # 522 panel hhs 
 dfeth <- dfeth |> filter(dupl==2) |> select(-dupl)
 look_for(dfeth)
-remove(eth4, eth5)
 dfeth$wave <- as.factor(dfeth$wave)
 dfeth <- dfeth |> 
   relocate(wave, .after= hh_id_obs)
@@ -32,13 +31,38 @@ dfeth <- dfeth |>
                                              .default = primary_education_manager)
          )
 look_for(dfeth)
+#### Consumption ##
+dfeth <- dfeth |> 
+  mutate(def_totcons_aeq=if_else(wave=="wave5", 244.6/388.2 * nom_totcons_aeq, nom_totcons_aeq),
+         def_foodcons_aeq=if_else(wave=="wave5", 244.6/388.2 * nom_foodcons_aeq, nom_foodcons_aeq)) |> 
+  relocate(def_totcons_aeq, .after = nom_totcons_aeq)
+
+# 2020 costs deflated to 2017 values using cpi https://data.worldbank.org/indicator/FP.CPI.TOTL?locations=ET
+# Main dependent variable is totcons_USD here but the above is developed to check robustness later in the analyses. 
+dfeth |> group_by(hh_id_obs) |> select(hh_id_obs, wave, nom_totcons_aeq, def_totcons_aeq) |>
+  arrange(hh_id_obs) |> print(n=12)
+dfeth |> group_by(hh_id_obs) |> select(hh_id_obs, wave, nom_foodcons_aeq, def_foodcons_aeq) |>
+  arrange(hh_id_obs) |> print(n=12)
+
+dfeth <- dfeth |> 
+  mutate(improved_maize=
+           factor(improved_maize, levels = c(0,1), labels = c("local", "improved")),
+         rotation=
+           factor(rotation, levels = c(0,1), labels = c("norotation", "rotation"))
+         )
 table(dfeth$rotation, dfeth$wave) # 174 and 201 adopters
 table(dfeth$improved_maize, dfeth$wave) # 201 and 269 adopters 
+dfeth <- dfeth |>
+  mutate(weather_shock= if_else(flood_shock | rain_shock | drought_shock ==1, 1, 0, missing = 0)) |> # 0 assumed for missing! 
+  relocate(weather_shock, .after = flood_shock)
+table(dfmlw$weather_shock, dfmlw$wave, useNA = "ifany")
+dfeth$improved <- NULL
 library(knitr)
 dfeth |> 
   count(wave, improved_maize, rotation) |> 
   pivot_wider(names_from = rotation, values_from = n, values_fill = 0) |> 
   kable()
+remove(eth4, eth5)
 # dir.create("data/est") # create the folder for estimation STATA datasets
 write_dta(dfeth, "data/est/dfeth.dta", version = 15)
 saveRDS(dfeth, file = "data/est/dfeth.rds")
@@ -63,15 +87,26 @@ setdiff(names(mlw2), names(mlw3))
 dfmlw <-bind_rows(mlw1, mlw2) # soil quality labels assumed from mlw1
 dfmlw <-bind_rows(dfmlw, mlw3)
 dfmlw <-bind_rows(dfmlw, mlw4)
+var_label(dfmlw) <- var_label(mlw3)
 remove(mlw1, mlw2, mlw3, mlw4)
 look_for(dfmlw)
 table(dfmlw$rain_shock, dfmlw$wave, useNA = "ifany")
 table(dfmlw$flood_shock, dfmlw$wave, useNA = "ifany")
+dfmlw <- dfmlw |> 
+  mutate(hybrid_maize=
+           factor(hybrid_maize, levels = c(0,1), labels = c("local", "improved")),
+         rotation=
+           factor(rotation, levels = c(0,1), labels = c("norotation", "rotation")),
+         intercrop=
+           factor(intercrop, levels = c(0,1), labels = c("purestand", "mixed"))
+         )
+table(dfmlw$rotation, dfmlw$wave)
+table(dfmlw$hybrid_maize, dfmlw$wave)
+table(dfmlw$intercrop, dfmlw$wave)
 dfmlw <- dfmlw |>
   mutate(weather_shock= if_else(flood_shock | rain_shock | drought_shock ==1, 1, 0, missing = 0)) |> # 0 assumed for missing! 
   relocate(weather_shock, .after = flood_shock)
 table(dfmlw$weather_shock, dfmlw$wave, useNA = "ifany")
-var_label(dfmlw) <- var_label(mlw3)
 dfmlw$improved <- NULL
 dfmlw <- dfmlw |> 
   relocate(wave, .after= hh_id_obs)
@@ -80,7 +115,7 @@ dfmlw <- dfmlw |>
   relocate(dupl, .after= hh_id_obs)
 table(dfmlw$dupl) # 654 panel hhs
 dfmlw$wave <- as_factor(dfmlw$wave)
-## mlw all rounds----
+## mlw all rounds ====  
 dfmlwfull <- dfmlw |> filter(dupl==4) |> select(-dupl) # HH that grown maize as a main crop in all 4 rounds
 look_for(dfmlwfull)
 table(dfmlwfull$subsistence_ag, dfmlwfull$wave, useNA = "ifany") # 5 obs in wave 3 and 4
@@ -119,6 +154,7 @@ dfmlwfull <- dfmlwfull |>
   )
 # 2004367 manager is 4 years old in wave1 
 write_dta(dfmlwfull, "data/est/dfmlwfull.dta", version = 15)
+saveRDS(dfmlwfull, file = "data/est/dfmlwfull.rds")
 ## mlw three rounds ----
 dfmlw3 <- dfmlw |> 
   filter(wave != "wave1")
@@ -153,7 +189,7 @@ dfmlw3 |>
   print(n=81) # for all subsistence_ag missing yield and shock are missing too naturally. 
 look_for(dfmlw3)
 write_dta(dfmlw3, "data/est/dfmlw3.dta", version = 15) # HH that grown maize as a main crop in all 3 rounds
-
+saveRDS(dfmlw3, file = "data/est/dfmlw3.rds")
 
 
 

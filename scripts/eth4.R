@@ -478,6 +478,13 @@ var_label(eth4$soil_type) <- "HH dominant soil type"
 frq(eth4$soil_type)
 remove(soil, maizeplots)
 
+## Consumption ----
+cons <- read_dta("data/eth/ess4/cons_agg_w4.dta") |> 
+  select(household_id, nom_foodcons_aeq, nom_totcons_aeq)
+look_for(cons)
+eth4 <- left_join(eth4, cons, by="household_id")
+rm(cons)
+
 # Notes on missing data ----
 ## 95 hhs do not have agricultural assets but still have asset index. This is because, 
 ## pca (factor) analysis still includes those with no asset and gives them a lower score. 

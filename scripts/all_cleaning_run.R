@@ -55,13 +55,26 @@ table(dfeth$improved_maize, dfeth$wave) # 201 and 269 adopters
 dfeth <- dfeth |>
   mutate(weather_shock= if_else(flood_shock | rain_shock | drought_shock ==1, 1, 0, missing = 0)) |> # 0 assumed for missing! 
   relocate(weather_shock, .after = flood_shock)
-table(dfmlw$weather_shock, dfmlw$wave, useNA = "ifany")
+table(dfeth$weather_shock, dfeth$wave, useNA = "ifany")
 dfeth$improved <- NULL
 library(knitr)
 dfeth |> 
   count(wave, improved_maize, rotation) |> 
   pivot_wider(names_from = rotation, values_from = n, values_fill = 0) |> 
   kable()
+dfeth <- dfeth |> 
+  mutate(agr_intens=
+           case_when(
+             rotation=="rotation" & improved_maize=="local" ~ 1,
+             rotation=="norotation" & improved_maize=="improved" ~2,
+             rotation=="rotation" & improved_maize=="improved" ~ 3,
+             .default = 0),
+         agr_intens=
+           factor(agr_intens, levels = c(0,1,2,3), labels=c("No intensification", "Rotation", "IV", "Rotation and IV"))
+         )
+table(dfeth$rotation, dfeth$improved_maize)
+frq(dfeth$agr_intens)
+table(dfeth$wave, dfeth$agr_intens)
 remove(eth4, eth5)
 # dir.create("data/est") # create the folder for estimation STATA datasets
 write_dta(dfeth, "data/est/dfeth.dta", version = 15)
@@ -115,6 +128,7 @@ dfmlw <- dfmlw |>
   relocate(dupl, .after= hh_id_obs)
 table(dfmlw$dupl) # 654 panel hhs
 dfmlw$wave <- as_factor(dfmlw$wave)
+
 ## mlw all rounds ====  
 dfmlwfull <- dfmlw |> filter(dupl==4) |> select(-dupl) # HH that grown maize as a main crop in all 4 rounds
 look_for(dfmlwfull)
@@ -153,8 +167,22 @@ dfmlwfull <- dfmlwfull |>
                                              .default = age_manager)
   )
 # 2004367 manager is 4 years old in wave1 
+dfmlwfull <- dfmlwfull |> 
+mutate(agr_intens=
+         case_when(
+           (rotation=="rotation" | intercrop == "mixed") & hybrid_maize=="local" ~ 1,
+           rotation=="norotation" & intercrop == "purestand"  & hybrid_maize=="improved" ~ 2,
+           (rotation=="rotation" | intercrop == "mixed") & hybrid_maize=="improved" ~ 3,
+           .default = 0),
+       agr_intens=
+         factor(agr_intens, levels = c(0,1,2,3), labels=c("No intensification", "Diversification", "IV", "Diversification and IV"))
+       )
+table(dfmlwfull$rotation, dfmlwfull$hybrid_maize)
+frq(dfmlwfull$agr_intens)
+table(dfmlwfull$wave, dfmlwfull$agr_intens)
 write_dta(dfmlwfull, "data/est/dfmlwfull.dta", version = 15)
 saveRDS(dfmlwfull, file = "data/est/dfmlwfull.rds")
+
 ## mlw three rounds ----
 dfmlw3 <- dfmlw |> 
   filter(wave != "wave1")

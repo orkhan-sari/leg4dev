@@ -416,6 +416,74 @@ summary(mainwage$in_kind)
 # error could be. For, now we will take the data as it is and think further during the model specification.
 mainwage <- mainwage |>  mutate(income=rowSums(across(c(main_income,in_kind)), na.rm=TRUE))
 
+#secondwage
+
+look_for(wage, details = "none")
+secondwage <- wage[, c(2, 7, 21:29)]
+secondwage <- secondwage |> filter(hh_e42==1)
+look_for(secondwage, details = "none")
+frq(secondwage$hh_e44_2)
+secondwage <- secondwage |>
+  mutate(
+    hh_e44_1 = as.numeric(hh_e44_1),   # cash wage amount
+    hh_e44_2 = as.numeric(hh_e44_2),   # cash wage time unit
+    hh_e46_1 = as.numeric(hh_e46_1),   # in-kind wage amount
+    hh_e46_2 = as.numeric(hh_e46_2),   # in-kind wage time unit
+    hh_e50   = as.numeric(hh_e50))    # hours worked in last 7 days  
+frq(secondwage$hh_e44_2)
+
+# Convert last payment to hourly wage based on payment period
+secondwage <- secondwage |> 
+  mutate(
+    hourly_wage = case_when(
+      hh_e44_2 == 1 ~ hh_e44_1,            # Hourly pay → hourly wage = amount
+      hh_e44_2 == 2 ~ hh_e44_1 / 8,        # Daily pay → divide by 8 hours/day
+      hh_e44_2 == 3 ~ hh_e44_1 / 40,       # Weekly pay → divide by 40 hours/week
+      hh_e44_2 == 4 ~ hh_e44_1 / 80,       # Fortnight pay → divide by 80 hours
+      hh_e44_2 == 5 ~ hh_e44_1 / 173.33,   # Monthly pay → divide by avg monthly hours
+      hh_e44_2 == 6 ~ hh_e44_1 / 520,      # Quarterly pay → divide by quarterly hours
+      hh_e44_2 == 7 ~ hh_e44_1 / 1040,     # Half-year pay → divide by half-year hours
+      hh_e44_2 == 8 ~ hh_e44_1 / 2080,     # Yearly pay → divide by annual hours
+      TRUE          ~ NA_real_              # Otherwise, set as NA
+    ),
+    weekly_second_income = hourly_wage * hh_e50   # Weekly income = hourly wage * hours worked last week
+  ) 
+
+# very rough calculation : For the second wage, only hours worked in the last week 
+#were recorded—there’s no info on total months or weeks worked during the year. 
+#Estimating annual income from this could overstate earnings, since it’s unclear 
+#if they worked the entire year. Therefore, I kept the calculation to weekly income. 
+#To do this, the reported payment is converted into an hourly wage by dividing it 
+#by the typical hours in the payment period (e.g., 8 hours per day, 40 hours per week). 
+#This hourly wage is then multiplied by hours worked in the last 7 days to 
+#consistently estimate weekly income across different pay units.
+
+frq(secondwage$hh_e46_2)
+
+# Convert in-kind pay to hourly wage 
+secondwage <- secondwage |> 
+  mutate(
+    in_kind_hourly = case_when(
+      hh_e46_2 == 2 ~ hh_e46_1 / 8, 
+      hh_e46_2 == 3 ~ hh_e46_1 / 40,
+      hh_e46_2 == 5 ~ hh_e46_1 / 173.33,
+      TRUE         ~ NA_real_             
+    ),
+    weekly_in_kind = in_kind_hourly * hh_e50)
+
+# Weekly_in_kind = in-kind hourly wage × hours worked last week
+
+summary(secondwage$weekly_second_income)
+summary(secondwage$weekly_in_kind)
+secondwage <- secondwage |>  mutate(weekly_income=rowSums(across(c(weekly_second_income,weekly_in_kind)), na.rm=TRUE))
+
+
+#Since the main wage income is estimated on an annual basis and the second wage income 
+#is calculated on a weekly basis, aggregating the two would lead to an inconsistent 
+#and misleading representation of total non-farm income. 
+#For this reason, I have not merged or added a combined non-farm income variable to the tza4 dataset.
+
+
 ##  Extension, advisory, credit----
 
 extension <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_12a.dta") |>
@@ -438,14 +506,38 @@ var_label(tza4$extension_service) <- "received extension from institutions"
 remove(extension)
 
 ### Credit ----
-credit <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/hh_sec_p.dta") |> 
-  select(y4_hhid, loancode, hh_p03, hh_p10_1, hh_p10_2, hh_p10_3)
-# Note: there is no variable to capture "no_credit_access"; only the details of 
-# respondents who has a credit has been asked
-# OKAY. IN THIS CASE, PLEASE JUST CREATE A VARIABLE THAT INDICATES IF HH GOT FORMAL CREDIT FROM INSTITUTIONS, OR 
-# NON-FORMAL FROM LENDER FRIEND ETC, OR DID NOT GET CREDIT. 
+credit <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/hh_sec_p.dta") %>% 
+  select(y4_hhid, loancode, hh_p03)
 
-frq(credit$loancode) 
+credit <- credit |>
+  mutate(
+    credit_type = case_when(
+      hh_p03 %in% c(1, 2, 3, 4, 5) ~ "Formal",
+      hh_p03 %in% c(6, 7, 8, 9, 10, 11, 12, 13) ~ "Non-formal",
+      is.na(hh_p03) ~ "No credit accessed"
+    )
+  )
+
+var_label(credit$credit_type) <- "Type of credit received by household"
+
+frq(credit$loancode)
+frq(credit$credit_type)
+
+## Note on credit_type:
+# * Formal credit = from institutions such as commercial banks (1), MFIs (2), 
+#   building societies (3), insurance companies (4), and others (5).
+# * Non-formal credit = from sources like friends (6), local merchants (7), 
+#   money lenders (8), employers (9), religious groups (10), NGOs (11), self-help groups (12), and others (13).
+# * No credit accessed = households that did not report receiving any credit.
+
+# Keep one row per household, taking the first credit_type encountered
+credit <- credit |>
+  distinct(y4_hhid, credit_type)
+
+tza4 <- left_join(tza4, credit, by = c("hhid" = "y4_hhid"))
+
+remove(credit)
+
 
 ## TLU ----
 ## page 10: https://appec-h.com/wp-content/uploads/2023/02/Livestock-production-systems.pdf
@@ -470,49 +562,34 @@ remove(tlu)
 
 ## Land tenure ----
 
-tenure <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |>  
-  select(
-    y4_hhid, plotnum,
-    ag3a_25,    # How was the plot acquired?
-    ag3a_28a,   # Type of legal certificate
-    ag3a_28d,   # Other types of legal/ownership documentation
-    ag3a_30,    # Right to sell
-    ag3a_38a    # Land dispute
-  ) |> 
-  rename(land_dispute = ag3a_38a)
-look_for(tenure, details = "none")
-frq(tenure$ag3a_38a) # most answer no. not a good variable. 
-frq(tenure$ag3a_25)
-frq(tenure$ag3a_28a)
-frq(tenure$ag3a_28d)
-tenure <- tenure |> 
-  filter(!is.na(land_dispute))
-n_distinct(tenure$y4_hhid)
-frq(tenure$land_dispute)
-tenure <- tenure |> 
-  mutate(land_dispute=as.numeric(land_dispute))
-tenure <- collap(tenure, land_dispute ~ y4_hhid, FUN = fmax, na.rm = TRUE)
+tenure <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |>
+  select(y4_hhid, plotnum, ag3a_25) |>
+  rename(acquisition_mode = ag3a_25)
 
-tenure <- left_join(maizehh, tenure, by = c("hh_id_merge" = "y4_hhid"))
-tza4   <- left_join(tza4, tenure, by = c("hhid" = "hh_id_merge"))
+look_for(tenure)
 
-tza4 <- tza4 |> 
-  mutate(tenure_security = case_when(
-    is.na(land_dispute) ~ 1,  # No reported dispute = secure
-    TRUE ~ 0                 # Dispute reported = insecure
-  )) |> 
-  select(-land_dispute)
+# Create binary tenure_security: 1 = secure (inherited/gift/allocated/purchased), 0 = not secure (otherwise)
+tenure <- tenure |>
+  mutate(
+    tenure_security = case_when(
+      acquisition_mode %in% c(1, 2, 4, 5) ~ 1,
+      !is.na(acquisition_mode) ~ 0,
+      TRUE ~ NA_real_ ))
+tenure <- tenure |>
+  set_variable_labels(tenure_security = "Indicates whether household owns the land by purchase, inheritance, gift, or allocation")
 
-rm(tenure)
+tenure_diff_security <- tenure |>
+  group_by(y4_hhid) |>
+  summarise(
+    unique_tenure = n_distinct(tenure_security, na.rm = TRUE),
+    plots_count = n()
+  ) |>
+  filter(unique_tenure > 1) 
+print(tenure_diff_security)
 
-# NOTE: The 'land_dispute' variable only reflects disputes in the past 12 months, 
-# which may not fully capture long-term tenure security. 
-# Should we consider constructing a more robust indicator by incorporating 
-# additional variables such as plot acquisition type (ag3a_25) and legal 
-# documentation (ag3a_28a, ag3a_28d)?
-# OKAY, THEN INSTEAD LET US CAPTURE OWNERSHIP. THOSE WHO HAVE INHERITED, GOT GIFT, PURCHASED, OR LAND WAS ALLOCATED TO THEM
-# HAVE MORE SAY ON THE LAND THAN THOSE OTHERWISE. THE VARIABLE CAN BE CALLED TENURE_SECURITY, AND LABEL SHOULD EXPLAIN THAT
-# THE VARAIBLE CAPTURES IF THE HH OWNES THE LAND AS PUCHASED, INHERITED OR ALLOCATED. 
+###NOTE:Some households have both secure and non-secure plots. 
+#So, combining tenure security just at the household level might not give the full picture. 
+#How should we handle this?
 
 
 ## Soil Type ----
@@ -534,6 +611,8 @@ soil_type <- soil_type |>
   mutate(soil_type=as.numeric(soil_type),
          loam_soil=if_else(soil_type==2,1,0))
 soil_type <- collap(soil_type, loam_soil ~ y4_hhid, FUN = fmax, na.rm= TRUE)
+tza4 <- left_join(tza4, soil_type, by=c("hhid"="y4_hhid"))
+remove(soil_type)
 
 ## Input coupon & improved variety use---- 
 fertcoupon <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |> 

@@ -65,17 +65,20 @@ dfeth |>
 dfeth <- dfeth |> 
   mutate(agr_intens=
            case_when(
-             rotation=="rotation" & improved_maize=="local" ~ 1,
-             rotation=="norotation" & improved_maize=="improved" ~2,
-             rotation=="rotation" & improved_maize=="improved" ~ 3,
-             .default = 0),
+             rotation=="rotation" & improved_maize=="local" ~ 2,
+             rotation=="norotation" & improved_maize=="improved" ~ 3,
+             rotation=="rotation" & improved_maize=="improved" ~ 4,
+             .default = 1),
          agr_intens=
-           factor(agr_intens, levels = c(0,1,2,3), labels=c("No intensification", "Rotation", "IV", "Rotation and IV"))
+           factor(agr_intens, levels = c(1,2,3,4), labels=c("No intensification", "Rotation", "IV", "Rotation and IV"))
          )
 table(dfeth$rotation, dfeth$improved_maize)
 frq(dfeth$agr_intens)
 table(dfeth$wave, dfeth$agr_intens)
 remove(eth4, eth5)
+dfeth <- dfeth |> 
+  mutate(maize_share=plot_area_GPS/farm_size)
+var_label(dfeth$maize_share) <- "% area dedicated to maize plots"
 # dir.create("data/est") # create the folder for estimation STATA datasets
 write_dta(dfeth, "data/est/dfeth.dta", version = 15)
 saveRDS(dfeth, file = "data/est/dfeth.rds")

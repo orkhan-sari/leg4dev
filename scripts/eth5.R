@@ -515,10 +515,11 @@ mode_or_max <- function(x) {
 soil <- collap(soil, soil_type ~ household_id, FUN =mode_or_max) # select dominant otherwise Luvisol. 
 rm(mode_or_max)
 soil <- soil |> 
-  mutate(soil_type= factor(soil_type, levels = c(0,1,2, labels = c("Other", "Vertisol", "Luvisol"))))
+  mutate(soil= factor(soil_type, levels = c(0,1,2), labels = c("Other", "Vertisol", "Luvisol"))) |> 
+  select(household_id, soil)
 eth5 <- left_join(eth5, soil, by="household_id")
-var_label(eth5$soil_type) <- "HH dominant soil type"
-frq(eth5$soil_type)
+var_label(eth5$soil) <- "HH dominant soil type"
+frq(eth5$soil)
 remove(soil, maizeplots)
 
 ## Consumption ----

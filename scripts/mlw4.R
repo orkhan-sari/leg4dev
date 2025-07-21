@@ -479,9 +479,10 @@ mode_or_max <- function(x) {
 } 
 modd <- collap(modd, soil_type ~ y4_hhid, FUN =mode_or_max) # select dominant otherwise clay 
 modd <- modd |> 
-  mutate(soil_type= factor(soil_type, levels = c(0,1,2), labels = c("Other or mix", "Sandy", "Clay")))
+  mutate(soil= factor(soil_type, levels = c(0,1,2), labels = c("Other or mix", "Sandy", "Clay"))) |> 
+  select(y2_hhid, soil)
 mlw4 <- left_join(mlw4, modd, by=c("hhid"="y4_hhid"))
-var_label(mlw4$soil_type) <- "HH dominant soil type"
+var_label(mlw4$soil) <- "HH dominant soil type"
 remove(modd, maizeplots, mode_or_max)
 
 ## Input coupon ---- 

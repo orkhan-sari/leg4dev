@@ -363,7 +363,7 @@ remove(plot_hh_dist, plot_market_dist, plot_road_dist, distance_from_plot)
 
 wage <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/hh_sec_e.dta")
 look_for(wage, details = "none")
-wage <- wage[, c(1:3, 5:7, 9:10, 28, 35:45, 51, 57:64)]
+wage <- wage[, c(1:3, 5:7, 9:10, 28, 35:45, 51, 57:64, 65:66)]
 wage <- semi_join(wage, maizehh, by = c("y4_hhid" = "hh_id_merge"))
 look_for(wage, details = "none")
 mainwage <- wage[, c(2, 7, 10:20)]
@@ -414,14 +414,18 @@ summary(mainwage$main_income)
 summary(mainwage$in_kind)
 # This data is likely to have enumerator or respondent errors. Unfortunately, we cannot know how and where the 
 # error could be. For, now we will take the data as it is and think further during the model specification.
-mainwage <- mainwage |>  mutate(income=rowSums(across(c(main_income,in_kind)), na.rm=TRUE))
+mainwage <- mainwage |>  
+  mutate(income=rowSums(across(c(main_income,in_kind)), na.rm=TRUE)) |> 
+  select(y4_hhid, income)
 
 #secondwage
 
 look_for(wage, details = "none")
-secondwage <- wage[, c(2, 7, 21:29)]
+secondwage <- wage[, c(2, 7, 21:31)]
 secondwage <- secondwage |> filter(hh_e42==1)
 look_for(secondwage, details = "none")
+frq(secondwage$hh_e52) # 4 say have a contract 
+frq(secondwage$hh_e52a) # these also do not seem like a contract but casual work.
 frq(secondwage$hh_e44_2)
 secondwage <- secondwage |>
   mutate(
@@ -431,58 +435,26 @@ secondwage <- secondwage |>
     hh_e46_2 = as.numeric(hh_e46_2),   # in-kind wage time unit
     hh_e50   = as.numeric(hh_e50))    # hours worked in last 7 days  
 frq(secondwage$hh_e44_2)
-
-# Convert last payment to hourly wage based on payment period
-secondwage <- secondwage |> 
-  mutate(
-    hourly_wage = case_when(
-      hh_e44_2 == 1 ~ hh_e44_1,            # Hourly pay → hourly wage = amount
-      hh_e44_2 == 2 ~ hh_e44_1 / 8,        # Daily pay → divide by 8 hours/day
-      hh_e44_2 == 3 ~ hh_e44_1 / 40,       # Weekly pay → divide by 40 hours/week
-      hh_e44_2 == 4 ~ hh_e44_1 / 80,       # Fortnight pay → divide by 80 hours
-      hh_e44_2 == 5 ~ hh_e44_1 / 173.33,   # Monthly pay → divide by avg monthly hours
-      hh_e44_2 == 6 ~ hh_e44_1 / 520,      # Quarterly pay → divide by quarterly hours
-      hh_e44_2 == 7 ~ hh_e44_1 / 1040,     # Half-year pay → divide by half-year hours
-      hh_e44_2 == 8 ~ hh_e44_1 / 2080,     # Yearly pay → divide by annual hours
-      TRUE          ~ NA_real_              # Otherwise, set as NA
-    ),
-    weekly_second_income = hourly_wage * hh_e50   # Weekly income = hourly wage * hours worked last week
-  ) 
+frq(secondwage$hh_e45)
+secondwage <- secondwage |>  
+  mutate(income=rowSums(across(c(hh_e44_1,hh_e46_1)), na.rm=TRUE)) |> 
+  select(y4_hhid, income)
 
 # very rough calculation : For the second wage, only hours worked in the last week 
-#were recorded—there’s no info on total months or weeks worked during the year. 
-#Estimating annual income from this could overstate earnings, since it’s unclear 
-#if they worked the entire year. Therefore, I kept the calculation to weekly income. 
-#To do this, the reported payment is converted into an hourly wage by dividing it 
-#by the typical hours in the payment period (e.g., 8 hours per day, 40 hours per week). 
-#This hourly wage is then multiplied by hours worked in the last 7 days to 
-#consistently estimate weekly income across different pay units.
-
-frq(secondwage$hh_e46_2)
-
-# Convert in-kind pay to hourly wage 
-secondwage <- secondwage |> 
-  mutate(
-    in_kind_hourly = case_when(
-      hh_e46_2 == 2 ~ hh_e46_1 / 8, 
-      hh_e46_2 == 3 ~ hh_e46_1 / 40,
-      hh_e46_2 == 5 ~ hh_e46_1 / 173.33,
-      TRUE         ~ NA_real_             
-    ),
-    weekly_in_kind = in_kind_hourly * hh_e50)
-
-# Weekly_in_kind = in-kind hourly wage × hours worked last week
-
-summary(secondwage$weekly_second_income)
-summary(secondwage$weekly_in_kind)
-secondwage <- secondwage |>  mutate(weekly_income=rowSums(across(c(weekly_second_income,weekly_in_kind)), na.rm=TRUE))
-
-
-#Since the main wage income is estimated on an annual basis and the second wage income 
-#is calculated on a weekly basis, aggregating the two would lead to an inconsistent 
-#and misleading representation of total non-farm income. 
-#For this reason, I have not merged or added a combined non-farm income variable to the tza4 dataset.
-
+# were recorded—there’s no info on total months or weeks worked during the year. 
+# Since the main wage income is estimated on an annual basis and the second wage income 
+# is calculated on a weekly basis. Annualizing second wage is not possible because the duration of the work is not clear.
+# Also the reporting periods are different, months, days etc
+# 
+# Therefore, we will only consider the latest payment received. 
+wage <- rbind(mainwage, secondwage)
+remove(mainwage, secondwage)
+wage <- collap(wage, income~y4_hhid, FUN=fsum)
+tza4 <- left_join(tza4, wage, by=c("hhid"="y4_hhid"))
+tza4 <- tza4 |> 
+  tidyr::replace_na(list(income = 0)) |> 
+  rename(wage_income=income)
+var_label(tza4$wage_income) <- "income from main and temporary off-farm work"
 
 ##  Extension, advisory, credit----
 
@@ -564,8 +536,10 @@ remove(tlu)
 
 tenure <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |>
   select(y4_hhid, plotnum, ag3a_25) |>
-  rename(acquisition_mode = ag3a_25)
-
+  rename(acquisition_mode = ag3a_25) |> 
+  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-")) |> 
+  filter(!is.na(acquisition_mode))
+tenure <- semi_join(tenure, maizeplots, by="plot_id") # KEPT ONLY MAIZE PLOTS
 look_for(tenure)
 
 # Create binary tenure_security: 1 = secure (inherited/gift/allocated/purchased), 0 = not secure (otherwise)
@@ -575,8 +549,7 @@ tenure <- tenure |>
       acquisition_mode %in% c(1, 2, 4, 5) ~ 1,
       !is.na(acquisition_mode) ~ 0,
       TRUE ~ NA_real_ ))
-tenure <- tenure |>
-  set_variable_labels(tenure_security = "Indicates whether household owns the land by purchase, inheritance, gift, or allocation")
+var_label(tenure$tenure_security) <- "purchased, inherited, gifted, or allocated land ownership"
 
 tenure_diff_security <- tenure |>
   group_by(y4_hhid) |>
@@ -586,10 +559,16 @@ tenure_diff_security <- tenure |>
   ) |>
   filter(unique_tenure > 1) 
 print(tenure_diff_security)
-
+tenure_diff_security <- tenure_diff_security |> 
+  mutate(diff=plots_count-unique_tenure)
+frq(tenure_diff_security$diff)
+frq(tenure_diff_security$plots_count) # most have two plots
 ###NOTE:Some households have both secure and non-secure plots. 
 #So, combining tenure security just at the household level might not give the full picture. 
 #How should we handle this?
+#
+# IT APPEARS THAT OUT OF 50 MAIZE PLOTS, IN MOST HH HAVE TWO UNIQUE TYPES, IN THIS CASE THE INDICATOR SHOULD 
+# CAPTURE IF AT LEAST ONE MAIZE PLOT IS OWNED MEANING PURCHASED OR INHERITED OR ALLOCATED. 
 
 
 ## Soil Type ----
@@ -609,9 +588,10 @@ frq(soil_type$ag3a_12)
 # loam is more dominant, sandy is less fertile, clay is suitable for some crops like rice. let's take loam as main.
 soil_type <- soil_type |> 
   mutate(soil_type=as.numeric(soil_type),
-         loam_soil=if_else(soil_type==2,1,0))
-soil_type <- collap(soil_type, loam_soil ~ y4_hhid, FUN = fmax, na.rm= TRUE)
+         soil=if_else(soil_type==2,1,0))
+soil_type <- collap(soil_type, soil ~ y4_hhid, FUN = fmax, na.rm= TRUE)
 tza4 <- left_join(tza4, soil_type, by=c("hhid"="y4_hhid"))
+var_label(tza4$soil) <-  "loam soil type"
 remove(soil_type)
 
 ## Input coupon & improved variety use---- 

@@ -56,7 +56,7 @@ ggplot(survey_data, aes(x = StartYear, xend = EndYear,
 
 There are **`r sum(dfeth$wave=="wave4")`** households in Ethiopian Social Survey (ESS) dataset who have produced maize as a main crop both in ESS4 and ESS5. In 2017, **`r sum(dfeth$rotation == "rotation" & dfeth$wave == "wave4")`** farmers have indicated that they have planted a legume on the maize plot during the past three years, and **`r sum(dfeth$rotation == "rotation" & dfeth$wave == "wave4" & dfeth$improved_maize == "improved")`** (**`r round(sum(dfeth$rotation == "rotation" & dfeth$wave == "wave4" & dfeth$improved_maize == "improved") / sum(dfeth$rotation == "rotation" & dfeth$wave == "wave4") * 100, 1)`**%) of them have also used improved maize seeds during the current cropping season. In 2020, the number of farmers adopting crop rotation has increased to **`r sum(dfeth$rotation == "rotation" & dfeth$wave == "wave5")`**, and also the number of those adopters who used improved maize seeds have increased to **`r sum(dfeth$rotation == "rotation" & dfeth$wave == "wave5" & dfeth$improved_maize == "improved")`** (**`r round(sum(dfeth$rotation == "rotation" & dfeth$wave == "wave5" & dfeth$improved_maize == "improved") / sum(dfeth$rotation == "rotation" & dfeth$wave == "wave5") * 100, 1)`**%).
 
-The data reveals significant changes in adoption rates between 2017 and 2020. The number of farmers practicing maize-legume rotations and using improved seeds increased substantially over this period. Overall, adoption of improved seeds has grown considerably, with many more farmers implementing legume rotation on the maize plots.
+The data reveals significant changes in adoption rates between 2017 and 2020. The number of farmers practicing maize-legume rotations and using improved seeds increased substantially over this period. Overall, adoption of improved seeds has grown considerably, with many more farmers implementing legume rotation on their maize plots.
 
 ::: {style="width:60%; background-color: #FDFDF6; padding: 12px "}
 ```{r}
@@ -112,10 +112,10 @@ dfmlwfull |>
 In the analysis of Ethiopian maize-producing households from waves 4 and 5 of the Ethiopia Socioeconomic Survey (ESS), we focus exclusively on legume rotations. Maize-legume intercropping is not considered in this part due to its rare occurrence among the sampled households.
 Our main variable, agroecological intensification, captures maize-legume rotations and improved maize cultivation practices. The variable of interest takes four values:
 
-* **0: No intensification**
-* **1: Maize-legume rotation**
-* **2: Improved variety**
-* **3: Maize-legume rotation with improved maize variety**
+* **1: No intensification**
+* **2: Maize-legume rotation**
+* **3: Improved variety**
+* **4: Maize-legume rotation with improved maize variety**
 
 The table below presents the social and plot-level characteristics considered in the analyses. Plot characteristics reflect the attributes of plots where maize is the primary crop.
 

@@ -156,6 +156,7 @@ modd <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_se
   rename(id_code=ag3a_08_1) |> 
   filter(!is.na(id_code))
 modd <- semi_join(modd, maizeplots, by="plot_id")
+
 individual <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/hh_sec_b.dta") |> 
   select(y4_hhid, indidy4, hh_b02, hh_b04) |> 
   mutate(female=ifelse(hh_b02==2,1,0)) |> 
@@ -164,6 +165,7 @@ modd <- left_join(modd, individual, by=c("y4_hhid", "id_code"))
 summary(modd)
 remove(individual)
 var_label(modd$female) <- "female primary dm concern. crops selection" # on crops to be planted
+
 modd <- modd |> select(plot_id, female, hh_b04 )  
 plot4 <- left_join(plot4, modd, by="plot_id")
 plot4 <- plot4 |> rename(age_manager_row=hh_b04)
@@ -455,6 +457,7 @@ tza4 <- tza4 |>
   tidyr::replace_na(list(income = 0)) |> 
   rename(wage_income=income)
 var_label(tza4$wage_income) <- "income from main and temporary off-farm work"
+remove(wage)
 
 ##  Extension, advisory, credit----
 
@@ -533,13 +536,13 @@ tza4 <- left_join(tza4, tlu, by=c("hhid"="y4_hhid"))
 remove(tlu)
 
 ## Land tenure ----
-
 tenure <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |>
   select(y4_hhid, plotnum, ag3a_25) |>
-  rename(acquisition_mode = ag3a_25) |> 
-  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-")) |> 
+  rename(acquisition_mode = ag3a_25) |>
+  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-")) |>
   filter(!is.na(acquisition_mode))
-tenure <- semi_join(tenure, maizeplots, by="plot_id") # KEPT ONLY MAIZE PLOTS
+
+tenure <- semi_join(tenure, maizeplots, by = "plot_id")  # KEPT ONLY MAIZE PLOTS
 look_for(tenure)
 
 # Create binary tenure_security: 1 = secure (inherited/gift/allocated/purchased), 0 = not secure (otherwise)
@@ -548,28 +551,38 @@ tenure <- tenure |>
     tenure_security = case_when(
       acquisition_mode %in% c(1, 2, 4, 5) ~ 1,
       !is.na(acquisition_mode) ~ 0,
-      TRUE ~ NA_real_ ))
+      TRUE ~ NA_real_ ) )
+
 var_label(tenure$tenure_security) <- "purchased, inherited, gifted, or allocated land ownership"
 
+# Quick sanity check
 tenure_diff_security <- tenure |>
   group_by(y4_hhid) |>
   summarise(
     unique_tenure = n_distinct(tenure_security, na.rm = TRUE),
     plots_count = n()
   ) |>
-  filter(unique_tenure > 1) 
-print(tenure_diff_security)
-tenure_diff_security <- tenure_diff_security |> 
-  mutate(diff=plots_count-unique_tenure)
-frq(tenure_diff_security$diff)
-frq(tenure_diff_security$plots_count) # most have two plots
-###NOTE:Some households have both secure and non-secure plots. 
-#So, combining tenure security just at the household level might not give the full picture. 
-#How should we handle this?
-#
-# IT APPEARS THAT OUT OF 50 MAIZE PLOTS, IN MOST HH HAVE TWO UNIQUE TYPES, IN THIS CASE THE INDICATOR SHOULD 
-# CAPTURE IF AT LEAST ONE MAIZE PLOT IS OWNED MEANING PURCHASED OR INHERITED OR ALLOCATED. 
+  filter(unique_tenure > 1)
 
+print(tenure_diff_security)
+
+tenure_diff_security <- tenure_diff_security |>
+  mutate(diff = plots_count - unique_tenure)
+
+frq(tenure_diff_security$diff)
+frq(tenure_diff_security$plots_count)  # most have two plots
+
+### NOTE:
+# Some households have both secure and non-secure plots. 
+# Combining tenure security only at the household level might not capture this complexity.
+# The indicator should reflect if at least one maize plot is secure (purchased/inherited/allocated).
+## sanity check end ##
+
+tenure <- collap(tenure, tenure_security ~ y4_hhid, FUN = fmax)
+
+tza4 <- left_join(tza4, tenure, by = c("hhid" = "y4_hhid"))
+
+remove(tenure, tenure_diff_security)
 
 ## Soil Type ----
 
@@ -661,5 +674,7 @@ cat("Of them, households that also grew maize in SR:", n_LR_legume_and_SR_maize_
 # Maybe this suggests that most of these households were likely primarily legume growers,
 # with limited transition to maize in SR.
 
-
+remove(legume_then_maize_hhs, LR_legume_hhs, SR_maize_hhs,
+   legume_codes, n_LR_legume_and_SR_maize_hhs, n_LR_legume_hhs,
+   hh14, maizehh, maizeplots)
 

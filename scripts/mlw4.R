@@ -42,9 +42,9 @@ hpdata <- hpdata|>
   mutate(plot_id=plot_id_merge)
 look_for(hpdata) # many missing
 
-### ### ### ### ### ### ### ###
-# Maize - legume intercropping----
-### ### ### ### ### ### ### ###
+# Crop diversification ----
+
+## Maize - legume intercropping----
 ### Garden means parcel; Garden -> Plot
 garden <- read_dta("data/mlw/ag_mod_d_19.dta") |> # plot level 
   select(y4_hhid, gardenid, plotid, ag_d14, ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e, ag_d20_oth) |> 
@@ -99,9 +99,8 @@ frq(garden$hybrid_maize1)
 garden$hybrid_maize1[is.na(garden$hybrid_maize1)] <- 0
 table(garden$hybrid_maize,garden$hybrid_maize1) # many differences. 
 remove(seed)
-### ### ### ### ### ### ### ###
-# Maize - legume rotation----
-### ### ### ### ### ### ### ###
+
+## Maize - legume rotation----
 modd <- read_dta("data/mlw/ag_mod_d_19.dta") |> 
   select(y4_hhid, gardenid, plotid, ag_d69, ag_d69_oth, ag_d70, ag_d70_oth) |> 
   mutate(plot_id = paste(y4_hhid, gardenid, plotid, sep = "-")) |> 
@@ -120,6 +119,37 @@ var_label(plot4$intercrop) <- "legume intercropped maize plot"
 var_label(plot4$rotation) <- "legume is cultivated before or after"
 var_label(plot4$count_plot) <- "number of main maize plots"
 var_label(plot4$hybrid_maize) <- " =1 if hybrid maize was cultivated plot data"
+
+### ### ### ### ### ### ### ###
+# Ecological soil management ----
+### ### ### ### ### ### ### ###
+soilman <-  read_dta("data/mlw/ag_mod_d_19.dta") |>   # plot level 
+  select(y4_hhid, gardenid, plotid, ag_d01, ag_d60, ag_d62) |> 
+  mutate(plot_id = paste(y4_hhid, gardenid, plotid, sep = "-")) |> 
+  rename(id_code=ag_d01)
+soilman <- semi_join(soilman, maizeplots, by="plot_id")
+look_for(soilman)
+frq(soilman$ag_d60)
+# 2 Left in the field as a cover and not ploughed in
+frq(soilman$ag_d62) # very few practiced min or zero tillage
+soilman <- soilman |> 
+  mutate(min_till=if_else(!is.na(ag_d62) & ag_d62 == 6, 1, 0),
+         zero_till=if_else(!is.na(ag_d62) & ag_d62 == 4, 1, 0),
+         crop_residue=if_else(!is.na(ag_d60) & ag_d60==2, 1, 0)
+  )
+frq(soilman$min_till) # 0.34% 
+frq(soilman$zero_till) # 1.%
+frq(soilman$crop_residue) # 5%
+soilman <- soilman |> 
+  select(plot_id, min_till, zero_till, crop_residue)
+plot4 <- left_join(plot4, soilman, by="plot_id")
+frq(plot4$crop_residue)
+frq(plot4$zero_till)
+frq(plot4$min_till)
+remove(soilman)
+var_label(plot4$min_till) <- "minimum tillage: one-pass till"
+var_label(plot4$zero_till) <- "no till"
+var_label(plot4$crop_residue) <- "Cover the field surface with crop residue/leaves"
 
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
@@ -212,7 +242,7 @@ aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_househo
 mlw4 <- mlw4 %>% select(-all_of(aggregated_vars))
 look_for(mlw4)
 mlw4 <- mlw4 |> 
-  select(1, 6:9, 14:25)
+  select(1, 6:12, 17:28)
 look_for(mlw4)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -480,7 +510,7 @@ mode_or_max <- function(x) {
 modd <- collap(modd, soil_type ~ y4_hhid, FUN =mode_or_max) # select dominant otherwise clay 
 modd <- modd |> 
   mutate(soil= factor(soil_type, levels = c(0,1,2), labels = c("Other or mix", "Sandy", "Clay"))) |> 
-  select(y2_hhid, soil)
+  select(y4_hhid, soil)
 mlw4 <- left_join(mlw4, modd, by=c("hhid"="y4_hhid"))
 var_label(mlw4$soil) <- "HH dominant soil type"
 remove(modd, maizeplots, mode_or_max)
@@ -509,6 +539,24 @@ var_label(mlw4$maize_voucher) <- "HH had obtained voucher for maize seed"
 var_label(mlw4$fert_voucher) <- "HH had obtained voucher for inorganic fertilizer"
 var_label(mlw4$bean_voucher) <- "HH had obtained voucher for bean seeds"
 remove(coupon)
+
+## Location ----
+location <- read_dta("data/mlw/hh_mod_a_filt_19.dta") |> 
+  select(y4_hhid,  region)
+mlw4 <- left_join(mlw4, location, by=c("hhid"="y4_hhid")) 
+rm(location)
+
+## HH head gender ----
+head <- read_dta("data/mlw/hh_mod_b_19.dta") |> 
+  select(y4_hhid, hh_b03, hh_b04 ) |> 
+  filter(hh_b04==1) # keep only head
+frq(head$hh_b04)
+frq(head$hh_b03)
+head <- head |> 
+  mutate(female_head=if_else(hh_b03==2,1,0)) |> 
+  select(y4_hhid, female_head)
+mlw4 <- left_join(mlw4, head, by=c("hhid"="y4_hhid"))
+rm(head)
 
 ## Missing data and notes ----
 ## shocks missing for 22 hhs

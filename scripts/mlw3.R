@@ -43,8 +43,10 @@ hpdata <- hpdata|>
 look_for(hpdata) # many missing
 
 ### ### ### ### ### ### ### ###
-# Maize - legume intercropping----
+# Crop diversification ----
 ### ### ### ### ### ### ### ###
+
+## Maize - legume intercropping----
 ### Garden means parcel; Garden -> Plot
 garden <- read_dta("data/mlw/ag_mod_d_16.dta") |> # plot level 
   select(y3_hhid, gardenid, plotid, ag_d14, ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e, ag_d20_oth) |> 
@@ -98,9 +100,7 @@ frq(garden$hybrid_maize)
 garden$hybrid_maize[is.na(garden$hybrid_maize)] <- 0
 remove(seed)
 
-### ### ### ### ### ### ### ###
-# Maize - legume rotation----
-### ### ### ### ### ### ### ###
+## Maize - legume rotation----
 modd <- read_dta("data/mlw/ag_mod_d_16.dta") |> 
   select(y3_hhid, gardenid, plotid, ag_d69, ag_d69_oth, ag_d70, ag_d70_oth) |> 
   mutate(plot_id = paste(y3_hhid, gardenid, plotid, sep = "-")) |> 
@@ -118,6 +118,37 @@ remove(garden,modd)
 var_label(plot3$intercrop) <- "legume intercropped maize plot"
 var_label(plot3$rotation) <- "legume is cultivated before or after"
 var_label(plot3$count_plot) <- "number of main maize plots"
+
+### ### ### ### ### ### ### ###
+# Ecological soil management ----
+### ### ### ### ### ### ### ###
+soilman <-  read_dta("data/mlw/ag_mod_d_16.dta") |>   # plot level 
+  select(y3_hhid, gardenid, plotid, ag_d01, ag_d60, ag_d62) |> 
+  mutate(plot_id = paste(y3_hhid, gardenid, plotid, sep = "-")) |> 
+  rename(id_code=ag_d01)
+soilman <- semi_join(soilman, maizeplots, by="plot_id")
+look_for(soilman)
+frq(soilman$ag_d60)
+# 2 Left in the field as a cover and not ploughed in
+frq(soilman$ag_d62) # very few practiced min or zero tillage
+soilman <- soilman |> 
+  mutate(min_till=if_else(!is.na(ag_d62) & ag_d62 == 6, 1, 0),
+         zero_till=if_else(!is.na(ag_d62) & ag_d62 == 4, 1, 0),
+         crop_residue=if_else(!is.na(ag_d60) & ag_d60==2, 1, 0)
+         )
+frq(soilman$min_till) # 0.24% 
+frq(soilman$zero_till) # 1%
+frq(soilman$crop_residue) # 0.72%
+soilman <- soilman |> 
+  select(plot_id, min_till, zero_till, crop_residue)
+plot3 <- left_join(plot3, soilman, by="plot_id")
+frq(plot3$crop_residue)
+frq(plot3$zero_till)
+frq(plot3$min_till)
+remove(soilman)
+var_label(plot3$min_till) <- "minimum tillage: one-pass till"
+var_label(plot3$zero_till) <- "no till"
+var_label(plot3$crop_residue) <- "Cover the field surface with crop residue/leaves"
 
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
@@ -212,7 +243,7 @@ aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_househo
 mlw3 <- mlw3 %>% select(-all_of(aggregated_vars))
 look_for(mlw3)
 mlw3 <- mlw3 |> 
-  select(1, 6:8, 13:24)
+  select(1, 6:11, 16:27)
 look_for(mlw3)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -557,7 +588,25 @@ var_label(mlw3$maize_voucher) <- "HH had obtained voucher for maize seed"
 var_label(mlw3$fert_voucher) <- "HH had obtained voucher for inorganic fertilizer"
 var_label(mlw3$bean_voucher) <- "HH had obtained voucher for bean seeds"
 remove(coupon)
- 
+
+## Location ----
+location <- read_dta("data/mlw/hh_mod_a_filt_16.dta") |> 
+  select(y3_hhid,  region)
+mlw3 <- left_join(mlw3, location, by=c("hhid"="y3_hhid")) 
+rm(location)
+
+## HH head gender ----
+head <- read_dta("data/mlw/hh_mod_b_16.dta") |> 
+  select(y3_hhid, hh_b03, hh_b04 ) |> 
+  filter(hh_b04==1) # keep only head
+frq(head$hh_b04)
+frq(head$hh_b03)
+head <- head |> 
+  mutate(female_head=if_else(hh_b03==2,1,0)) |> 
+  select(y3_hhid, female_head)
+mlw3 <- left_join(mlw3, head, by=c("hhid"="y3_hhid"))
+rm(head)
+
 ## Missing data and notes ----
 ## shocks missing for 16 hhs
 

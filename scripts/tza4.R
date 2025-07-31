@@ -10,11 +10,6 @@ pacman::p_load(tidyverse,
 getwd()
 options(scipen = 999)
 
-# identify panel households
-hh14 <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/hh_filters.dta") |> 
-  select(y4_hhid) |> 
-  distinct(y4_hhid, .keep_all = TRUE) 
-
 ### ### ### ### ### ### ### ###
 # HP data ----
 ### ### ### ### ### ### ### ###
@@ -676,5 +671,5 @@ cat("Of them, households that also grew maize in SR:", n_LR_legume_and_SR_maize_
 
 remove(legume_then_maize_hhs, LR_legume_hhs, SR_maize_hhs,
    legume_codes, n_LR_legume_and_SR_maize_hhs, n_LR_legume_hhs,
-   hh14, maizehh, maizeplots)
+   maizehh, maizeplots)
 

@@ -10,11 +10,6 @@ pacman::p_load(tidyverse,
 getwd()
 options(scipen = 999)
 
-# identify panel households
-hh20 <- read_dta("data/tza/tza_wave5_2020_21/hh_sec_a.dta") |> 
-  select(y5_hhid) |> 
-  distinct(y5_hhid, .keep_all = TRUE) 
-
 ### ### ### ### ### ### ### ###
 # HP data ----
 ### ### ### ### ### ### ### ###
@@ -608,6 +603,8 @@ var_label(tza5$soil) <-  "loam soil type"
 remove(soil_type)
 
 ## Input coupon & improved variety use---- 
+## In wave 5, if they received voucher for inputs. Instead their was a question why they used input,
+## and one answer option is voucher. But this is not a good measure. 
 inputcoupon <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_3a.dta") |> 
   select(y5_hhid, plot_id, ag3a_47, ag3a_52, ag3a_60, ag3a_64, ag3a_65a, ag3a_65d )
 
@@ -618,7 +615,7 @@ inputcoupon <- inputcoupon |>
     fert_voucher = if_else(ag3a_47 == 1 & !is.na(ag3a_52) & ag3a_52 == 2, 1, 0),
     herb_voucher = if_else(ag3a_60 == 1 & !is.na(ag3a_64) & ag3a_64 == 2, 1, 0),
     pest_voucher = if_else(ag3a_65a == 1 & !is.na(ag3a_65d) & ag3a_65d == 2, 1, 0)
-  )
+    )
 
 frq(inputcoupon$fert_voucher)
 frq(inputcoupon$herb_voucher)
@@ -673,4 +670,4 @@ cat("Of them, households that also grew maize in SR:", n_LR_legume_and_SR_maize_
 
 remove(legume_then_maize_hhs, LR_legume_hhs, SR_maize_hhs,
        legume_codes, n_LR_legume_and_SR_maize_hhs, n_LR_legume_hhs,
-       hh20, maizehh, maizeplots)
+       maizehh, maizeplots)

@@ -37,7 +37,10 @@ hpdata <- hpdata|>
 look_for(hpdata) # many missing, especially improved seeds
 
 ### ### ### ### ### ### ### ###
-# Maize - legume intercropping----
+# Crop diversification ----
+### ### ### ### ### ### ### ###
+
+## Maize - legume intercropping----
 ### ### ### ### ### ### ### ###
 ### Garden means parcel; Garden -> Plot
 garden <- read_dta("data/mlw/ag_mod_d_10.dta") |>   # plot level 
@@ -92,10 +95,8 @@ maizehh <- maizeplots |>  distinct(hh_id_merge)
 hpdata <- semi_join(hpdata, maizeplots, by="plot_id")
 remove(plots)
 
-### ### ### ### ### ### ### ###
-# Maize - legume rotation----
+## Maize - legume rotation----
 # If legume was cultivated after the rainy season
-### ### ### ### ### ### ### ###
 modm <- read_dta("data/mlw/ag_mod_m_10.dta") |> 
   select(case_id, ag_m0b, ag_m0d) |> 
   filter(!is.na(ag_m0d))
@@ -124,6 +125,10 @@ var_label(plot1$intercrop) <- "=1 if legume intercropped maize plot"
 var_label(plot1$rotation) <- "=1 if legume is cultivated after" # ONLY AFTER CAN BE IDENTIFIED
 var_label(plot1$count_plot) <- "number of main maize plots"
 var_label(plot1$hybrid_maize) <- " =1 if hybrid maize was cultivated plot section"
+
+### ### ### ### ### ### ### ###
+# Ecological soil management ----
+# NO DATA ON TILLAGE OR RESIDUE RETENTION
 
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
@@ -536,6 +541,18 @@ frq(mlw1$fert_voucher)
 var_label(mlw1$maize_voucher) <- "HH had obtained vaicher for maize seed"
 var_label(mlw1$fert_voucher) <- "HH had obtained vaicher for inorganic fertilizer"
 remove(coupon)
+
+## HH head gender ----
+head <- read_dta("data/mlw/hh_mod_b_10.dta") |> 
+  select(case_id, hh_b03, hh_b04 ) |> 
+  filter(hh_b04==1) # keep only head
+frq(head$hh_b04)
+frq(head$hh_b03)
+head <- head |> 
+  mutate(female_head=if_else(hh_b03==2,1,0)) |> 
+  select(case_id, female_head)
+mlw1 <- left_join(mlw1, head, by=c("hhid"="case_id"))
+rm(head)
 
 ## Missing data and notes ----
 ## Some do not have agricultural assets but still have asset index. This is because, pca (factor) analysis still includes those with 

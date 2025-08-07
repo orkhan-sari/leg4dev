@@ -532,6 +532,24 @@ modd <- modd |>
   select(y2_hhid, soil)
 mlw2 <- left_join(mlw2, modd, by=c("hhid"="y2_hhid"))
 var_label(mlw2$soil) <- "HH dominant soil type"
+remove(modd)
+
+## Slop ----
+modd <-  read_dta("data/mlw/ag_mod_d_13.dta") |> 
+  select(y2_hhid, ag_d00, ag_d26) |> 
+  mutate(plot_id = paste(y2_hhid, ag_d00, sep = "-"))
+modd <- semi_join(modd, maizeplots, by="plot_id")
+frq(modd$ag_d26) # do mode max again, if there is a steep slope that will be captured this way too. 
+modd <- modd |> filter(!is.na(ag_d26))
+modd <- modd |>
+  mutate(ag_d26 = as.numeric(modd$ag_d26))
+modd <- collap(modd, ag_d26 ~ y2_hhid, FUN =mode_or_max)
+modd <- modd |> 
+  mutate(slope= factor(ag_d26, levels = c(1,2,3,4), labels = c("Flat", "Slight slope", "Moderate slope", "Steep"))) |> 
+  select(y2_hhid, slope)
+frq(modd$slope)
+mlw2 <- left_join(mlw2, modd, by=c("hhid"="y2_hhid"))
+var_label(mlw2$slope) <- "Dominant slope"
 remove(modd, maizeplots, mode_or_max)
 
 ## Input coupon ---- 

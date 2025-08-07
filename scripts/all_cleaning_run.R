@@ -8,9 +8,10 @@ setdiff(names(eth5), names(eth4))
 dfeth <-rbind(eth4, eth5) 
 dfeth <- dfeth |> 
   group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup()
-table(dfeth$dupl) # 522 panel hhs 
+table(dfeth$dupl) # 522 panel hhs
 dfeth <- dfeth |> filter(dupl==2) |> select(-dupl)
 look_for(dfeth)
+# run rainfall script here
 dfeth$wave <- as.factor(dfeth$wave)
 dfeth <- dfeth |> 
   relocate(wave, .after= hh_id_obs)
@@ -43,12 +44,17 @@ dfeth |> group_by(hh_id_obs) |> select(hh_id_obs, wave, nom_totcons_aeq, def_tot
   arrange(hh_id_obs) |> print(n=12)
 dfeth |> group_by(hh_id_obs) |> select(hh_id_obs, wave, nom_foodcons_aeq, def_foodcons_aeq) |>
   arrange(hh_id_obs) |> print(n=12)
-
 dfeth <- dfeth |> 
   mutate(improved_maize=
            factor(improved_maize, levels = c(0,1), labels = c("local", "improved")),
          rotation=
            factor(rotation, levels = c(0,1), labels = c("norotation", "rotation"))
+         )
+table(dfeth$rotation, dfeth$intercrop) # only 19 hhs had intercropped but not rotated
+dfeth <- dfeth |> 
+  mutate(legume_intens=
+           case_when(rotation=="rotation" | intercrop==1 ~ 1L,
+                     .default = 0L)
          )
 table(dfeth$rotation, dfeth$wave) # 174 and 201 adopters
 table(dfeth$improved_maize, dfeth$wave) # 201 and 269 adopters 
@@ -105,11 +111,70 @@ dfeth <- dfeth |>
   mutate(maize_share=plot_area_GPS/farm_size)
 var_label(dfeth$maize_share) <- "% area dedicated to maize plots"
 dfeth <- dfeth |> 
-  mutate(year= if_else(wave=="wave4", 2017, 2020))
+  mutate(year= if_else(wave=="wave4", 2018, 2021))
+# source("scripts/rainfall_eth.R")
+dfeth <- dfeth |> 
+  mutate(wavem=case_when(wave=="wave4" ~ 4,
+                         wave=="wave5" ~ 5,
+                         .default = NA_real_))
+spatial <- read_dta("data/hp/Household_dataset.dta") |>
+  filter(country == "Ethiopia") |> 
+  select(hh_id_obs, wave, lat_modified, lon_modified) |> 
+  rename(wavem=wave)
+dfeth <- left_join(dfeth, spatial, by=c("hh_id_obs", "wavem")) # 8 missing geo coordinates
+dfeth <- left_join(dfeth, rainfalleth, by=c("lat_modified"="lat", "lon_modified"="lon", "wavem"="wave"))
+var_label(dfeth$seasonal_rainfall) <- "Total annaul rainfall"
+var_label(dfeth$average_rainfall) <- "Average rainfall observed since 1990"
+var_label(dfeth$sd_rainfall) <- "Standard deviation of mean annual rainfall since 1990"
+var_label(dfeth$rainfall_shock) <- "Deviations from expected annual rainfall"
+var_label(dfeth$lag_rainfall) <- "Total rainfall of the lagged year"
+look_for(dfeth)
+dfeth <- dfeth |> 
+  mutate(ln_wage_income = log(wage_income+1),
+         b_enterprise_income=if_else(enterprise_income>0,1,0)
+         )
+
+## Adopting neighbors ----
+## Adopters
+library(geosphere)
+dfspatial4 <- dfeth |> 
+  filter(wavem==4) |> 
+  select(lat_modified, lon_modified, hh_id_obs, legume_intens, wavem) 
+dist_matrix <- distm(dfspatial4[, c("lon_modified", "lat_modified")], fun = distHaversine)
+
+# Count number of neighbors with adopted == 1 within 10 km (10,000 m)
+within10km_adopted <- sapply(1:nrow(dfspatial4), function(i) {
+  neighbors <- which(dist_matrix[i, ] <= 10000 & dfspatial4$hh_id_obs != dfspatial4$hh_id_obs[i])
+  sum(dfspatial4$legume_intens[neighbors])
+})
+dfspatial4$adopted_neighbors_10km <- within10km_adopted
+frq(dfspatial4$adopted_neighbors_10km)
+dfspatial4 <- dfspatial4 |> 
+  select(hh_id_obs, adopted_neighbors_10km, wavem )
+# wave5 
+dfspatial5 <- dfeth |> 
+  filter(wavem==5) |> 
+  select(lat_modified, lon_modified, hh_id_obs, legume_intens, wavem) 
+dist_matrix <- distm(dfspatial5[, c("lon_modified", "lat_modified")], fun = distHaversine)
+
+# Count number of neighbors with adopted == 1 within 10 km (10,000 m)
+within10km_adopted <- sapply(1:nrow(dfspatial5), function(i) {
+  neighbors <- which(dist_matrix[i, ] <= 10000 & dfspatial5$hh_id_obs != dfspatial5$hh_id_obs[i])
+  sum(dfspatial5$legume_intens[neighbors])
+})
+dfspatial5$adopted_neighbors_10km <- within10km_adopted
+frq(dfspatial5$adopted_neighbors_10km)
+dfspatial5 <- dfspatial5 |> 
+  select(hh_id_obs, adopted_neighbors_10km, wavem )
+dfn <- rbind(dfspatial4, dfspatial5)
+dfeth <- left_join(dfeth, dfn, by=c("hh_id_obs", "wavem"))
+rm(dfspatial4, dfspatial5, dfn, within10km_adopted, dist_matrix)
+# Run nearest adopters script here
 # dir.create("data/est") # create the folder for estimation STATA datasets
 write_dta(dfeth, "data/est/dfeth.dta", version = 15)
 saveRDS(dfeth, file = "data/est/dfeth.rds")
-
+dftest <- dfeth |> arrange(wavem, hh_id_obs) |> select("hh_id_obs", "wavem", "legume_intens", "adopted_neighbors_20km", lon_modified
+                                                       , lat_modified)
 # Malawi ----
 source("scripts/mlw1.R") # 1009 obs
 source("scripts/mlw2.R") # 1252 obs
@@ -146,6 +211,22 @@ dfmlw <- dfmlw |>
                     .default = 0)
     )
 dfmlw$region <- drop_unused_value_labels(dfmlw$region)
+dfmlw <- dfmlw %>%
+  arrange(hh_id_obs, year) %>%
+  group_by(hh_id_obs) %>%
+  fill(region, .direction = "downup") %>%  # fill down then up
+  ungroup()
+# market distance is available fro all hhs in wave1 and some for wave4. Since, the it is measured in distance,
+# we will replace the missing in other waves with the average observed from wave 1 and 4.
+dfmlw <- dfmlw %>%
+  group_by(hh_id_obs) %>%
+  mutate(
+    market_distance = mean(market_distance, na.rm = TRUE)
+  ) %>%
+  ungroup()
+dfmlw <- dfmlw |> 
+  relocate(wave, .after= hh_id_obs) |> 
+  relocate(region, .after=wave)
 table(dfmlw$rain_shock, dfmlw$wave, useNA = "ifany")
 table(dfmlw$flood_shock, dfmlw$wave, useNA = "ifany")
 dfmlw <- dfmlw |> 
@@ -174,22 +255,14 @@ dfmlw <- dfmlw |>
 table(dfmlw$weather_shock, dfmlw$wave, useNA = "ifany")
 dfmlw$improved <- NULL
 dfmlw <- dfmlw |> 
-  relocate(wave, .after= hh_id_obs)
-dfmlw <- dfmlw |> 
   group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 
   relocate(dupl, .after= hh_id_obs)
-table(dfmlw$dupl) # 654 panel hhs
+table(dfmlw$dupl) # 654 panel hhs for all rounds
 
-## mlw all rounds ====  
+## mlw all rounds ====  Most likely won't be needed for estimations
 dfmlwfull <- dfmlw |> filter(dupl==4) |> select(-dupl) # HH that grown maize as a main crop in all 4 rounds
 look_for(dfmlwfull)
 table(dfmlwfull$subsistence_ag, dfmlwfull$wave, useNA = "ifany") # 5 obs in wave 3 and 4
-dfmlwfull |> 
-  group_by(hh_id_obs) |> 
-  select(hh_id_obs, wave, subsistence_ag) |> 
-  filter(any(is.na(subsistence_ag))) |> 
-  arrange(hh_id_obs) |> 
-  print(n=50) # some differences are observed over years. 
 dfmlwfull |> 
   group_by(hh_id_obs) |> 
   select(hh_id_obs, wave, age_manager, female_manager) |> 
@@ -215,7 +288,7 @@ dfmlwfull |>
 dfmlwfull <- dfmlwfull |> 
   mutate(primary_education_manager=case_when(hh_id_obs=="2002935" & wave=="wave4" ~ 0,
                                              hh_id_obs=="2002949" & wave=="wave4" ~ 0,
-                                             .default = age_manager)
+                                             .default = primary_education_manager)
   )
 # 2004367 manager is 4 years old in wave1 
 dfmlwfull <- dfmlwfull |> 
@@ -226,11 +299,39 @@ mutate(agr_intens=
            (rotation=="rotation" | intercrop == "mixed") & hybrid_maize=="improved" ~ 3,
            .default = 0),
        agr_intens=
-         factor(agr_intens, levels = c(0,1,2,3), labels=c("No intensification", "Diversification", "IV", "Diversification and IV"))
+         factor(agr_intens, levels = c(0,1,2,3), labels=c("No intensification", "Diversification", "IV", "Diversification and IV")),
+       legume_intens=
+         case_when(rotation=="rotation" | intercrop=="mixed" ~ 1L,
+                   .default = 0L)
        )
-table(dfmlwfull$rotation, dfmlwfull$hybrid_maize)
-frq(dfmlwfull$agr_intens)
-table(dfmlwfull$wave, dfmlwfull$agr_intens)
+dfmlwfull <- dfmlwfull |> 
+  mutate(wavem=case_when(wave=="wave1" ~ 1,
+                         wave=="wave2" ~ 2,
+                         wave=="wave3" ~ 3,
+                         wave=="wave4" ~ 4,
+                         .default = NA_real_))
+spatial <- read_dta("data/hp/Household_dataset.dta") |>
+  filter(country == "Malawi") |> 
+  select(hh_id_obs, wave, lat_modified, lon_modified) |> 
+  rename(wavem=wave)
+dfmlwfull <- left_join(dfmlwfull, spatial, by=c("hh_id_obs", "wavem")) # 2 missing geo coordinates
+dfmlwfull <- left_join(dfmlwfull, rainfall, by=c("lat_modified"="lat", "lon_modified"="lon", "wavem"="wave"))
+var_label(dfmlwfull$seasonal_rainfall) <- "Total rainfall during the production season"
+var_label(dfmlwfull$average_rainfall) <- "Average rainfall observed since 1990"
+var_label(dfmlwfull$sd_rainfall) <- "Standard deviation of mean seasonal rainfall since 1990"
+var_label(dfmlwfull$rainfall_shock) <- "Deviations from expected seasonal rainfall"
+var_label(dfmlwfull$lag_rainfall) <- "Total rainfall of the lagged year"
+look_for(dfmlwfull)
+dfmlwfull$wavem <- NULL
+table(dfmlwfull$wave, dfmlwfull$slope)
+dfmlwfull <- dfmlwfull |> 
+  mutate(slope=case_when(slope %in% c("Steep", "Moderate slope") ~ 3,
+                         slope == "Flat" ~ 1,
+                         .default = 2),
+         slope=
+           factor(slope, levels = c(1,2,3), labels=c("Flat", "Moderate", "Steep"))
+         )
+table(dfmlwfull$wave, dfmlwfull$slope)
 write_dta(dfmlwfull, "data/est/dfmlwfull.dta", version = 15)
 saveRDS(dfmlwfull, file = "data/est/dfmlwfull.rds")
 
@@ -293,7 +394,7 @@ var_label(dfmlw3$rainfall_shock) <- "Deviations from expected seasonal rainfall"
 var_label(dfmlw3$lag_rainfall) <- "Total rainfall of the lagged year"
 look_for(dfmlw3)
 dfmlw3$wavem <- NULL
-rm(spatial, rain_df, rain_df2, rain_df3, rain_df4, rainfall)
+rm(spatial, rain_df, rain_df1, rain_df2, rain_df3, rain_df4, rainfall)
 dfmlw3 |> 
   group_by(hh_id_obs) |> 
   select(hh_id_obs, wave, age_manager, female_manager) |> 
@@ -326,9 +427,111 @@ dfmlw3 |>
   print(n=81) # for all subsistence_ag missing yield and shock are missing too naturally. 
 look_for(dfmlw3)
 dfmlw3$wave <- as_factor(dfmlw3$wave)
+table(dfmlw3$wave, dfmlw3$slope)
+dfmlw3 <- dfmlw3 |> 
+  mutate(slope=case_when(slope %in% c("Steep", "Moderate slope") ~ 3,
+                         slope == "Flat" ~ 1,
+                         .default = 2),
+         slope=
+           factor(slope, levels = c(1,2,3), labels=c("Flat", "Moderate", "Steep"))
+  )
+table(dfmlw3$wave, dfmlw3$slope)
 write_dta(dfmlw3, "data/est/dfmlw3.dta", version = 15) # HH that grown maize as a main crop in all 3 rounds
 saveRDS(dfmlw3, file = "data/est/dfmlw3.rds")
 
+## mlw last two rounds ----
+dfmlw2 <- dfmlw |> 
+  filter(!wave %in% c("wave1", "wave2"))
+# source("scripts/rainfall.R")
+dfmlw2 <- dfmlw2 |> 
+  mutate(agroecology=
+           case_when(
+             (rotation=="rotation" | intercrop=="mixed") & eco_soil_mng==0 ~ 2,
+             rotation=="norotation" & intercrop=="purestand" & eco_soil_mng== 1 ~ 3,
+             (rotation=="rotation" | intercrop=="mixed") & eco_soil_mng== 1 ~ 4,
+             .default = 1),
+         agroecology=
+           factor(agroecology, levels = c(1,2,3,4), labels=c("No agroecology", "Diversification", "Soil management", "Agroecology"))
+  )
+table(dfmlw2$wave, dfmlw2$agroecology)
+dfmlw2 <- dfmlw2 |> 
+  mutate(b_agroecology=
+           if_else(
+             agroecology=="No agroecology", 0L, 1L),
+         b_agroecology=
+           factor(b_agroecology, levels = c(0,1), labels=c("No agroecology", "Agroecology")),
+         legume_intens=
+           case_when(rotation=="rotation" | intercrop=="mixed" ~ 1L,
+                     .default = 0L)
+  )
+dfmlw2 <- dfmlw2 |> 
+  mutate(agr_intens=
+           case_when(
+             (rotation=="rotation" | intercrop=="mixed") & hybrid_maize=="local" ~ 2,
+             rotation=="norotation" & intercrop=="purestand" & hybrid_maize=="improved" ~ 3,
+             (rotation=="rotation" | intercrop=="mixed") & hybrid_maize=="improved" ~ 4,
+             .default = 1),
+         agr_intens=
+           factor(agr_intens, levels = c(1,2,3,4), labels=c("No intensification", "Rotation", "IV", "Rotation and IV"))
+  )
+dfmlw2 <- dfmlw2 |> 
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 
+  relocate(dupl, .after= hh_id_obs)
+table(dfmlw2$dupl)
+dfmlw2 <- dfmlw2 |> filter(dupl==2) |> select(-dupl) # HH that grown maize as a main crop in past 3 rounds
+look_for(dfmlw2)
+dfmlw2 <- dfmlw2 |> 
+  mutate(wavem=case_when(wave=="wave3" ~ 3,
+                         wave=="wave4" ~ 4,
+                         .default = NA_real_))
+spatial <- read_dta("data/hp/Household_dataset.dta") |>
+  filter(country == "Malawi") |> 
+  select(hh_id_obs, wave, lat_modified, lon_modified) |> 
+  rename(wavem=wave)
+dfmlw2 <- left_join(dfmlw2, spatial, by=c("hh_id_obs", "wavem")) # 2 missing geo coordinates
+dfmlw2 <- left_join(dfmlw2, rainfall, by=c("lat_modified"="lat", "lon_modified"="lon", "wavem"="wave"))
+var_label(dfmlw2$seasonal_rainfall) <- "Total rainfall during the production season"
+var_label(dfmlw2$average_rainfall) <- "Average rainfall observed since 1990"
+var_label(dfmlw2$sd_rainfall) <- "Standard deviation of mean seasonal rainfall since 1990"
+var_label(dfmlw2$rainfall_shock) <- "Deviations from expected seasonal rainfall"
+var_label(dfmlw2$lag_rainfall) <- "Total rainfall of the lagged year"
+look_for(dfmlw2)
+dfmlw2$wavem <- NULL
+rm(spatial, rain_df, rain_df2, rain_df3, rain_df4, rainfall)
+dfmlw2 |> 
+  group_by(hh_id_obs) |> 
+  select(hh_id_obs, wave, age_manager, female_manager) |> 
+  filter(any(is.na(age_manager))) |> 
+  arrange(hh_id_obs) |> 
+  print(n=75) # some differences are observed over years. 
+dfmlw2 |> select(hh_id_obs, wave, elevation) |> view()
+dfmlw2 <- dfmlw2 %>%
+  group_by(hh_id_obs) %>% 
+  mutate(elevation = if_else(is.na(elevation),
+                             mean(elevation, na.rm = TRUE),
+                             elevation)) %>%
+  ungroup()
+dfmlw2 <- dfmlw2 |> 
+  mutate(age_manager=case_when(hh_id_obs=="2000927" & wave=="wave3" ~ 27,
+                               hh_id_obs=="2002018" & wave=="wave3" ~ 27,
+                               hh_id_obs=="2002188" & wave=="wave3" ~ 54,
+                               hh_id_obs=="2002784" & wave=="wave3" ~ 30,
+                               hh_id_obs=="2002856" & wave=="wave3" ~ 30,
+                               hh_id_obs=="2002918" & wave=="wave3" ~ 67,
+                               hh_id_obs=="2004988" & wave=="wave3" ~ 56,
+                               .default = age_manager)
+  )
+table(dfmlw2$subsistence_ag, dfmlw2$wave, useNA = "ifany") # 3,6,6 obs
+dfmlw2 |> 
+  group_by(hh_id_obs) |> 
+  select(hh_id_obs, wave, subsistence_ag, yield_value_USD, drought_shock) |> 
+  filter(any(is.na(yield_value_USD))) |> 
+  arrange(hh_id_obs) |> 
+  print(n=81) # for all subsistence_ag missing yield and shock are missing too naturally. 
+look_for(dfmlw2)
+dfmlw2$wave <- as_factor(dfmlw2$wave)
+write_dta(dfmlw2, "data/est/dfmlw2.dta", version = 15) # HH that grown maize as a main crop in all 3 rounds
+saveRDS(dfmlw2, file = "data/est/dfmlw2.rds")
 
 
 

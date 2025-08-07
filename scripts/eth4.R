@@ -8,7 +8,6 @@ pacman::p_load(tidyverse,
                sjmisc)
 getwd()
 options(scipen = 999)
-rm(list = ls())
 ### ### ### ### ### ### ### ###
 # HP data ----
 ### ### ### ### ### ### ### ###
@@ -28,19 +27,17 @@ hpdata|>
 hpdata <- hpdata|>
   select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size, 
          manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager, respondent_id_obs, 
-         respondent_id_merge, improved, organic_fertilizer, inorganic_fertilizer, intercropped, soil_fertility_index, dist_market, elevation, 
+         respondent_id_merge, improved, organic_fertilizer, inorganic_fertilizer, soil_fertility_index, dist_market, elevation, 
          plot_dist_household, ag_asset_index, plot_certificate, drought_shock, rain_shock, flood_shock,irrigated, nb_seasonal_crop,
          used_pesticides, yield_value_LCU, yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
 look_for(hpdata) #many missing
 
 ### ### ### ### ### ### ### ###
-# Maize - legume intercropping----
-# RARE! Please refer to the qmd file \leg4dev\outputs\ethiopia.qmd
+# Crop diversification ----
+### ### ### ### ### ### ### ###
 
-### ### ### ### ### ### ### ###
-# Maize - legume rotation----
-### ### ### ### ### ### ### ###
+## Maize - legume rotation----
 ## There are few fields reported more than 1 with different holders.
 ## These are probably divided between hh members.
 ## Let us first identify these fields
@@ -122,6 +119,58 @@ var_label(rotation4$rotation) <- "If household rotated at least one maize field 
 var_label(rotation4$count_plot) <- "number of main maize plots"
 plotdata4 <- left_join(cropdata4, hpdata, by=c("plot_id")) |>
   select(-s3q03, -s3q34, -s4q02)
+
+## Maize - legume intercropping----
+## # RARE! Also refer to the qmd file \leg4dev\outputs\ethiopia.qmd
+cropdata <- read_dta("data/eth/ess4/sect4_pp_w4.dta") |> 
+  select("household_id", "holder_id", "parcel_id", "field_id","crop_id", "s4q01b", "s4q02", "s4q03") |> 
+  rename(mixedcrop=s4q02)
+table(cropdata$mixedcrop) # 2692 plots with mixed cropping where 6085 crops are produced
+cropdata <- cropdata |> 
+  dplyr::group_by(household_id, parcel_id, field_id) |> 
+  mutate(legum = ifelse(s4q01b %in% c(9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 24), 1, 0),
+         legume = ifelse(any(mixedcrop == 2) & any(legum == 1), 1, 0)) |> 
+  ungroup()
+cropdata <- cropdata |> 
+  filter(legume==1) |> 
+  filter(s4q01b==2) |> 
+  mutate(plot_id = paste(holder_id, parcel_id, field_id, sep = "-")) |> 
+  select(plot_id, legume) |> 
+  rename(intercrop=legume)
+plotdata4 <- left_join(plotdata4, cropdata, by="plot_id")
+plotdata4$intercrop[is.na(plotdata4$intercrop)] <- 0
+frq(plotdata4$intercrop) # only 54 main maize plots are intercropped with legume
+rm(cropdata)
+
+# Ecological soil management ----
+soilman <- read_dta("data/eth/ess4/sect3_pp_w4.dta") |> 
+  select(household_id, holder_id, parcel_id, field_id, s3q35, s3q36, s3q41) |> 
+  mutate(plot_id = paste(holder_id, parcel_id, field_id, sep = "-"))
+soilman <- semi_join(soilman, maizeplots, by="plot_id")
+frq(soilman$s3q36)
+# 1 no till and in 5 the answer is not at all. The difference between two is not clear
+# in the next round 5: Cover with crop but not tilled for this season. I believe 5 then also can be assumed no till.
+# 2 = once: this can mean one-pass till meaning minimum tillage. 
+# We will capture zero and minimum tillage.
+frq(soilman$s3q41)
+soilman <- soilman |> 
+  mutate(min_till=if_else(!is.na(s3q36) & s3q36 %in% c(1,2,5), 1, 0),
+         zero_till=if_else(!is.na(s3q36) & s3q36 %in% c(1,5), 1, 0),
+         crop_residue=if_else(!is.na(s3q41) & s3q41==2, 1, 0)
+         )
+frq(soilman$min_till) # 19% 
+frq(soilman$zero_till) # 3%
+frq(soilman$crop_residue) #1%
+soilman <- soilman |> 
+  select(plot_id, min_till, zero_till, crop_residue)
+plotdata4 <- left_join(plotdata4, soilman, by="plot_id")
+frq(plotdata4$crop_residue)
+frq(plotdata4$zero_till)
+frq(plotdata4$min_till)
+remove(soilman)
+var_label(plotdata4$min_till) <- "minimum tillage: one-pass till"
+var_label(plotdata4$zero_till) <- "no till"
+var_label(plotdata4$crop_residue) <- "Cover the field surface with crop residue/leaves"
 
 ## improved maize  ----
 ## here we don't have the info at parcel level but only at hh level. all seeds were asked. We concentrate on maize. 
@@ -246,7 +295,7 @@ plotdata4 <- plotdata4 |>
   select(-s3q13, -s4q03,-s4q01b)
 look_for(plotdata4)
 wave4 <- plotdata4 |> 
-  select(1, 10, 15:44)
+  select(1, 10, 15:47)
 look_for(wave4)  
 wave4basics <- wave4 |> 
   select(household_id, hh_id_obs) |> 
@@ -265,7 +314,7 @@ aggregated_vars <- c("farm_size", "age_manager", "dist_market", "elevation", "pl
 wave4 <- wave4 %>% select(-all_of(aggregated_vars))
 look_for(wave4)
 wave4 <- wave4 |> 
-  select(1, 6:8, 11:21)
+  select(1, 6:8, 11:24)
 look_for(wave4)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -275,7 +324,7 @@ look_for(wave4)
 # only one value being returned or etc. Thus:  
 wave4 <- wave4 |> 
   mutate(across(c(female_manager, formal_education_manager, primary_education_manager,
-                  inorganic_fertilizer, intercropped, plot_certificate, irrigated),
+                  inorganic_fertilizer, plot_certificate, irrigated),
                 as.numeric))
 wave4max <- collap(wave4,
                    ~ household_id, 
@@ -294,6 +343,7 @@ wave4 <- wave4 |>
 var_label(wave4$share_female_owned) <- "women's control over assets"
 var_label(wave4$female_edu) <- "HH has an adult female who can read and write"
 var_label(wave4$improved_maize) <- "HH has cultivated imporved maize in at least one field"
+var_label(wave4$intercrop) <- "HH has intercroped maize-legume"
 remove(wave4basics, wave4max, wave4sum,wave4mean,rotation4, assets, aggregated_vars, hhhp4, individual)
 
 ## Cleaning missing data ----
@@ -398,7 +448,7 @@ remove(wage,enterprise,other_income)
 ##  Extension, advisory, credit----
 extension <- read_dta("data/eth/ess4/sect7_pp_w4.dta") |> 
   filter(saq14==1) |> 
-  select("household_id", "s7q04", "s7q06", "s7q08",  "s7q08_os","s7q09", "s7q10" )
+  select("household_id", "saq01", "s7q04", "s7q06", "s7q08",  "s7q08_os","s7q09", "s7q10" )
 look_for(extension)
 frq(extension$s7q04)
 frq(extension$s7q09) # the label should be do you get advisory services?
@@ -409,9 +459,9 @@ extension <- extension |>
                                      .default = 0)) |> 
   mutate(credit_unavailable=case_when(s7q08==1 ~ 1,
                                       .default = 0)) |>  
-  select(household_id,extension_program, advisory_service, credit_unavailable)
+  select(household_id,extension_program, advisory_service, credit_unavailable, saq01)
 # The information is gathered at the holder level. For HH level data, we collapse and choose the max value. 
-extension <- collap(extension, extension_program +advisory_service + credit_unavailable ~household_id, FUN=fmax)
+extension <- collap(extension, extension_program +advisory_service + credit_unavailable + saq01 ~household_id, FUN=fmax)
 wave4 <- left_join(wave4,extension,by="household_id")
 remove(extension)
 
@@ -469,7 +519,6 @@ mode_or_max <- function(x) {
   }
 } 
 soil <- collap(soil, soil_type ~ household_id, FUN =mode_or_max) # select dominant otherwise Luvisol. 
-rm(mode_or_max)
 soil <- soil |> 
   mutate(soil= factor(soil_type, levels = c(0,1,2), labels = c("Other", "Vertisol", "Luvisol")))
 frq(soil$soil_type)
@@ -479,7 +528,7 @@ soil <- soil |>
 eth4 <- left_join(eth4, soil, by="household_id")
 var_label(eth4$soil) <- "HH dominant soil type"
 frq(eth4$soil)
-remove(soil, maizeplots)
+remove(soil)
 
 ## Consumption ----
 cons <- read_dta("data/eth/ess4/cons_agg_w4.dta") |> 
@@ -487,6 +536,32 @@ cons <- read_dta("data/eth/ess4/cons_agg_w4.dta") |>
 look_for(cons)
 eth4 <- left_join(eth4, cons, by="household_id")
 rm(cons)
+
+## Head gender ----
+head <- read_dta("data/eth/ess4/sect1_hh_w4.dta") |>
+  select(household_id, s1q01, s1q02) |> 
+  filter(s1q01==1)
+frq(head$s1q02)
+head <- head |> 
+  mutate(female_head=if_else(s1q02==2,1,0)) |> 
+  select(household_id, female_head)
+eth4 <- left_join(eth4, head, by="household_id")
+rm(head)
+
+## Slope 
+slope <- read_dta("data/eth/ess4/sect3_pp_w4.dta") |> 
+  mutate(parcel_id = paste(holder_id, parcel_id, sep = "-")) |> 
+  select("household_id", "parcel_id", "s3q12")
+slope <- semi_join(slope, maizeplots, by=c("parcel_id"="parcel_id_merge"))
+look_for(slope)
+frq(slope$s3q12)
+slope <- collap(slope, s3q12 ~ household_id, FUN =mode_or_max)
+slope <- slope |> 
+  rename(slope=s3q12)
+frq(slope$slope)
+eth4 <- left_join(eth4, slope, by="household_id")
+var_label(eth4$slope) <- "Dominant slope"
+remove(slope, maizeplots, mode_or_max)
 
 # Notes on missing data ----
 ## 95 hhs do not have agricultural assets but still have asset index. This is because, 

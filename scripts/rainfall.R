@@ -53,6 +53,41 @@ rain_df <- rain_df |>
   group_by(id, lon, lat, season) |> 
   summarise(seasonal_rainfall = sum(sum_month, na.rm = TRUE), .groups = "drop")
 
+## wave 1 rainfall ----
+rain_df1 <- rain_df |>
+  filter(!season %in% c("2009-2010", "2010-2011", "2011-2012", "2012-2013", "2013-2014", 
+                        "2014-2015", "2015-2016", "2016-2017", "2017-2018", "2018-2019"))
+rain_df1 <- rain_df1 |>
+  group_by(id, lon, lat) |> 
+  mutate(
+    average_rainfall = mean(seasonal_rainfall, na.rm = TRUE),
+    sd_rainfall = sd(seasonal_rainfall, na.rm = TRUE)
+  )
+rain_df1 <- rain_df1 |> 
+  mutate(rainfall_shock=abs((average_rainfall - seasonal_rainfall)/sd_rainfall),
+         rainfall_variation=sd_rainfall/average_rainfall*100
+  )
+rain_df1 <- rain_df1 %>%
+  mutate(
+    season_start = as.integer(str_sub(season, 1, 4))
+  ) %>%
+  arrange(id, season_start) %>%
+  group_by(id, lon, lat) %>%
+  mutate(
+    lag_rainfall = lag(seasonal_rainfall, n = 1)
+  ) %>%
+  ungroup()
+rain_df1 <- rain_df1 |> 
+  mutate(lag_rainfall_shock=abs((average_rainfall - lag_rainfall)/sd_rainfall))
+rain_df1 <- rain_df1 |> 
+  filter(season=="2008-2009")
+rain_df1 <- rain_df1 |> 
+  select(-id, - season_start, -season) |> 
+  mutate(wave=1)
+rain_df1 <- rain_df1 |> 
+  distinct()
+
+
 ## wave 2 rainfall ----
 rain_df2 <- rain_df |>
   filter(!season %in% c("2012-2013", "2013-2014", "2014-2015", "2015-2016", "2016-2017", "2017-2018", "2018-2019"))
@@ -151,6 +186,8 @@ rain_df4 <- rain_df4 |>
   mutate(wave=4)
 rain_df4 <- rain_df4 |> 
   distinct()
-rainfall <- bind_rows(rain_df2, rain_df3)
+rainfall <- bind_rows(rain_df1, rain_df2)
+rainfall <- bind_rows(rainfall, rain_df3)
 rainfall <- bind_rows(rainfall, rain_df4)
 look_for(rainfall)
+

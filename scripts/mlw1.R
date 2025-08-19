@@ -29,11 +29,15 @@ hpdata <- hpdata|>
   filter(main_crop=="MAIZE") |> 
   select(hh_id_merge, hh_id_obs, ea_id_merge, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop,
          farm_size, manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, 
-         primary_education_manager, respondent_id_obs, respondent_id_merge, improved,organic_fertilizer, 
+         primary_education_manager, agro_ecological_zone, twi, improved, organic_fertilizer, 
          inorganic_fertilizer, soil_fertility_index, elevation, plot_dist_household, ag_asset_index, plot_certificate, 
          drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop, used_pesticides, yield_value_LCU, 
          yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
+hpdata <- hpdata |>
+  group_by(hh_id_obs) |> 
+  mutate(crop_count=sum(nb_seasonal_crop)) |> 
+  relocate(crop_count, .after = nb_seasonal_crop)
 look_for(hpdata) # many missing, especially improved seeds
 
 ### ### ### ### ### ### ### ###
@@ -202,8 +206,7 @@ plot1 <- plot1 |> select(-female)
 
 ## Collapse / aggregate ----
 mlw1 <- plot1 |> 
-  select(-hh_id_merge,-plot_id_merge, -plot_id_obs, -parcel_id_merge, -parcel_id_obs,
-         -respondent_id_obs, -respondent_id_merge,-age_manager_row)
+  select(-hh_id_merge,-plot_id_merge, -plot_id_obs, -parcel_id_merge, -parcel_id_obs, -age_manager_row)
 look_for(mlw1)
 mlw1basics <- mlw1 |> 
   select(hhid, hh_id_obs, ea_id_merge) |> 
@@ -211,20 +214,20 @@ mlw1basics <- mlw1 |>
 n_distinct(mlw1basics$hh_id_obs) # 1009 observations
 wave1mean <- collap(mlw1,
                    farm_size + age_manager + elevation + plot_dist_household + ag_asset_index + count_plot + 
-                     soil_fertility_index  ~ hhid,
+                     soil_fertility_index + crop_count + twi  ~ hhid,
                    FUN = fmean,
                    na.rm = TRUE)
 wave1sum <- collap(mlw1,
                    plot_area_GPS + nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
                    FUN = fsum,
                    na.rm = TRUE)
-aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_household", "soil_fertility_index",
-                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", 
+aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_household", "soil_fertility_index", "crop_count",
+                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", "twi", 
                      "yield_value_LCU", "yield_value_USD")
 mlw1 <- mlw1 %>% select(-all_of(aggregated_vars))
 look_for(mlw1)
 mlw1 <- mlw1 |> 
-  select(1, 4:7, 12:23)
+  select(1, 4:7, 12:24)
 look_for(mlw1)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -450,7 +453,7 @@ tlu <- tlu |>
 tlu <- collap(tlu, tlu ~ case_id, FUN = fsum)
 mlw1 <- left_join(mlw1, tlu, by=c("hhid"="case_id"))
 mlw1$tlu[is.na(mlw1$tlu)] <- 0
-remove(tlu, maizehh)
+remove(tlu)
 mlw1 <- mlw1 |> 
   rename(ea_id=ea_id_merge)
 
@@ -520,7 +523,6 @@ remove(modd)
 modd <-  read_dta("data/mlw/ag_mod_d_10.dta") |> 
   select(case_id, ag_d00, ag_d26) |> 
   mutate(plot_id = paste(case_id, ag_d00, sep = "-"))
-modd <- semi_join(modd, maizeplots, by="plot_id")
 frq(modd$ag_d26) # do mode max again, if there is a steep slope that will be captured this way too. 
 modd <- modd |>
   mutate(ag_d26 = as.numeric(modd$ag_d26))
@@ -571,44 +573,32 @@ head <- head |>
 mlw1 <- left_join(mlw1, head, by=c("hhid"="case_id"))
 rm(head)
 
+## Other crops produced -----
+garden <- read_dta("data/mlw/ag_mod_d_10.dta") |>   # plot level 
+  select(case_id, ag_d14, ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e) |> 
+  filter(ag_d14==1)
+look_for(garden)
+garden <- semi_join(garden, maizehh, by=c("case_id"="hh_id_merge"))
+garden <- garden |> 
+  rowwise() |> 
+  mutate(
+    other_crops_count = sum(
+      !is.na(c_across(c(ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e))) & 
+      !(c_across(ag_d20a:ag_d20e) %in% c(1, 11:16, 27, 34:36, 46))  # not maize or legumes
+      )
+      ) %>%
+  ungroup()
+garden <- garden |> 
+  group_by(case_id) |> 
+  summarise(other_crops=sum(other_crops_count))
+mlw1 <- left_join(mlw1, garden, by=c("hhid"="case_id"))
+frq(mlw1$other_crops)
+var_label(mlw1$other_crops) <- "number of other crops produced"
+rm(maizehh, garden)
 ## Missing data and notes ----
 ## Some do not have agricultural assets but still have asset index. This is because, pca (factor) analysis still includes those with 
 ## no asset and gives them a lower score.
 ## Flood shock is absent in mlw1, some missing in other waves are assumed no shock. 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

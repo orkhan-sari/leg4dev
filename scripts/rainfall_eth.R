@@ -40,34 +40,21 @@ rain_dfeth <- rain_dfeth |>
   mutate(sum_month=sum(chirps)) |>  ungroup()
 rain_dfeth <- rain_dfeth |>
   mutate(year=as.numeric(year),
-         month=as.numeric(month),
-         season = case_when(
-           month >= 9 ~ paste0(year, "-", year + 1),  # September to December Meher
-           month <= 2  ~ paste0(year - 1, "-", year),  # January to February Meher
-           TRUE ~ NA_character_)
-  ) # Exclude months outside Nov-Apr
-# Main rainy season  Meher which corresponds to data collection is from September to January.
-rain_dfeth <- rain_dfeth |> 
-  filter(month %in% c(9,10,11, 12, 1, 2)) |> 
-  filter(season >= "1990-1991", season <= "2021-2022")
-rain_dfeth <- rain_dfeth |> 
-  distinct(id, lon, lat, month, sum_month, season, .keep_all = TRUE)
-rain_dfeth <- rain_dfeth |> 
-  group_by(id, lon, lat, season) |> 
-  summarise(seasonal_rainfall = sum(sum_month, na.rm = TRUE), .groups = "drop")
+         month=as.numeric(month)
+         )
 
 # If ANNUAL RAINFAL: 
-# rain_dfeth <- rain_dfeth |> 
-#   group_by(id, year) |> #seasonal rainfall is annual rainfall in ETH
-#   mutate(seasonal_rainfall=sum(chirps, na.rm = TRUE)) |>  ungroup()
-# rain_dfeth <- rain_dfeth |> 
-#   distinct(id, lon, lat, year, seasonal_rainfall)
+rain_dfeth <- rain_dfeth |> 
+ group_by(id, lon, lat, year) |> #seasonal rainfall is annual rainfall in ETH
+ mutate(seasonal_rainfall=sum(chirps, na.rm = TRUE)) |>  ungroup()
+rain_dfeth <- rain_dfeth |> 
+ distinct(id, lon, lat, year, seasonal_rainfall)
 
 ## wave 4 rainfall ----
 ## Households were visited from Sept-Nov 2018 that is in Meher
 ## Rotation is defined as "During the last 3 years, have you planted a legume on this [FIELD]?
 rain_df1 <- rain_dfeth |>
-  filter(!season %in% c("2019-2020", "2020-2021", "2021-2022"))
+  filter(!year %in% c(2019, 2020, 2021, 2022))
 rain_df1 <- rain_df1 |>
   group_by(id, lon, lat) |> 
   mutate(
@@ -79,22 +66,9 @@ rain_df1 <- rain_df1 |>
   mutate(rainfall_shock=abs((average_rainfall - seasonal_rainfall)/sd_rainfall),
          rainfall_variation=sd_rainfall/average_rainfall*100
   )
-rain_df1 <- rain_df1 %>%
-  mutate(
-    season_start = as.integer(str_sub(season, 1, 4))
-  ) %>%
-  arrange(id, season_start) %>%
-  group_by(id, lon, lat) %>%
-  mutate(
-    lag_rainfall = lag(seasonal_rainfall, n = 1)
-  ) %>%
-  ungroup()
 rain_df1 <- rain_df1 |> 
-  mutate(lag_rainfall_shock=abs((average_rainfall - lag_rainfall)/sd_rainfall))
-rain_df1 <- rain_df1 |> 
-  filter(season=="2018-2019")
-rain_df1 <- rain_df1 |> 
-  select(-id, - season_start, -season) |> 
+  filter(year==2018) |> 
+  select(-id, -year) |> 
   mutate(wave=4)
 rain_df1 <- rain_df1 |> 
   distinct()
@@ -102,7 +76,8 @@ rain_df1 <- rain_df1 |>
 ## wave 5 rainfall ----
 ## Households were visited from 2021-09-16 	2022-01-31 that is in Meher
 ## Rotation is defined as "During the last 3 years, have you planted a legume on this [FIELD]?
-rain_df2 <- rain_dfeth
+rain_df2 <- rain_dfeth |> 
+  filter(year != 2022)
 rain_df2 <- rain_df2 |>
   group_by(id, lon, lat) |> 
   mutate(
@@ -114,22 +89,9 @@ rain_df2 <- rain_df2 |>
   mutate(rainfall_shock=abs((average_rainfall - seasonal_rainfall)/sd_rainfall),
          rainfall_variation=sd_rainfall/average_rainfall*100
   )
-rain_df2 <- rain_df2 %>%
-  mutate(
-    season_start = as.integer(str_sub(season, 1, 4))
-  ) %>%
-  arrange(id, season_start) %>%
-  group_by(id, lon, lat) %>%
-  mutate(
-    lag_rainfall = lag(seasonal_rainfall, n = 1)
-  ) %>%
-  ungroup()
-rain_df2 <- rain_df2 |> 
-  mutate(lag_rainfall_shock=abs((average_rainfall - lag_rainfall)/sd_rainfall))
-rain_df2 <- rain_df2 |> 
-  filter(season=="2021-2022")
-rain_df2 <- rain_df2 |> 
-  select(-id, - season_start, -season) |> 
+rain_df2 <- rain_df2 |>
+  filter(year==2021) |> 
+  select(-id, -year) |> 
   mutate(wave=5)
 rain_df2 <- rain_df2 |> 
   distinct()

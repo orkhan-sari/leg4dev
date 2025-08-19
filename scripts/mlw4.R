@@ -35,11 +35,15 @@ hpdata <- hpdata|>
   filter(main_crop=="MAIZE") |> 
   select(hh_id_merge, hh_id_obs, ea_id_merge, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop,
          farm_size, manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, 
-         primary_education_manager, respondent_id_obs, respondent_id_merge, improved,organic_fertilizer, 
+         primary_education_manager, agro_ecological_zone, twi,, improved,organic_fertilizer, 
          inorganic_fertilizer, soil_fertility_index, elevation, plot_dist_household, ag_asset_index, plot_certificate, 
          drought_shock, rain_shock, flood_shock, irrigated,  nb_seasonal_crop, used_pesticides, yield_value_LCU, 
          yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
+hpdata <- hpdata |>
+  group_by(hh_id_obs) |> 
+  mutate(crop_count=sum(nb_seasonal_crop)) |> 
+  relocate(crop_count, .after = nb_seasonal_crop)
 look_for(hpdata) # many missing
 
 # Crop diversification ----
@@ -220,8 +224,7 @@ plot4 <- plot4 |> select(-female)
 
 ## Collapse / aggregate ----
 mlw4 <- plot4 |> 
-  select(-ag_d14, -hh_id_merge,-plot_id_merge, -plot_id_obs, -parcel_id_merge, -parcel_id_obs,
-         -respondent_id_obs, -respondent_id_merge,-age_manager_row)
+  select(-ag_d14, -hh_id_merge,-plot_id_merge, -plot_id_obs, -parcel_id_merge, -parcel_id_obs, -age_manager_row)
 look_for(mlw4)
 mlw4basics <- mlw4 |> 
   select(hhid, ea_id_merge, hh_id_obs) |> 
@@ -229,26 +232,26 @@ mlw4basics <- mlw4 |>
 n_distinct(mlw4basics$hh_id_obs) # 2085 observations
 wave4mean <- collap(mlw4,
                     farm_size + age_manager + elevation + plot_dist_household + ag_asset_index + count_plot + 
-                      soil_fertility_index  ~ hhid,
+                      soil_fertility_index + crop_count + twi  ~ hhid,
                     FUN = fmean,
                     na.rm = TRUE)
 wave4sum <- collap(mlw4,
                    plot_area_GPS +nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
                    FUN = fsum,
                    na.rm = TRUE)
-aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_household", "soil_fertility_index",
-                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", 
+aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_household", "soil_fertility_index", "crop_count",
+                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", "twi",
                      "yield_value_LCU", "yield_value_USD")
 mlw4 <- mlw4 %>% select(-all_of(aggregated_vars))
 look_for(mlw4)
 mlw4 <- mlw4 |> 
-  select(1, 6:12, 17:28)
+  select(1, 6:12, 17:29)
 look_for(mlw4)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
 # at least one plot is being intercropped and etc. 
 mlw4 <- mlw4 |> 
-  mutate(across(c(female_manager, formal_education_manager, primary_education_manager,
+  mutate(across(c(female_manager, formal_education_manager, primary_education_manager, agro_ecological_zone,
                   inorganic_fertilizer, plot_certificate, irrigated),
                 as.numeric))
 wave4max <- collap(mlw4,
@@ -475,7 +478,7 @@ tlu <- tlu |>
 tlu <- collap(tlu, tlu ~ y4_hhid, FUN = fsum)
 mlw4 <- left_join(mlw4, tlu, by=c("hhid"="y4_hhid"))
 mlw4$tlu[is.na(mlw4$tlu)] <- 0
-remove(tlu, maizehh)
+remove(tlu)
 
 ## Land tenure - not collected ----
 
@@ -574,6 +577,29 @@ head <- head |>
   select(y4_hhid, female_head)
 mlw4 <- left_join(mlw4, head, by=c("hhid"="y4_hhid"))
 rm(head)
+
+## Other crops produced -----
+garden <- read_dta("data/mlw/ag_mod_d_19.dta") |>   # plot level 
+  select(y4_hhid, ag_d14, ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e) |> 
+  filter(ag_d14==1)
+look_for(garden)
+garden <- semi_join(garden, maizehh, by=c("y4_hhid"="hh_id_merge"))
+garden <- garden |> 
+  rowwise() |> 
+  mutate(
+    other_crops_count = sum(
+      !is.na(c_across(c(ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e))) & 
+        !(c_across(ag_d20a:ag_d20e) %in% c(1, 11:16, 27, 34:36, 46))  # not maize or legumes
+    )
+  ) %>%
+  ungroup()
+garden <- garden |> 
+  group_by(y4_hhid) |> 
+  summarise(other_crops=sum(other_crops_count))
+mlw4 <- left_join(mlw4, garden, by=c("hhid"="y4_hhid"))
+frq(mlw4$other_crops)
+var_label(mlw4$other_crops) <- "number of other crops produced"
+rm(maizehh, garden)
 
 ## Missing data and notes ----
 ## shocks missing for 22 hhs

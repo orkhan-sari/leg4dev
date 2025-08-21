@@ -97,6 +97,6 @@ rain_df2 <- rain_df2 |>
   distinct()
 rainfalleth <- bind_rows(rain_df1, rain_df2)
 look_for(rainfalleth)
-
+rm(rain_df1, rain_df2, rain_dfeth)
 
 

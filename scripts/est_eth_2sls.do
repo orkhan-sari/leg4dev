@@ -115,17 +115,17 @@ marginsplot, title("") plotopts(msize(large)) recast(scatter) ci(lwidth(thick) l
 graph combine fig1 fig2 fig3 fig4, col(2) ///
 title("Average Marginal Effects of Legume Intensification") ///
 note("Poisson fixed-effects model; dash lines indicate 95% CI", size(vsmall) position(12) justification(center))
-graph export "C:\Users\490A\Nextcloud\Research\leg4dev\outputs\figures\mlw_mes.tiff", as(tif) width(800) height(550) replace
+graph export "C:\Users\490A\Nextcloud\Research\leg4dev\outputs\figures\eth_mes.tiff", as(tif) width(800) height(550) replace
 
 
 
 **# Weak identification test
 tab year, gen(year)
 xtivreg2 HDDS primary_education_manager age_manager hh_size hh_dependency_ratio ///
-	farm_size maize_share other_crops steep_slope mod_slope ln_dis_plot ///
+	farm_size maize_share other_crops flat_slope ln_dis_plot ///
 	ln_wage_income b_enterprise_income tlu subsistence_ag ///
 	extension_program advisory_service credit_unavailable eco_soil_mng ///
-	soil_fertility_index twi average_rainfall dist_market year2 (legume_intens=ghat) , fe vce( cluster hh_id_obs)
+	soil_fertility_index twi average_rainfall dist_market year2 (legume_intens=ghat) , fe
 	
 **# Control function approach etregress - convergence not achieved 
 etregress HDDS i.female_manager $xlist mean_* i.year i.region, ///

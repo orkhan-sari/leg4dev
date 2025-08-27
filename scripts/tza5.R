@@ -638,6 +638,79 @@ tza5 <- left_join(tza5, improved_var, by = c("hhid" = "y5_hhid"))
 var_label(tza5$improved_seed) <- "The main seeds used in the HH are improved seeds"
 remove(improved_var)
 
+## Location ----
+location <- read_dta("data/tza/tza_wave5_2020_21/hh_sec_a.dta") |> 
+  select(y5_hhid, hh_a01_1) |> 
+  rename(region = hh_a01_1)
+
+tza5 <- left_join(tza5, location, by = c("hhid" = "y5_hhid")) 
+
+rm(location)
+
+
+## Other crops produced -----
+cultivatedplot <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_3a.dta") |>
+  select(y5_hhid, ag3a_03) |>
+  filter(ag3a_03 == 1)
+
+plot_data <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_4a.dta") |>  # plot level
+  select(y5_hhid, plot_id, cropid)  
+
+plot_data <- plot_data |> 
+  semi_join(cultivatedplot, by = "y5_hhid")
+
+look_for(plot_data)
+
+plot_data <- semi_join(plot_data, maizehh, by=c("y5_hhid"="hh_id_merge"))
+plot_data <- plot_data |> 
+  rowwise() |> 
+  mutate(
+    other_crops_count = sum(
+      !is.na(c_across(c(cropid))) & 
+        !(c_across(cropid) %in% c(1, 11:16, 27, 34:36, 46))  # not maize or legumes
+    )
+  ) %>%
+  ungroup()
+plot_data <- plot_data |> 
+  group_by(y5_hhid) |> 
+  summarise(other_crops=sum(other_crops_count))
+tza5 <- left_join(tza5, plot_data, by=c("hhid"="y5_hhid"))
+frq(tza5$other_crops)
+var_label(tza5$other_crops) <- "number of other crops produced"
+rm(maizehh, plot_data, cultivatedplot)
+
+## Slop ----
+modd <-  read_dta("data/tza/tza_wave5_2020_21/ag_sec_3a.dta") |> 
+  select(y5_hhid, plot_id, ag3a_17) |>
+  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-"))
+modd <- semi_join(modd, maizeplots, by="plot_id")
+frq(modd$ag3a_17) # do mode max again, if there is a steep slope that will be captured this way too. 
+modd <- modd |>
+  mutate(ag3a_17 = as.numeric(modd$ag3a_17))
+
+mode_or_max <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) return(NA)
+  
+  tab <- table(x)
+  most_common <- which(tab == max(tab))
+  
+  if (length(most_common) == 1) {
+    return(as.numeric(names(most_common)))
+  } else {
+    return(max(as.numeric(names(most_common))))
+  }
+} 
+
+modd <- collap(modd, ag3a_17 ~ y5_hhid, FUN =mode_or_max) 
+modd <- modd |> 
+  mutate(slope= factor(ag3a_17, levels = c(1,2,3,4), labels = c("Flat bottom", "Flat top", "Slightly sloped", "Very steep"))) |> 
+  select(y5_hhid, slope)
+frq(modd$slope)
+tza5 <- left_join(tza5, modd, by=c("hhid"="y5_hhid"))
+var_label(tza5$slope) <- "Dominant slope"
+remove(modd, maizeplots, mode_or_max)
+
 ### ### ### ### ### ### ### ### #### ##### #### ### ###
 # Auxiliary Check: How Many LR Legume-Growing Households Planted Maize in the SR
 ### ### ### ### ### ### ### ###### ### ###  ### ### ### 

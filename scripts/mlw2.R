@@ -27,12 +27,12 @@ hpdata|>
   ungroup() # 0 duplicates - plots are uniquely identified  
 hpdata <- hpdata|>
   filter(main_crop=="MAIZE") |> 
+  mutate(yield_value_USD= yield_value_USD * (share_value_LEGUMES + share_value_MAIZE)) |> 
   select(hh_id_merge, hh_id_obs, ea_id_merge, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop,
          farm_size, manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, 
          primary_education_manager, agro_ecological_zone, twi, improved,organic_fertilizer, 
          inorganic_fertilizer, soil_fertility_index, elevation, plot_dist_household, ag_asset_index, plot_certificate, 
-         drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop, used_pesticides, yield_value_LCU, 
-         yield_value_USD) |>
+         drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop, used_pesticides,  yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
 hpdata <- hpdata |>
   group_by(hh_id_obs) |> 
@@ -68,7 +68,7 @@ garden <- garden |>
     if_any(c(ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e), ~ . %in% c(11:16, 27, 34:36, 46))
   ),
   hybrid_maize=as.integer(
-    if_any(c(ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e), ~ . %in% c(3,4))
+    if_any(c(ag_d20a, ag_d20b, ag_d20c, ag_d20d, ag_d20e), ~ . %in% c(2:4))
   ))
 ## improved maize  ----
 seed <- read_dta("data/mlw/ag_mod_g_13.dta") |> 
@@ -82,7 +82,7 @@ seed <- seed |> filter(ag_g0b %in% c(1:4))
 # Unlike mlw3 and 4, here the question on type was not directly asked.
 # Thus will generate from the crop code ag_g0b
 seed <- seed |> 
-  mutate(hybrid_maize1= case_when(ag_g0b %in% c(3,4) ~ 1,
+  mutate(hybrid_maize1= case_when(ag_g0b %in% c(2:4) ~ 1,
                                   .default = 0)) |> 
   select(plot_id, hybrid_maize1)
 frq(seed$hybrid_maize1)
@@ -91,6 +91,9 @@ frq(garden$hybrid_maize1)
 garden$hybrid_maize1[is.na(garden$hybrid_maize1)] <- 0
 table(garden$hybrid_maize,garden$hybrid_maize1) # many differences. 
 remove(seed)
+garden <- garden |> 
+  mutate(iv_maize= if_else(hybrid_maize1==1 & hybrid_maize==1 , 1 , 0)) |> 
+  select(-hybrid_maize, -hybrid_maize1)
 # Also in HP data, keep only plots that have been cultivated. 
 plots <- garden |> select(plot_id)
 maizeplots <- semi_join(maizeplots, plots, by="plot_id")
@@ -126,12 +129,12 @@ garden <- left_join(garden, modm, by="plot_id")
 frq(garden$rotation) # 59 plots only.
 garden$rotation[is.na(garden$rotation)] <- 0
 plot2 <- garden |> 
-  select(y2_hhid, plot_id, count_plot, intercrop, rotation, hybrid_maize, hybrid_maize1)
+  select(y2_hhid, plot_id, count_plot, intercrop, rotation, iv_maize)
 remove(garden,modm)
 var_label(plot2$intercrop) <- "=1 if legume intercropped maize plot"
 var_label(plot2$rotation) <- "=1 if legume is cultivated after" # ONLY AFTER CAN BE IDENTIFIED
 var_label(plot2$count_plot) <- "number of main maize plots"
-var_label(plot2$hybrid_maize) <- " =1 if hybrid maize was cultivated plot section"
+var_label(plot2$iv_maize) <- "=1 if improved maize was cultivated plot section"
 
 ### ### ### ### ### ### ### ###
 # Ecological soil management ----
@@ -225,6 +228,59 @@ hdds2 <- hdds2|>
   semi_join(maizehh, by="hh_id_merge")
 look_for(hdds2) # 208 missing for share_kg_sold
 
+# FCS
+fcs <- read_dta("data/mlw/hh_mod_g2_13.dta")
+look_for(fcs)
+summary(fcs)
+fcs$hh_g08c[is.na(fcs$hh_g08c)] <- 0
+frq(fcs$hh_g08a)
+table(fcs$hh_g08a, fcs$hh_g08c)
+fcs <- fcs |> 
+  group_by(y2_hhid) %>%
+  mutate(
+    sum_A_B = sum(hh_g08c[hh_g08a %in% c(1,2)], na.rm = TRUE),
+    sum_A_B = case_when(sum_A_B > 7 ~ 7,
+                        .default = sum_A_B),
+    count = case_when(hh_g08a== 1 ~ sum_A_B,
+                      .default = hh_g08c)
+  ) |> 
+  ungroup()
+fcs <- fcs |> 
+  filter(hh_g08a != 2)
+table(fcs$hh_g08a,fcs$count)
+frq(fcs$hh_g08a)
+fcs <- fcs |>
+  mutate(total=case_when(hh_g08a == 1 ~ count * 2,
+                         hh_g08a == 3 ~ count * 3,
+                         hh_g08a == 4 ~ count * 1,
+                         hh_g08a == 5 ~ count * 4,
+                         hh_g08a == 6 ~ count * 1,
+                         hh_g08a == 7 ~ count * 4,
+                         hh_g08a == 8 ~ count * 0.5,
+                         hh_g08a == 9 ~ count * 0.5,
+                         hh_g08a == 10 ~ count * 0)
+  )
+fcs <- fcs |> 
+  group_by(y2_hhid) |> 
+  summarise(fcs=sum(total)) |> 
+  ungroup()
+summary(fcs$fcs)
+fcs <- semi_join(fcs, maizehh, by=c("y2_hhid" = "hh_id_merge"))
+hdds2 <- left_join(hdds2, fcs, by=c("hh_id_merge" = "y2_hhid"))
+rm(fcs)
+
+# Food security
+fs <- read_dta("data/mlw/hh_mod_h_13.dta") |> 
+  select(y2_hhid, hh_h01, hh_h04)
+look_for(fs)
+fs <- fs |> 
+  mutate(enough_food = if_else(hh_h01==1, 1, 0),
+         enough_food12 = if_else(hh_h04==1, 1, 0)
+  ) |> 
+  select(-hh_h01, -hh_h04)
+fs <- semi_join(fs, maizehh, by=c("y2_hhid" = "hh_id_merge"))
+hdds2 <- left_join(hdds2, fs, by=c("hh_id_merge" = "y2_hhid"))
+
 ### ### ### ### ### ### ### ###
 # Final data  ----
 ### ### ### ### ### ### ### ###
@@ -251,16 +307,15 @@ wave2mean <- collap(mlw2,
                     FUN = fmean,
                     na.rm = TRUE)
 wave2sum <- collap(mlw2,
-                   plot_area_GPS + nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
+                   plot_area_GPS + nb_seasonal_crop + yield_value_USD  ~ hhid,
                    FUN = fsum,
                    na.rm = TRUE)
 aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_household", "soil_fertility_index", "crop_count",
-                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", "twi",
-                     "yield_value_LCU", "yield_value_USD")
+                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", "twi", "yield_value_USD")
 mlw2 <- mlw2 %>% select(-all_of(aggregated_vars))
 look_for(mlw2)
 mlw2 <- mlw2 |> 
-  select(1, 4:10, 15:27)
+  select(1, 4:9, 14:26)
 look_for(mlw2)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -373,7 +428,6 @@ var_label(mlw2$subsistence_ag) <- "HH did not sell any crop harvest"
 var_label(mlw2$plot_area_GPS) <- "Area (ha) of maize plots"
 var_label(mlw2$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
 var_label(mlw2$female_edu) <- "HH has an educated adult female"
-var_label(mlw2$hybrid_maize1) <- " =1 if hybrid maize was cultivated crop section"
 remove(wage)
 
 # enterprise

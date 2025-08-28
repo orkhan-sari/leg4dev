@@ -25,11 +25,12 @@ hpdata|>
   filter(n() > 1)|>
   ungroup() # 0 duplicates - plots are uniquely identified  
 hpdata <- hpdata |>
+  mutate(yield_value_USD= yield_value_USD * (share_value_LEGUMES + share_value_MAIZE)) |> 
   select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size, 
          manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager,  
          agro_ecological_zone, twi, improved, organic_fertilizer, inorganic_fertilizer, soil_fertility_index, elevation, dist_market, 
          plot_dist_household, ag_asset_index, plot_certificate, drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop,
-         used_pesticides, yield_value_LCU, yield_value_USD) |>
+         used_pesticides, yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
 hpdata <- hpdata |>
   group_by(hh_id_obs) |> 
@@ -290,6 +291,59 @@ hhhp4 <- hhhp4|>
 look_for(hhhp4) # 297 mising for share_kg_sold
 # 60 maize producing households are not in the harmonized panel
 
+# FCS - only wave 4 if needed
+fcs <- read_dta("data/eth/ess4/sect6b1_hh_w4.dta")
+look_for(fcs)
+look_for(fcs, details = "none")
+fcs <- fcs |>
+  select(household_id, food_id, s6bq01, s6bq02) |> 
+  filter(s6bq01==1)
+naniar::miss_var_summary(fcs)
+table(fcs$food_id)
+fcs <- fcs |> 
+  filter(!is.na(s6bq02))
+fcs <- fcs |> 
+  group_by(household_id) %>%
+  mutate( cereal= case_when( food_id  %in% c(1:4) ~ s6bq02,
+                             .default = 0),
+          meat = case_when(food_id  %in% c(9:12) ~ s6bq02,
+                           .default = 0)
+          ) |> 
+  ungroup()
+fcs <- fcs |> 
+  group_by(household_id) |> 
+  mutate(cerealsum=sum(cereal),
+         meatsum=sum(meat),
+         cerealsum= if_else(cerealsum>7, 7, cerealsum),
+         meatsum= if_else(meatsum>7, 7, meatsum),
+         cerealcount=cerealsum*2,
+         meatcount=meatsum*4
+         ) |> 
+  ungroup()
+fcs <- fcs |>
+  filter(!is.na(s6bq02)) |> 
+  mutate(total=case_when(food_id == 5 ~ s6bq02 * 0.5,
+                         food_id == 6 ~ s6bq02 * 3,
+                         food_id == 7 ~ s6bq02 * 1,
+                         food_id == 8 ~ s6bq02 * 1,
+                         food_id == 13 ~ s6bq02 * 0.5,
+                         food_id == 14 ~ s6bq02 * 4,
+                         food_id %in% c(15,16) ~ s6bq02 * 0,
+                         .default = 0)
+  )
+fcs <- fcs |> 
+  group_by(household_id) |> 
+  summarise(fcs1=sum(total),
+            cereal=max(cerealcount),
+            meat=max(meatcount)) |> 
+  ungroup()
+fcs <- fcs |> 
+  mutate(fcs=fcs1+cereal+meat) |> 
+  select(household_id, fcs)
+summary(fcs$fcs)
+fcs <- semi_join(fcs, maizehh, by=c("household_id" = "hh_id_merge"))
+rm(fcs)
+
 ### ### ### ### ### ### ### ###
 # Final data  ----
 ### ### ### ### ### ### ### ###
@@ -299,7 +353,7 @@ plotdata4 <- plotdata4 |>
   select(-s3q13, -s4q03,-s4q01b)
 look_for(plotdata4)
 wave4 <- plotdata4 |> 
-  select(1, 10, 15:48)
+  select(1, 10, 15:47)
 look_for(wave4)  
 wave4basics <- wave4 |> 
   select(household_id, hh_id_obs) |> 
@@ -310,12 +364,11 @@ wave4mean <- collap(wave4,
                     FUN = fmean,
                     na.rm = TRUE)
 wave4sum <- collap(wave4,
-                   plot_area_GPS + nb_seasonal_crop + yield_value_LCU + yield_value_USD  ~ household_id,
+                   plot_area_GPS + nb_seasonal_crop + yield_value_USD  ~ household_id,
                    FUN = fsum,
                    na.rm = TRUE)
 aggregated_vars <- c("farm_size", "age_manager", "dist_market", "elevation", "plot_dist_household", "soil_fertility_index", "crop_count",
-                     "ag_asset_index", "plot_area_GPS", "nb_seasonal_crop", "twi",
-                     "yield_value_LCU", "yield_value_USD")
+                     "ag_asset_index", "plot_area_GPS", "nb_seasonal_crop", "twi", "yield_value_USD")
 wave4 <- wave4 %>% select(-all_of(aggregated_vars))
 look_for(wave4)
 wave4 <- wave4 |> 

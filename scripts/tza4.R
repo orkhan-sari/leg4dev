@@ -641,43 +641,48 @@ remove(coupon, seedcoupon, fertcoupon)
 ## Location ----
 location <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/hh_sec_a.dta") |> 
   select(y4_hhid, hh_a01_1) |> 
-  rename(region = hh_a01_1)
-
+  rename(Region = hh_a01_1)
 tza4 <- left_join(tza4, location, by = c("hhid" = "y4_hhid")) 
-
+frq(tza4$Region)
+tza4 <- tza4 |> 
+  mutate(zone = case_when(
+    Region %in% c(7,6,5,4) ~ "eastern",
+    Region %in% c(7, 6, 5, 4) ~ "Eastern",
+    Region %in% c(2, 3, 21) ~ "Northern",
+    Region %in% c(1, 13, 14) ~ "Central",
+    Region %in% c(18, 19, 20, 17, 25, 24) ~ "Lake",
+    Region %in% c(16, 23, 15) ~ "Western",
+    Region %in% c(11, 12, 22, 10) ~ "Southern Highlands",
+    Region %in% c(8, 9) ~ "Southern",
+    Region %in% c(51, 52, 53, 54, 55) ~ "Zanzibar",
+    TRUE ~ NA_character_))
+tza4$Region <- NULL
+frq(tza4$zone)
 rm(location)
 
 
 ## Other crops produced -----
-cultivatedplot <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |>
-  select(y4_hhid, ag3a_03) |>
-  filter(ag3a_03 == 1)
-
 plot_data <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4a.dta") |>  # plot level
   select(y4_hhid, plotnum, zaocode, plotname, zaoname)  
-
-plot_data <- plot_data |> 
-  semi_join(cultivatedplot, by = "y4_hhid")
-
 look_for(plot_data)
-
 plot_data <- semi_join(plot_data, maizehh, by=c("y4_hhid"="hh_id_merge"))
 plot_data <- plot_data |> 
   rowwise() |> 
   mutate(
     other_crops_count = sum(
       !is.na(c_across(c(zaocode))) & 
-        !(c_across(zaocode) %in% c(1, 11:16, 27, 34:36, 46))  # not maize or legumes
+        !(c_across(zaocode) %in% c(11, 31:37, 43, 47))  # not maize or legumes
     )
   ) %>%
   ungroup()
 plot_data <- plot_data |> 
+  filter(!is.na(zaocode)) |> 
   group_by(y4_hhid) |> 
   summarise(other_crops=sum(other_crops_count))
 tza4 <- left_join(tza4, plot_data, by=c("hhid"="y4_hhid"))
 frq(tza4$other_crops)
 var_label(tza4$other_crops) <- "number of other crops produced"
-rm(maizehh, plot_data, cultivatedplot)
+rm(maizehh, plot_data)
 
 ## Slop ----
 modd <-  read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |> 
@@ -703,12 +708,14 @@ mode_or_max <- function(x) {
 } 
 
 modd <- collap(modd, ag3a_17 ~ y4_hhid, FUN =mode_or_max) 
+frq(modd$ag3a_17)
 modd <- modd |> 
-  mutate(slope= factor(ag3a_17, levels = c(1,2,3,4), labels = c("Flat bottom", "Flat top", "Slightly sloped", "Very steep"))) |> 
-  select(y4_hhid, slope)
-frq(modd$slope)
+  mutate(flat_slope= case_when(ag3a_17 %in% c(1,2) ~ 1,
+                               .default = 0)) |> 
+  select(y4_hhid, flat_slope)
+frq(modd$flat_slope)
 tza4 <- left_join(tza4, modd, by=c("hhid"="y4_hhid"))
-var_label(tza4$slope) <- "Dominant slope"
+var_label(tza4$flat_slope) <- "Dominant slope"
 remove(modd, maizeplots, mode_or_max)
 
 ### ### ### ### ### ### ### ### #### ##### #### ### ###
@@ -742,6 +749,5 @@ cat("Of them, households that also grew maize in SR:", n_LR_legume_and_SR_maize_
 # with limited transition to maize in SR.
 
 remove(legume_then_maize_hhs, LR_legume_hhs, SR_maize_hhs,
-   legume_codes, n_LR_legume_and_SR_maize_hhs, n_LR_legume_hhs,
-   maizehh, maizeplots)
+   legume_codes, n_LR_legume_and_SR_maize_hhs, n_LR_legume_hhs)
 

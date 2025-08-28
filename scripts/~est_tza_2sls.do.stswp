@@ -1,0 +1,29 @@
+**# Estimations Tanzania
+**## Drop missing
+global folder = "C:\Users\490A\Nextcloud\Research\leg4dev"
+cd $folder
+pwd
+set seed 12345
+set scheme s1color
+graph set window fontface "Palatino Linotype"
+use "data\est\dftza.dta", clear
+mdesc female_manager primary_education_manager age_manager hh_size hh_dependency_ratio ///
+	farm_size plot_certificate other_crops flat_slope plot_dist_household ///
+	hh_asset_index  tlu subsistence_ag ///
+	extension_service  fert_voucher  organic_fertilizer inorganic_fertilizer  ///
+	soil_fertility_index  rainfall_diff average_rainfall adopted_neighbors_10km 
+bys hh_id_obs: egen dis_plot1 = max(plot_dist_household)
+gen dis_plot=plot_dist_household
+replace dis_plot=dis_plot1 if plot_dist_household==.
+gen ln_dis_plot=ln(dis_plot+1)
+global vars female_manager primary_education_manager age_manager farm_size ///
+	maize_share subsistence_ag soil_fertility_index twi rainfall_diff average_rainfall slope ln_dis_plot
+egen missing_flag = rowmiss($vars)
+drop if missing_flag > 0
+egen n_obs = count(year), by(hh_id_obs)
+egen max_obs = max(n_obs)
+* assuming balanced panel should have max number of periods
+keep if n_obs == max_obs
+drop n_obs max_obs missing_flag // 872 hhs
+bysort hh_id_obs: egen mode_region = mode(region)   
+replace region = mode_region // 13 obs have error in region

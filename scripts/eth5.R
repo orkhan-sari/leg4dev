@@ -25,11 +25,12 @@ hpdata|>
   filter(n() > 1)|>
   ungroup() # 0 duplicates - plots are uniquely identified  
 hpdata <- hpdata |>
+  mutate(yield_value_USD= yield_value_USD * (share_value_LEGUMES + share_value_MAIZE)) |> 
   select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size, 
          manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager,  
          agro_ecological_zone, twi, improved, organic_fertilizer, inorganic_fertilizer, soil_fertility_index, elevation, dist_market, 
          plot_dist_household, ag_asset_index, plot_certificate, drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop,
-         used_pesticides, yield_value_LCU, yield_value_USD) |> 
+         used_pesticides, yield_value_USD) |> 
   mutate(plot_id=plot_id_merge)
 hpdata <- hpdata |>
   group_by(hh_id_obs) |> 
@@ -322,7 +323,7 @@ plotdata5 <- plotdata5 |>
   select(-s3q13,-s4q01b,-s4q03)
 look_for(plotdata5)
 wave5 <- plotdata5 |> 
-  select(1, 10, 15:48)
+  select(1, 10, 15:47)
 look_for(wave5)  
 wave5basics <- wave5 |> 
   select(household_id, hh_id_obs) |> 
@@ -333,12 +334,11 @@ wave5mean <- collap(wave5,
                     FUN = fmean,
                     na.rm = TRUE)
 wave5sum <- collap(wave5,
-                   plot_area_GPS + nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ household_id,
+                   plot_area_GPS + nb_seasonal_crop + yield_value_USD  ~ household_id,
                    FUN = fsum,
                    na.rm = TRUE)
 aggregated_vars <- c("farm_size", "age_manager", "dist_market", "elevation", "plot_dist_household", "soil_fertility_index", "crop_count",
-                     "ag_asset_index", "plot_area_GPS", "nb_seasonal_crop", "twi",
-                     "yield_value_LCU", "yield_value_USD")
+                     "ag_asset_index", "plot_area_GPS", "nb_seasonal_crop", "twi", "yield_value_USD")
 wave5 <- wave5 %>% select(-all_of(aggregated_vars))
 look_for(wave5)
 wave5 <- wave5 |> 

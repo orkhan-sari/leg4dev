@@ -23,7 +23,7 @@ dates <- c("1990-01-02","2019-01-01")
 # UNCOMMMENT BELOW TO DOWNLOAD
 # some days on 2010 was missing. exact_dates = False is better here. 
 # raindfeth <- get_chirps(spatial, dates, server = "CHC", exact_dates = FALSE)
-# I forgot 2020 and 21 data will donwload append below. 
+# I forgot 2020 and 21 data will download append below. 
 rain_dfeth <- raindfeth
 remove(dates)
 dates <- c("2019-01-02","2022-01-01")
@@ -34,7 +34,8 @@ rain_dfeth <- rain_dfeth |>
   mutate(
     year = year(date),
     month = month(date)
-  )
+  ) |> 
+  filter(month %in% c(5:9))
 rain_dfeth <- rain_dfeth |> 
   group_by(id, year, month) |> 
   mutate(sum_month=sum(chirps)) |>  ungroup()
@@ -63,7 +64,7 @@ rain_df1 <- rain_df1 |>
   ) |> 
   ungroup()
 rain_df1 <- rain_df1 |> 
-  mutate(rainfall_shock=abs((average_rainfall - seasonal_rainfall)/sd_rainfall),
+  mutate(rainfall_diff=seasonal_rainfall- average_rainfall,
          rainfall_variation=sd_rainfall/average_rainfall*100
   )
 rain_df1 <- rain_df1 |> 
@@ -86,7 +87,7 @@ rain_df2 <- rain_df2 |>
   ) |> 
   ungroup()
 rain_df2 <- rain_df2 |> 
-  mutate(rainfall_shock=abs((average_rainfall - seasonal_rainfall)/sd_rainfall),
+  mutate(rainfall_diff=seasonal_rainfall- average_rainfall,
          rainfall_variation=sd_rainfall/average_rainfall*100
   )
 rain_df2 <- rain_df2 |>

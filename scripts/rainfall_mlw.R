@@ -66,9 +66,9 @@ rain_df1 <- rain_df1 |>
     sd_rainfall = sd(seasonal_rainfall, na.rm = TRUE)
   )
 rain_df1 <- rain_df1 |> 
-  mutate(rainfall_shock=abs((average_rainfall - seasonal_rainfall)/sd_rainfall),
+  mutate(rainfall_diff=seasonal_rainfall- average_rainfall,
          rainfall_variation=sd_rainfall/average_rainfall*100
-  )
+         )
 rain_df1 <- rain_df1 %>%
   mutate(
     season_start = as.integer(str_sub(season, 1, 4))
@@ -100,7 +100,7 @@ rain_df2 <- rain_df2 |>
     sd_rainfall = sd(seasonal_rainfall, na.rm = TRUE)
   )
 rain_df2 <- rain_df2 |> 
-  mutate(rainfall_shock=abs((average_rainfall - seasonal_rainfall)/sd_rainfall),
+  mutate(rainfall_diff=seasonal_rainfall- average_rainfall,
          rainfall_variation=sd_rainfall/average_rainfall*100
          )
 rain_df2 <- rain_df2 %>%
@@ -134,7 +134,7 @@ rain_df3 <- rain_df3 |>
     sd_rainfall = sd(seasonal_rainfall, na.rm = TRUE)
   )
 rain_df3 <- rain_df3 |> 
-  mutate(rainfall_shock=abs((average_rainfall - seasonal_rainfall)/sd_rainfall),
+  mutate(rainfall_diff=seasonal_rainfall- average_rainfall,
          rainfall_variation=sd_rainfall/average_rainfall*100
          )
 rain_df3 <- rain_df3 %>%
@@ -167,8 +167,9 @@ rain_df4 <- rain_df4 |>
     sd_rainfall = sd(seasonal_rainfall, na.rm = TRUE)
   )
 rain_df4 <- rain_df4 |> 
-  mutate(rainfall_shock=abs((average_rainfall - seasonal_rainfall)/sd_rainfall),
-         rainfall_variation=sd_rainfall/average_rainfall*100)
+  mutate(rainfall_diff=seasonal_rainfall- average_rainfall,
+         rainfall_variation=sd_rainfall/average_rainfall*100
+         )
 rain_df4 <- rain_df4 %>%
   mutate(
     season_start = as.integer(str_sub(season, 1, 4))

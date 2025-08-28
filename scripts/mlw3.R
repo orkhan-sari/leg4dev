@@ -33,12 +33,12 @@ hpdata|>
   ungroup() # 0 duplicates - plots are uniquely identified  
 hpdata <- hpdata|>
   filter(main_crop=="MAIZE") |> 
+  mutate(yield_value_USD= yield_value_USD * (share_value_LEGUMES + share_value_MAIZE)) |> 
   select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop,
          farm_size, manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, 
          primary_education_manager, agro_ecological_zone, twi, improved, organic_fertilizer, 
          inorganic_fertilizer, soil_fertility_index, elevation, plot_dist_household, ag_asset_index, plot_certificate, 
-         drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop, used_pesticides, yield_value_LCU, 
-         yield_value_USD) |>
+         drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop, used_pesticides, yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
 hpdata <- hpdata |>
   group_by(hh_id_obs) |> 
@@ -92,16 +92,16 @@ frq(seed$ag_g0f)
 frq(seed$local_vs_improved) # what is this local vs improved?
 #-------------------------------------------------# 
 # there is a mismatch between crop code and ag_g0f;
-# crop code reports 1350 hybrid while ag_g0f reports 1421 improved. 
+# crop code reports 1351 hybrid while ag_g0f reports 1421 improved. 
 # will refer  to ag_g0f as this was a separate question.
 seed <- seed |> 
-  mutate(hybrid_maize= case_when(ag_g0f==2 ~ 1,
+  mutate(iv_maize= case_when(ag_g0f==2 ~ 1,
                                  .default = 0)) |> 
-  select(plot_id, hybrid_maize)
-frq(seed$hybrid_maize)
+  select(plot_id, iv_maize)
+frq(seed$iv_maize)
 garden <- left_join(garden, seed, by= "plot_id")
-frq(garden$hybrid_maize)
-garden$hybrid_maize[is.na(garden$hybrid_maize)] <- 0
+frq(garden$iv_maize)
+garden$iv_maize[is.na(garden$iv_maize)] <- 0
 remove(seed)
 
 ## Maize - legume rotation----
@@ -209,6 +209,55 @@ hdds3 <- hdds3|>
   semi_join(maizehh, by="hh_id_merge")
 look_for(hdds3) # 297 missing for share_kg_sold
 
+# FCS
+fcs <- read_dta("data/mlw/hh_mod_g2_16.dta")
+look_for(fcs, details = "none")
+summary(fcs)
+naniar::miss_var_summary(fcs)
+fcs$hh_g08i[is.na(fcs$hh_g08i)] <- 0
+fcs$hh_g08c[is.na(fcs$hh_g08c)] <- 0
+fcs$hh_g08g[is.na(fcs$hh_g08g)] <- 0
+fcs$hh_g08h[is.na(fcs$hh_g08h)] <- 0
+fcs <- fcs |> 
+  rowwise() |> 
+  mutate(cereal=sum(
+    c_across(c(hh_g08a, hh_g08b))
+  ))
+fcs <- fcs |> 
+  mutate(cereal=if_else(cereal>7, 7, cereal))
+
+fcs <- fcs |> 
+  mutate(count=
+           (cereal * 2) +
+           (hh_g08c * 3) +
+           (hh_g08d * 1) +
+           (hh_g08e * 4) +
+           (hh_g08f * 1) +
+           (hh_g08g * 4) +
+           (hh_g08h * 0.5) +
+           (hh_g08i * 0.5)
+  )
+fcs <- fcs |> 
+  group_by(y3_hhid) |> 
+  summarise(fcs=sum(count)) |> 
+  ungroup()
+summary(fcs$fcs)
+fcs <- semi_join(fcs, maizehh, by=c("y3_hhid" = "hh_id_merge"))
+hdds3 <- left_join(hdds3, fcs, by=c("hh_id_merge" = "y3_hhid"))
+rm(fcs)
+
+# Food security
+fs <- read_dta("data/mlw/hh_mod_h_16.dta") |> 
+  select(y3_hhid, hh_h01, hh_h04)
+look_for(fs)
+fs <- fs |> 
+  mutate(enough_food = if_else(hh_h01==1, 1, 0),
+         enough_food12 = if_else(hh_h04==1, 1, 0)
+  ) |> 
+  select(-hh_h01, -hh_h04)
+fs <- semi_join(fs, maizehh, by=c("y3_hhid" = "hh_id_merge"))
+hdds3 <- left_join(hdds3, fs, by=c("hh_id_merge" = "y3_hhid"))
+
 ### ### ### ### ### ### ### ###
 # Final data  ----
 ### ### ### ### ### ### ### ###
@@ -221,7 +270,6 @@ plot3 <- plot3 |> relocate(ea_id,.after = hhid)
 table(plot3$female_manager, plot3$female) # same information.
 plot3 <- plot3 |> select(-female)
 # manager age is missing for 102 plots.
-
 
 ## Collapse / aggregate ----
 mlw3 <- plot3 |> 
@@ -237,12 +285,11 @@ wave3mean <- collap(mlw3,
                     FUN = fmean,
                     na.rm = TRUE)
 wave3sum <- collap(mlw3,
-                   plot_area_GPS + nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
+                   plot_area_GPS + nb_seasonal_crop + yield_value_USD  ~ hhid,
                    FUN = fsum,
                    na.rm = TRUE)
 aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_household", "soil_fertility_index", "crop_count",
-                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", "twi", 
-                     "yield_value_LCU", "yield_value_USD")
+                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", "twi", "yield_value_USD")
 mlw3 <- mlw3 %>% select(-all_of(aggregated_vars))
 look_for(mlw3)
 mlw3 <- mlw3 |> 
@@ -369,7 +416,7 @@ var_label(mlw3$subsistence_ag) <- "HH did not sell any crop harvest"
 var_label(mlw3$plot_area_GPS) <- "Area (ha) of maize plots"
 var_label(mlw3$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
 var_label(mlw3$female_edu) <- "HH has an educated adult female"
-var_label(mlw3$hybrid_maize) <- "Improved maize adoption"
+var_label(mlw3$iv_maize) <- "Improved maize adoption"
 remove(wage)
 # enterprise
 enterprise <- read_dta("data/mlw/hh_mod_n2_16.dta")

@@ -16,11 +16,11 @@ dftza <- dftza |> filter(dupl==2) |> select(-dupl)
 frq(dftza$wave)
 duplicates <- dftza %>%
   group_by(wave, hh_id_obs) %>%
-  filter(n() > 1)
-duplicates # 6 ons with same ids repeat within wave
+  filter(n() > 1) 
+duplicates # 6 obs with same ids repeat within wave
 dftza <- dftza |> 
   group_by(hh_id_obs) |> 
-  filter(n_distinct(wave)==2)
+  filter(n_distinct(wave)==2) # 522 panel hhs 
 frq(dftza$rotation) # 25
 frq(dftza$intercrop_legume) #338
 dftza <- dftza |> 
@@ -43,11 +43,16 @@ dftza <- left_join(dftza, spatial, by=c("hh_id_obs", "wavem")) # many missing fo
 dftza <- dftza %>%
   group_by(hh_id_obs) %>%
   mutate(
-    lon_modified = ifelse(is.na(lon_modified), first(lon_modified[wavem == 4], na.rm = TRUE), lon_modified),
-    lat_modified = ifelse(is.na(lat_modified), first(lat_modified[wavem == 4], na.rm = TRUE), lat_modified)
+    lon_modified = ifelse(is.na(lon_modified), first(lon_modified[wavem == 4]), lon_modified),
+    lat_modified = ifelse(is.na(lat_modified), first(lat_modified[wavem == 4]), lat_modified)
   ) %>%
   ungroup()
 look_for(dftza)
+frq(dftza$credit_type)
+dftza <- dftza |> 
+  mutate(credit=if_else(credit_type=="No credit accessed" , 0,  1))
+frq(dftza$credit)
+var_label(dftza$credit) <- "= 1 if received credit"
 dftza <- left_join(dftza, rainfalltza, by=c("lat_modified"="lat", "lon_modified"="lon", "wavem"="wave"))
 var_label(dftza$seasonal_rainfall) <- "Total rainfall during the production season"
 var_label(dftza$average_rainfall) <- "Average rainfall observed since 1990"
@@ -89,5 +94,5 @@ dfspatial5 <- dfspatial5 |>
 dfn <- rbind(dfspatial4, dfspatial5)
 dftza <- left_join(dftza, dfn, by=c("hh_id_obs", "wavem"))
 rm(dfspatial4, dfspatial5, dfn, within10km_adopted, dist_matrix)
-write_dta(dfeth, "data/est/dftza.dta", version = 15)
-saveRDS(dfeth, file = "data/est/dftza.rds")
+write_dta(dftza, "data/est/dftza.dta", version = 15)
+saveRDS(dftza, file = "data/est/dftza.rds")

@@ -58,6 +58,7 @@ rain_df1 <- rain_df1 |>
   mutate(
     average_rainfall = mean(seasonal_rainfall, na.rm = TRUE),
     sd_rainfall = sd(seasonal_rainfall, na.rm = TRUE),
+    rainfall_diff=seasonal_rainfall- average_rainfall,
     rainfall_variation=sd_rainfall/average_rainfall*100
   ) |> 
   ungroup()
@@ -77,6 +78,7 @@ rain_df2 <- rain_df2 |>
   mutate(
     average_rainfall = mean(seasonal_rainfall, na.rm = TRUE),
     sd_rainfall = sd(seasonal_rainfall, na.rm = TRUE),
+    rainfall_diff=seasonal_rainfall- average_rainfall,
     rainfall_variation=sd_rainfall/average_rainfall*100
   ) |> 
   ungroup()

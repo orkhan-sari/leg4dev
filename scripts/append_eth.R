@@ -44,10 +44,10 @@ dfeth |> group_by(hh_id_obs) |> select(hh_id_obs, wave, nom_totcons_aeq, def_tot
 dfeth |> group_by(hh_id_obs) |> select(hh_id_obs, wave, nom_foodcons_aeq, def_foodcons_aeq) |>
   arrange(hh_id_obs) |> print(n=12)
 dfeth <- dfeth |> 
-  mutate(improved_maize=
-           factor(improved_maize, levels = c(0,1), labels = c("local", "improved")),
-         rotation=
-           factor(rotation, levels = c(0,1), labels = c("norotation", "rotation"))
+  mutate(rotation=
+           factor(rotation, levels = c(0,1), labels = c("norotation", "rotation")),
+         tot_other_income = if_else(tot_other_income<0, 0, tot_other_income),
+         ln_other_income = log(tot_other_income+1),
          )
 table(dfeth$rotation, dfeth$intercrop) # only 19 hhs had intercropped but not rotated
 dfeth <- dfeth |> 
@@ -93,7 +93,7 @@ dfeth <- left_join(dfeth, rainfalleth, by=c("lat_modified"="lat", "lon_modified"
 var_label(dfeth$seasonal_rainfall) <- "Total annaul rainfall"
 var_label(dfeth$average_rainfall) <- "Average rainfall observed since 1990"
 var_label(dfeth$sd_rainfall) <- "Standard deviation of mean annual rainfall since 1990"
-var_label(dfeth$rainfall_shock) <- "Deviations from expected annual rainfall"
+var_label(dfeth$rainfall_diff) <- "Season's deviation from expected annual rainfall"
 look_for(dfeth)
 dfeth <- dfeth |> 
   mutate(ln_wage_income = log(wage_income+1),

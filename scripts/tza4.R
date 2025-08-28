@@ -141,6 +141,29 @@ LRseason$rotation[is.na(LRseason$rotation)] <- 0
 plot4 <- left_join(intercropdata, LRseason, by = "plot_id")
 remove(LRseason, SRseason, legume_codes, intercropdata)
 
+## improved maize  ----
+## here we don't have the info at parcel level but only at hh level. all seeds were asked. We concentrate on maize. 
+seed <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4a.dta") |> 
+  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-")) |> 
+  select(y4_hhid, plot_id, zaocode, ag4a_06, ag4a_08) |> 
+  filter(zaocode==11)
+look_for(seed)
+seed |> group_by(y4_hhid) |> 
+  filter(n()>1) |>
+  ungroup() # improved varieties in some fields of HHs. 
+# HHs have several maize fields,and it is not possible to identify 
+# in which parcel the improved seed was cultivated, i.e., rotated parcel or not.** 
+frq(seed$ag4a_08)
+seed <- seed |>
+  mutate(improved_maize=if_else(ag4a_08 %in% c(1,3),1,0))
+frq(seed$improved_maize)
+seed <- seed |> 
+  group_by(plot_id) |> 
+  summarise(improved_maize=max(improved_maize))
+plot4 <- left_join(plot4, seed, by="plot_id")
+frq(plot4$improved_maize)
+remove(seed)
+
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
@@ -252,11 +275,9 @@ aggregated_vars <- c("farm_size", "age_manager", "plot_dist_household", "soil_fe
                      "yield_value_LCU", "yield_value_USD")
 tza4 <- tza4 %>% select(-all_of(aggregated_vars))
 look_for(tza4)
-
 tza4 <- tza4 |> 
-  select(4, 1:3, 10:21)
+  select(5, 1:4, 11:22)
 # ---------------------------------------------------------------------------- #
-
 look_for(tza4)
 # For all remaining binary variables, I will select the max. Meaning, for example,
 # at least one plot is managed by female, at least one maize plot manager has primary education, 
@@ -625,9 +646,8 @@ coupon <- left_join(
 coupon <- coupon |>
   rename(mainseed_variety_name = ag4a_06,
          seed_type = ag4a_08 ) |>
-  mutate(seed_type=as.numeric(seed_type),
-         improved_seed = if_else(seed_type %in% c(1,3), 1, 0)) # 3 is also improved but recycled.
-coupon <- collap(coupon, seed_voucher + fert_voucher + improved_seed ~ y4_hhid, FUN = fmax, na.rm = TRUE)
+  mutate(seed_type=as.numeric(seed_type)) # 3 is also improved but recycled.
+coupon <- collap(coupon, seed_voucher + fert_voucher ~ y4_hhid, FUN = fmax, na.rm = TRUE)
 tza4 <- left_join(tza4, coupon, by=c("hhid"="y4_hhid"))
 tza4$seed_voucher[is.na(tza4$seed_voucher)] <- 0
 tza4$fert_voucher[is.na(tza4$fert_voucher)] <- 0
@@ -635,7 +655,6 @@ frq(tza4$seed_voucher)
 frq(tza4$fert_voucher)
 var_label(tza4$seed_voucher) <- "HH had obtained voucher for seed"
 var_label(tza4$fert_voucher) <- "HH had obtained voucher for inorganic fertilizer"
-var_label(tza4$improved_seed) <- "The main seeds used in the HH are improved seeds"
 remove(coupon, seedcoupon, fertcoupon)
 
 ## Location ----

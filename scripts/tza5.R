@@ -141,6 +141,29 @@ LRseason$rotation[is.na(LRseason$rotation)] <- 0
 plot5 <- left_join(intercropdata, LRseason, by = "plot_id")
 remove(LRseason, SRseason, intercropdata)
 
+## improved maize  ----
+## here we don't have the info at parcel level but only at hh level. all seeds were asked. We concentrate on maize. 
+seed <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_4a.dta") |> 
+  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-")) |> 
+  select(y5_hhid, plot_id, cropid, ag4a_06, ag4a_08) |> 
+  filter(cropid==11)
+look_for(seed)
+seed |> group_by(y5_hhid) |> 
+  filter(n()>1) |>
+  ungroup() # improved varieties in some fields of HHs. 
+# HHs have several maize fields,and it is not possible to identify 
+# in which parcel the improved seed was cultivated, i.e., rotated parcel or not.** 
+frq(seed$ag4a_08)
+seed <- seed |>
+  mutate(improved_maize=if_else(ag4a_08 %in% c(1,3),1,0))
+frq(seed$improved_maize)
+seed <- seed |> 
+  group_by(plot_id) |> 
+  summarise(improved_maize=max(improved_maize))
+plot5 <- left_join(plot5, seed, by="plot_id")
+frq(plot5$improved_maize)
+remove(seed)
+
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
@@ -215,7 +238,6 @@ hdds5 <- hdds5|>
 plot5 <- left_join(plot5, hpdata, by = "plot_id")
 look_for(plot5)
 remove(hpdata)
-
 plot5 <- plot5 |> rename(hhid=hh_id_merge)
 table(plot5$female_manager, plot5$female)
 mismatched_rows <- plot5 |> filter(female_manager != female)
@@ -252,9 +274,8 @@ aggregated_vars <- c("farm_size", "age_manager", "plot_dist_household", "soil_fe
                      "yield_value_LCU", "yield_value_USD")
 tza5 <- tza5 %>% select(-all_of(aggregated_vars))
 look_for(tza5)
-
 tza5 <- tza5 |> 
-  select(4, 1:3, 10:21)
+  select(5, 1:4, 11:22)
 # ---------------------------------------------------------------------------- #
 
 look_for(tza5)
@@ -278,8 +299,6 @@ tza5 <- tza5 |>
   mutate(female_edu=if_else(is.na(female_edu), 0, female_edu))
 remove(tza5basics, wave5max, wave5sum,wave5mean,aggregated_vars, hdds5, plot5, individual)
 tza5 <- tza5 |> mutate(wave="wave5")
-
-
 
 ## Cleaning missing data ----
 look_for(tza5)
@@ -357,7 +376,6 @@ tza5 <- left_join(tza5, plot_market_dist, by = c("hhid" = "y5_hhid"))
 remove(plot_hh_dist, plot_market_dist, plot_road_dist, distance_from_plot)
 
 ## Non-farm income ----
-
 wage <- read_dta("data/tza/tza_wave5_2020_21/hh_sec_e1.dta")
 look_for(wage, details = "none")
 wage <- wage[, c(1:3, 7:12, 53:63, 84:93)]
@@ -602,7 +620,7 @@ tza5 <- left_join(tza5, soil_type, by=c("hhid"="y5_hhid"))
 var_label(tza5$soil) <-  "loam soil type"
 remove(soil_type)
 
-## Input coupon & improved variety use---- 
+## Input coupon ---- 
 ## In wave 5, if they received voucher for inputs. Instead their was a question why they used input,
 ## and one answer option is voucher. But this is not a good measure. 
 inputcoupon <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_3a.dta") |> 
@@ -623,20 +641,6 @@ frq(inputcoupon$pest_voucher)
 ## No farmer using fertilizer/herbicide/pesticide reported 'received voucher' 
 #(code 2) as reason; no other input coupon variables available either.
 remove(inputcoupon)
-
-improved_var <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_4a.dta") |>
-  select(y5_hhid, plot_id, ag4a_06, ag4a_08) |>
-  rename(
-    mainseed_variety_name = ag4a_06,
-    seed_type = ag4a_08 ) |>
-  mutate(
-    seed_type = as.numeric(seed_type),
-    improved_seed = if_else(seed_type %in% c(1, 3), 1, 0)) # 3 is improved but recycled 
-
-improved_var <- collap(improved_var, improved_seed ~ y5_hhid, FUN = fmax, na.rm = TRUE)
-tza5 <- left_join(tza5, improved_var, by = c("hhid" = "y5_hhid"))
-var_label(tza5$improved_seed) <- "The main seeds used in the HH are improved seeds"
-remove(improved_var)
 
 ## Location ----
 location <- read_dta("data/tza/tza_wave5_2020_21/hh_sec_a.dta") |> 

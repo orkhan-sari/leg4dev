@@ -43,7 +43,8 @@ hpdata <- hpdata|>
 hpdata <- hpdata |>
   group_by(hh_id_obs) |> 
   mutate(crop_count=sum(nb_seasonal_crop)) |> 
-  relocate(crop_count, .after = nb_seasonal_crop)
+  relocate(crop_count, .after = nb_seasonal_crop) |> 
+  ungroup()
 look_for(hpdata) # many missing
 
 # Crop diversification ----
@@ -639,7 +640,8 @@ garden <- garden |>
   ungroup()
 garden <- garden |> 
   group_by(y4_hhid) |> 
-  summarise(other_crops=sum(other_crops_count))
+  summarise(other_crops=sum(other_crops_count)) |> 
+  ungroup()
 mlw4 <- left_join(mlw4, garden, by=c("hhid"="y4_hhid"))
 frq(mlw4$other_crops)
 var_label(mlw4$other_crops) <- "number of other crops produced"

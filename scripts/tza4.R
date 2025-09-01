@@ -159,10 +159,12 @@ seed <- seed |>
 frq(seed$improved_maize)
 seed <- seed |> 
   group_by(plot_id) |> 
-  summarise(improved_maize=max(improved_maize))
+  summarise(improved_maize=max(improved_maize)) |> 
+  ungroup()
 plot4 <- left_join(plot4, seed, by="plot_id")
 frq(plot4$improved_maize)
 remove(seed)
+
 
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
@@ -231,6 +233,45 @@ hdds4 <- read_dta("data/hp/Household_dataset.dta") |>
   select(hh_id_merge, hh_size, hh_shock, hh_dependency_ratio, hh_asset_index, HDDS, share_kg_sold)
 hdds4 <- hdds4|> 
   semi_join(maizehh, by="hh_id_merge")
+
+# FCS
+fcs <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/hh_sec_j3.dta")
+look_for(fcs)
+fcs$itemcode <- as.factor(fcs$itemcode)
+fcs <- fcs |> 
+  group_by(y4_hhid) %>%
+  mutate(
+    sum_A_B = sum(hh_j08_3[itemcode %in% c(1, 2)], na.rm = TRUE),
+    sum_A_B = case_when(sum_A_B > 7 ~ 7,
+                        .default = sum_A_B),
+    count = case_when(itemcode== 1 ~ sum_A_B,
+                      .default = hh_j08_3)
+  ) |> 
+  ungroup()
+fcs <- fcs |> 
+  filter(itemcode != 2)
+table(fcs$itemcode,fcs$count)
+fcs <- fcs |> 
+  mutate(count=if_else(count > 7, 7, count))
+fcs <- fcs |> 
+  mutate(total=case_when(itemcode == 1 ~ count * 2,
+                         itemcode == 3 ~ count * 3,
+                         itemcode == 4 ~ count * 1,
+                         itemcode == 5 ~ count * 4,
+                         itemcode == 6 ~ count * 1,
+                         itemcode == 7 ~ count * 4,
+                         itemcode == 8 ~ count * 0.5,
+                         itemcode == 9 ~ count * 0.5,
+                         itemcode == 10 ~ count * 0)
+         )
+fcs <- fcs |> 
+  group_by(y4_hhid) |> 
+  summarise(fcs=sum(total)) |> 
+  ungroup()
+fcs <- semi_join(fcs, maizehh, by=c("y4_hhid" = "hh_id_merge"))
+hdds4 <- left_join(hdds4, fcs, by=c("hh_id_merge" = "y4_hhid"))
+summary(hdds4$fcs)
+rm(fcs)
 
 ### ### ### ### ### ### ### ###
 # Final data  ----
@@ -324,7 +365,7 @@ remove(subsistence_ag)
 ### ### ### ### ### ### ### ###
 
 ### ### ### ### ### ### ### ###
-# Distance from Plot to Home, Road and Market
+## Distance from Plot to Home, Road and Market ====
 
 distance_from_plot <- "data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta"
 
@@ -341,7 +382,8 @@ plot_hh_dist |>
   filter(n > 1)
 plot_hh_dist<- plot_hh_dist |>
   group_by(y4_hhid) |>
-  summarise(plot_hh_dist_mean = mean(plot_hh_distance, na.rm = TRUE))
+  summarise(plot_hh_dist_mean = mean(plot_hh_distance, na.rm = TRUE)) |> 
+  ungroup()
 tza4 <- left_join(tza4, plot_hh_dist, by = c("hhid" = "y4_hhid"))
 
 # ───── Plot-to-road distance ─────
@@ -373,12 +415,73 @@ plot_market_dist |>
   filter(n > 1)
 plot_market_dist<- plot_market_dist |>
   group_by(y4_hhid) |>
-  summarise(plot_market_dist_mean = mean(plot_market_distance, na.rm = TRUE))
+  summarise(plot_market_dist_mean = mean(plot_market_distance, na.rm = TRUE)) |> 
+  ungroup()
 tza4 <- left_join(tza4, plot_market_dist, by = c("hhid" = "y4_hhid"))
 remove(plot_hh_dist, plot_market_dist, plot_road_dist, distance_from_plot)
 
-## Non-farm income ----
+### ### ### ### ### ### ### ###
+## Ecological soil management ----
+# crop residue short season
+plots <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4b.dta") |> 
+  select(y4_hhid, plotnum, zaocode) |> 
+  filter(!is.na(zaocode)) |> 
+  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-")) |> 
+  select(-plotnum)
+look_for(plots)
+plots <- plots |> 
+  distinct(y4_hhid, zaocode, .keep_all = TRUE)
+soilman <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_5b.dta") |> # crop level no plot key 
+  select(y4_hhid, ag5b_33, zaocode)
+look_for(soilman)
+frq(soilman$ag5b_33)
+soilman <- soilman |>
+  filter(zaocode %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47)) # keep only maize and legume
+soilman <- soilman |>
+  filter(!is.na(ag5b_33)) |> 
+  mutate(crop_residue=if_else(ag5b_33==2, 1, 0)) |> 
+  select(-ag5b_33)
+soilman <- left_join(soilman, plots, by=c("y4_hhid", "zaocode"))
+soilman <- soilman |> 
+  group_by(y4_hhid) |> 
+  summarise(crop_residue_short=max(crop_residue)) |> 
+  ungroup()
+tza4 <- left_join(tza4, soilman, by=c("hhid" = "y4_hhid"))
+frq(tza4$crop_residue_short)
+tza4$crop_residue_short[is.na(tza4$crop_residue_short)] <- 0
+var_label(tza4$crop_residue_short) <- "Residues from short rainy season were left in the field"
 
+# residue long season
+plots <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4a.dta") |> 
+  select(y4_hhid, plotnum, zaocode) |> 
+  filter(!is.na(zaocode)) |> 
+  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-")) |> 
+  select(-plotnum)
+# for long season we concentrate on maize and legumes to possible be able ot link to the fields of interest as there is no direct key
+plots <- plots |>
+  filter(zaocode %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47))
+plots <- plots |> 
+  distinct(y4_hhid, zaocode, .keep_all = TRUE)
+soilman <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_5a.dta") |> # crop level no plot key 
+  select(y4_hhid, zaocode, ag5a_33)
+soilman <- soilman |>
+  filter(zaocode %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47))
+look_for(soilman)
+soilman <- soilman |>
+  filter(!is.na(ag5a_33)) |> 
+  mutate(crop_residue=if_else(ag5a_33==2, 1, 0)
+  )
+soilman <- left_join(soilman, plots, by=c("y4_hhid", "zaocode"))
+soilman <- soilman |> 
+  group_by(y4_hhid) |> 
+  summarise(crop_residue_long=max(crop_residue)) |> 
+  ungroup()
+tza4 <- left_join(tza4, soilman, by=c("hhid" = "y4_hhid"))
+frq(tza4$crop_residue_long)
+tza4$crop_residue_long[is.na(tza4$crop_residue_long)] <- 0
+var_label(tza4$crop_residue_long) <- "Residues from the latest long season were left in the field"
+
+## Non-farm income ----
 wage <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/hh_sec_e.dta")
 look_for(wage, details = "none")
 wage <- wage[, c(1:3, 5:7, 9:10, 28, 35:45, 51, 57:64, 65:66)]
@@ -578,7 +681,8 @@ tenure_diff_security <- tenure |>
     unique_tenure = n_distinct(tenure_security, na.rm = TRUE),
     plots_count = n()
   ) |>
-  filter(unique_tenure > 1)
+  filter(unique_tenure > 1) |> 
+  ungroup()
 
 print(tenure_diff_security)
 
@@ -633,7 +737,8 @@ fertcoupon <- fertcoupon |>
          fert_voucher = if_else(ag3a_50 == 1 | ag3a_57 == 1, 1, 0))
 frq(fertcoupon$fert_voucher)
 seedcoupon<- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_4a.dta") |> 
-  select(y4_hhid, plotnum, ag4a_06, ag4a_08, ag4a_13a)
+  select(y4_hhid, zaocode, plotnum, ag4a_06, ag4a_08, ag4a_13a)
+table(seedcoupon$zaocode, seedcoupon$ag4a_13a) # 11 maize but no legume coupon.
 seedcoupon <- seedcoupon |> 
   mutate(ag4a_13a=as.numeric(ag4a_13a),
          seed_voucher = if_else(ag4a_13a == 1, 1, 0))
@@ -697,7 +802,8 @@ plot_data <- plot_data |>
 plot_data <- plot_data |> 
   filter(!is.na(zaocode)) |> 
   group_by(y4_hhid) |> 
-  summarise(other_crops=sum(other_crops_count))
+  summarise(other_crops=sum(other_crops_count)) |> 
+  ungroup()
 tza4 <- left_join(tza4, plot_data, by=c("hhid"="y4_hhid"))
 frq(tza4$other_crops)
 var_label(tza4$other_crops) <- "number of other crops produced"
@@ -736,6 +842,7 @@ frq(modd$flat_slope)
 tza4 <- left_join(tza4, modd, by=c("hhid"="y4_hhid"))
 var_label(tza4$flat_slope) <- "Dominant slope"
 remove(modd, maizeplots, mode_or_max)
+tza4$plot_dist_household <- NULL
 
 ### ### ### ### ### ### ### ### #### ##### #### ### ###
 # Auxiliary Check: How Many LR Legume-Growing Households Planted Maize in the SR

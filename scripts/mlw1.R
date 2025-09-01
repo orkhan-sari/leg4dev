@@ -646,7 +646,8 @@ garden <- garden |>
   ungroup()
 garden <- garden |> 
   group_by(case_id) |> 
-  summarise(other_crops=sum(other_crops_count))
+  summarise(other_crops=sum(other_crops_count)) |> 
+  ungroup()
 mlw1 <- left_join(mlw1, garden, by=c("hhid"="case_id"))
 frq(mlw1$other_crops)
 var_label(mlw1$other_crops) <- "number of other crops produced"

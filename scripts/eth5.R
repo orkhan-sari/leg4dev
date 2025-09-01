@@ -35,7 +35,8 @@ hpdata <- hpdata |>
 hpdata <- hpdata |>
   group_by(hh_id_obs) |> 
   mutate(crop_count=sum(nb_seasonal_crop)) |> 
-  relocate(crop_count, .after = nb_seasonal_crop)
+  relocate(crop_count, .after = nb_seasonal_crop) |> 
+  ungroup()
 look_for(hpdata) #many missing
 
 ### ### ### ### ### ### ### ###
@@ -434,7 +435,8 @@ sec4 <- sec4 |>
 sec4 %>%
   group_by(household_id) %>%
   summarise(n_unique = n_distinct(subsistence_ag, na.rm = TRUE)) %>%
-  filter(n_unique > 1) # many cases where answer to the question differs. 
+  filter(n_unique > 1) |>  # many cases where answer to the question differs. 
+  ungroup()
 sec4 <- collap(sec4, subsistence_ag~household_id, FUN = fmin) # if some consider for sale then not a subsistence. 
 wave5 <- left_join(wave5, sec4, by="household_id")
 table(wave5$subsistence_ag)
@@ -633,7 +635,8 @@ crops <- crops |>
   ungroup()
 crops <- crops |> 
   group_by(household_id) |> 
-  summarise(other_crops=sum(other_crops_count))
+  summarise(other_crops=sum(other_crops_count)) |> 
+  ungroup()
 eth5 <- left_join(eth5, crops, by="household_id")
 var_label(eth5$other_crops) <- "number of other crops produced"
 remove(maizehh, crops)

@@ -159,7 +159,8 @@ seed <- seed |>
 frq(seed$improved_maize)
 seed <- seed |> 
   group_by(plot_id) |> 
-  summarise(improved_maize=max(improved_maize))
+  summarise(improved_maize=max(improved_maize)) |> 
+  ungroup()
 plot5 <- left_join(plot5, seed, by="plot_id")
 frq(plot5$improved_maize)
 remove(seed)
@@ -231,6 +232,45 @@ hdds5 <- read_dta("data/hp/Household_dataset.dta") |>
   select(hh_id_merge, hh_size, hh_shock, hh_dependency_ratio, hh_asset_index, HDDS, share_kg_sold)
 hdds5 <- hdds5|> 
   semi_join(maizehh, by="hh_id_merge")
+
+# FCS
+fcs <- read_dta("data/tza/tza_wave5_2020_21/hh_sec_j3.dta")
+look_for(fcs)
+fcs$itemcode <- as.factor(fcs$itemcode)
+fcs <- fcs |> 
+  group_by(y5_hhid) %>%
+  mutate(
+    sum_A_B = sum(hh_j08[itemcode %in% c(1, 2)], na.rm = TRUE),
+    sum_A_B = case_when(sum_A_B > 7 ~ 7,
+                        .default = sum_A_B),
+    count = case_when(itemcode== 1 ~ sum_A_B,
+                      .default = hh_j08)
+  ) |> 
+  ungroup()
+fcs <- fcs |> 
+  filter(itemcode != 2)
+table(fcs$itemcode,fcs$count)
+fcs <- fcs |> 
+  mutate(count=if_else(count > 7, 7, count))
+fcs <- fcs |> 
+  mutate(total=case_when(itemcode == 1 ~ count * 2,
+                         itemcode == 3 ~ count * 3,
+                         itemcode == 4 ~ count * 1,
+                         itemcode == 5 ~ count * 4,
+                         itemcode == 6 ~ count * 1,
+                         itemcode == 7 ~ count * 4,
+                         itemcode == 8 ~ count * 0.5,
+                         itemcode == 9 ~ count * 0.5,
+                         itemcode == 10 ~ count * 0)
+  )
+fcs <- fcs |> 
+  group_by(y5_hhid) |> 
+  summarise(fcs=sum(total)) |> 
+  ungroup()
+fcs <- semi_join(fcs, maizehh, by=c("y5_hhid" = "hh_id_merge"))
+hdds5 <- left_join(hdds5, fcs, by=c("hh_id_merge" = "y5_hhid"))
+summary(hdds5$fcs)
+rm(fcs)
 
 ### ### ### ### ### ### ### ###
 # Final data  ----
@@ -322,7 +362,7 @@ remove(subsistence_ag)
 ### ### ### ### ### ### ### ###
 
 ### ### ### ### ### ### ### ###
-# Distance from Plot to Home, Road and Market
+## Distance from Plot to Home, Road and Market ----
 
 distance_from_plot <- "data/tza/tza_wave5_2020_21/ag_sec_3a.dta"
 
@@ -339,7 +379,8 @@ plot_hh_dist |>
   filter(n > 1)
 plot_hh_dist<- plot_hh_dist |>
   group_by(y5_hhid) |>
-  summarise(plot_hh_dist_mean = mean(plot_hh_distance, na.rm = TRUE))
+  summarise(plot_hh_dist_mean = mean(plot_hh_distance, na.rm = TRUE)) |> 
+  ungroup()
 tza5 <- left_join(tza5, plot_hh_dist, by = c("hhid" = "y5_hhid"))
 
 # ───── Plot-to-road distance ─────
@@ -371,7 +412,8 @@ plot_market_dist |>
   filter(n > 1)
 plot_market_dist<- plot_market_dist |>
   group_by(y5_hhid) |>
-  summarise(plot_market_dist_mean = mean(plot_market_distance, na.rm = TRUE))
+  summarise(plot_market_dist_mean = mean(plot_market_distance, na.rm = TRUE)) |> 
+  ungroup()
 tza5 <- left_join(tza5, plot_market_dist, by = c("hhid" = "y5_hhid"))
 remove(plot_hh_dist, plot_market_dist, plot_road_dist, distance_from_plot)
 
@@ -472,8 +514,66 @@ tza5 <- tza5 |>
 var_label(tza5$wage_income) <- "income from main and temporary off-farm work"
 remove(wage)
 
-##  Extension, advisory, credit----
+### ### ### ### ### ### ### ###
+## Ecological soil management ----
+# crop residue short season
+plots <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_4b.dta") |> 
+  select(y5_hhid, plot_id, cropid) |> 
+  filter(!is.na(cropid)) |> 
+  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-"))
+look_for(plots)
+plots <- plots |> 
+  distinct(y5_hhid, cropid, .keep_all = TRUE)
+soilman <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_5b.dta") |> # crop level no plot key 
+  select(y5_hhid, ag5b_33, cropid)
+look_for(soilman)
+frq(soilman$ag5b_33)
+soilman <- soilman |>
+  filter(cropid %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47)) # keep only maize and legume
+soilman <- soilman |>
+  filter(!is.na(ag5b_33)) |> 
+  mutate(crop_residue=if_else(ag5b_33==2, 1, 0)) |> 
+  select(-ag5b_33)
+soilman <- left_join(soilman, plots, by=c("y5_hhid", "cropid"))
+soilman <- soilman |> 
+  group_by(y5_hhid) |> 
+  summarise(crop_residue_short=max(crop_residue)) |> 
+  ungroup()
+tza5 <- left_join(tza5, soilman, by=c("hhid" = "y5_hhid"))
+frq(tza5$crop_residue_short)
+tza5$crop_residue_short[is.na(tza5$crop_residue_short)] <- 0
+var_label(tza5$crop_residue_short) <- "Residues from short rainy season were left in the field"
 
+# residue long season
+plots <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_4a.dta") |> 
+  select(y5_hhid, plot_id, cropid) |> 
+  filter(!is.na(cropid)) |> 
+  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-"))
+# for long season we concentrate on maize and legumes to possible be able ot link to the fields of interest as there is no direct key
+plots <- plots |>
+  filter(cropid %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47))
+plots <- plots |> 
+  distinct(y5_hhid, cropid, .keep_all = TRUE)
+soilman <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_5a.dta") |> # crop level no plot key 
+  select(y5_hhid, ag5a_33, cropid)
+soilman <- soilman |>
+  filter(cropid %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47))
+look_for(soilman)
+soilman <- soilman |>
+  filter(!is.na(ag5a_33)) |> 
+  mutate(crop_residue=if_else(ag5a_33==2, 1, 0)
+  )
+soilman <- left_join(soilman, plots, by=c("y5_hhid", "cropid"))
+soilman <- soilman |> 
+  group_by(y5_hhid) |> 
+  summarise(crop_residue_long=max(crop_residue)) |> 
+  ungroup()
+tza5 <- left_join(tza5, soilman, by=c("hhid" = "y5_hhid"))
+frq(tza5$crop_residue_long)
+tza5$crop_residue_long[is.na(tza5$crop_residue_long)] <- 0
+var_label(tza5$crop_residue_long) <- "Residues from the latest long season were left in the field"
+
+##  Extension, advisory, credit----
 extension <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_12a.dta") |>
   select(y5_hhid, sourceid, ag12a_01_1:ag12a_01_8, ag12a_02) |>
   filter(ag12a_02 == 1)               #receiving *any* advice
@@ -575,7 +675,8 @@ tenure_diff_security <- tenure |>
     unique_tenure = n_distinct(tenure_security, na.rm = TRUE),
     plots_count = n()
   ) |>
-  filter(unique_tenure > 1)
+  filter(unique_tenure > 1) |> 
+  ungroup()
 
 print(tenure_diff_security)
 
@@ -680,7 +781,8 @@ plot_data <- plot_data |>
   ungroup()
 plot_data <- plot_data |> 
   group_by(y5_hhid) |> 
-  summarise(other_crops=sum(other_crops_count))
+  summarise(other_crops=sum(other_crops_count)) |> 
+  ungroup()
 tza5 <- left_join(tza5, plot_data, by=c("hhid"="y5_hhid"))
 frq(tza5$other_crops)
 var_label(tza5$other_crops) <- "number of other crops produced"
@@ -718,7 +820,7 @@ frq(modd$flat_slope)
 tza5 <- left_join(tza5, modd, by=c("hhid"="y5_hhid"))
 var_label(tza5$flat_slope) <- "Dominant slope"
 remove(modd, maizeplots, mode_or_max)
-
+tza5$plot_dist_household <- NULL
 ### ### ### ### ### ### ### ### #### ##### #### ### ###
 # Auxiliary Check: How Many LR Legume-Growing Households Planted Maize in the SR
 ### ### ### ### ### ### ### ###### ### ###  ### ### ### 

@@ -53,6 +53,8 @@ dftza <- dftza |>
   mutate(credit=if_else(credit_type=="No credit accessed" , 0,  1))
 frq(dftza$credit)
 var_label(dftza$credit) <- "= 1 if received credit"
+dftza <- dftza |> 
+  mutate(maize_share=plot_area_GPS/farm_size)
 dftza <- left_join(dftza, rainfalltza, by=c("lat_modified"="lat", "lon_modified"="lon", "wavem"="wave"))
 var_label(dftza$seasonal_rainfall) <- "Total rainfall during the production season"
 var_label(dftza$average_rainfall) <- "Average rainfall observed since 1990"

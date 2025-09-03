@@ -337,7 +337,7 @@ tza5 <- left_join(tza5, hdds5, by=c("hhid"="hh_id_merge"))
 tza5<- left_join(tza5, individual, by=c("hhid"="y5_hhid"))
 tza5 <- tza5 |> 
   mutate(female_edu=if_else(is.na(female_edu), 0, female_edu))
-remove(tza5basics, wave5max, wave5sum,wave5mean,aggregated_vars, hdds5, plot5, individual)
+remove(tza5basics, wave5max, wave5sum, wave5mean, aggregated_vars, hdds5, plot5, individual)
 tza5 <- tza5 |> mutate(wave="wave5")
 
 ## Cleaning missing data ----
@@ -514,6 +514,23 @@ tza5 <- tza5 |>
 var_label(tza5$wage_income) <- "income from main and temporary off-farm work"
 remove(wage)
 
+## Enterprise income
+
+enterprise <- read_dta("data/tza/tza_wave5_2020_21/hh_sec_n.dta") |> 
+  select(y5_hhid, hh_n19, hh_n20 )
+look_for(enterprise)
+enterprise <- enterprise |> 
+  filter(!is.na(hh_n19)) |> 
+  mutate(profit=hh_n19*hh_n20)
+enterprise <- enterprise |> 
+  group_by(y5_hhid) |> 
+  summarise(enterprise_income=sum(profit)) |> 
+  ungroup()
+tza5 <- left_join(tza5, enterprise, by=c("hhid"="y5_hhid"))
+tza5$enterprise_income[is.na(tza5$enterprise_income)] <- 0
+var_label(tza5$enterprise_income) <- "annual enterprise income"
+rm(enterprise)
+
 ### ### ### ### ### ### ### ###
 ## Ecological soil management ----
 # crop residue short season
@@ -647,6 +664,7 @@ tlu <- tlu |>
 tlu <- collap(tlu, tlu ~ y5_hhid, FUN = fsum)
 tza5 <- left_join(tza5, tlu, by=c("hhid"="y5_hhid"))
 remove(tlu)
+tza5$tlu[is.na(tza5$tlu)] <- 0
 
 ## Land tenure ----
 tenure <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_3a.dta") |>
@@ -745,22 +763,28 @@ remove(inputcoupon)
 
 ## Location ----
 location <- read_dta("data/tza/tza_wave5_2020_21/hh_sec_a.dta") |> 
-  select(y5_hhid, hh_a01_1) |> 
+  select(y5_hhid, hh_a01_1, hh_a10, tracking_class) |> 
   rename(Region = hh_a01_1)
+look_for(location)
+frq(location$hh_a10)
+frq(location$tracking_class)
+location <- location |> 
+  rename(originalhh=hh_a10)
+frq(location$tracking_class) # still some more 
+frq(location$originalhh)
+n_distinct(location$y5_hhid)
 tza5 <- left_join(tza5, location, by = c("hhid" = "y5_hhid")) 
 rm(location)
 frq(tza5$Region)
 tza5 <- tza5 |> 
   mutate(zone = case_when(
-    Region %in% c(7,6,5,4) ~ "eastern",
-    Region %in% c(7, 6, 5, 4) ~ "Eastern",
+    Region %in% c(4, 5, 6, 7, 51, 52, 53, 54, 55) ~ "Eastern",
     Region %in% c(2, 3, 21) ~ "Northern",
     Region %in% c(1, 13, 14) ~ "Central",
-    Region %in% c(18, 19, 20, 17, 25, 24) ~ "Lake",
-    Region %in% c(16, 23, 15) ~ "Western",
-    Region %in% c(11, 12, 22, 10, 26) ~ "Southern Highlands",
+    Region %in% c(17, 18, 19, 20, 24, 25) ~ "Lake",
+    Region %in% c(15, 16, 23) ~ "Western",
+    Region %in% c(10, 11, 12, 22, 26) ~ "Southern Highlands",
     Region %in% c(8, 9) ~ "Southern",
-    Region %in% c(51, 52, 53, 54, 55) ~ "Zanzibar",
     TRUE ~ NA_character_))
 tza5$Region <- NULL
 frq(tza5$zone)

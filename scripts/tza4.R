@@ -578,6 +578,23 @@ tza4 <- tza4 |>
 var_label(tza4$wage_income) <- "income from main and temporary off-farm work"
 remove(wage)
 
+## Enterprise income
+
+enterprise <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/hh_sec_n.dta") |> 
+  select(y4_hhid, hh_n19, hh_n20 )
+look_for(enterprise)
+enterprise <- enterprise |> 
+  filter(!is.na(hh_n19)) |> 
+  mutate(profit=hh_n19*hh_n20)
+enterprise <- enterprise |> 
+  group_by(y4_hhid) |> 
+  summarise(enterprise_income=sum(profit)) |> 
+  ungroup()
+tza4 <- left_join(tza4, enterprise, by=c("hhid"="y4_hhid"))
+tza4$enterprise_income[is.na(tza4$enterprise_income)] <- 0
+var_label(tza4$enterprise_income) <- "annual enterprise income"
+rm(enterprise)
+
 ##  Extension, advisory, credit----
 
 extension <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_12a.dta") |>
@@ -642,17 +659,18 @@ tlu <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/lf_sec
   filter(lf02_01==1)   |>
   mutate(lf02_04 = rowSums(across(c(lf02_04_1, lf02_04_2)), na.rm = TRUE))
 frq(tlu$lvstckid)
-
 tlu <- tlu |> 
   mutate(tlu=case_when(lvstckid %in% c(1:6) ~ lf02_04 * 0.7,
                        lvstckid %in% c(7:8) ~ lf02_04 * 0.1,
                        lvstckid==9 ~ lf02_04 * 0.2,
                        lvstckid %in% c(10:12) ~ lf02_04 * 0.01,
                        lvstckid %in% c(14) ~ lf02_04 * 0.7,
-                       .default = 0))  #hare(13)  and dogs(15) were omitted, since I couldn't find the TLU values for them.
+                       .default = 0)) 
 tlu <- collap(tlu, tlu ~ y4_hhid, FUN = fsum)
 tza4 <- left_join(tza4, tlu, by=c("hhid"="y4_hhid"))
 remove(tlu)
+frq(tza4$tlu)
+tza4$tlu[is.na(tza4$tlu)] <- 0
 
 ## Land tenure ----
 tenure <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |>
@@ -770,15 +788,13 @@ tza4 <- left_join(tza4, location, by = c("hhid" = "y4_hhid"))
 frq(tza4$Region)
 tza4 <- tza4 |> 
   mutate(zone = case_when(
-    Region %in% c(7,6,5,4) ~ "eastern",
-    Region %in% c(7, 6, 5, 4) ~ "Eastern",
+    Region %in% c(4, 5, 6, 7, 51, 52, 53, 54, 55) ~ "Eastern",
     Region %in% c(2, 3, 21) ~ "Northern",
     Region %in% c(1, 13, 14) ~ "Central",
-    Region %in% c(18, 19, 20, 17, 25, 24) ~ "Lake",
-    Region %in% c(16, 23, 15) ~ "Western",
-    Region %in% c(11, 12, 22, 10) ~ "Southern Highlands",
+    Region %in% c(17, 18, 19, 20, 24, 25) ~ "Lake",
+    Region %in% c(15, 16, 23) ~ "Western",
+    Region %in% c(10, 11, 12, 22, 26) ~ "Southern Highlands",
     Region %in% c(8, 9) ~ "Southern",
-    Region %in% c(51, 52, 53, 54, 55) ~ "Zanzibar",
     TRUE ~ NA_character_))
 tza4$Region <- NULL
 frq(tza4$zone)

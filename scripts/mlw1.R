@@ -258,7 +258,7 @@ remove(hpdata)
 look_for(plot1)
 plot1 <- plot1 |> rename(hhid=case_id)
 plot1 <- plot1 |> relocate(ea_id_merge,.after = hhid)
-table(plot1$female_manager, plot1$female) # same information.
+table(plot1$female_manager, plot1$female) # same information. managers are decision-makers 
 plot1 <- plot1 |> select(-female)
 # manager age is missing for 13 plots like in hpdata. can be dropped. 
 

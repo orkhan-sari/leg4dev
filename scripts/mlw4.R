@@ -405,7 +405,7 @@ ganyu <- ganyu |>
 ganyu <- collap(ganyu,income~y4_hhid, FUN=fsum)
 wage <- rbind(ganyu, mainwage, secondwage)
 remove(ganyu, mainwage, secondwage)
-wage <- collap(wage,income~y4_hhid, FUN=fsum)
+wage <- collap(wage, income~y4_hhid, FUN=fsum)
 mlw4 <- left_join(mlw4, wage, by=c("hhid"="y4_hhid"))
 mlw4 <- mlw4 |> 
   tidyr::replace_na(list(income = 0)) |> 

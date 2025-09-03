@@ -10,7 +10,8 @@ look_for(dftza)
 dftza <- dftza |> 
   group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 
   relocate(dupl, .after= hh_id_obs) |> 
-  relocate(wave, .after= dupl)
+  relocate(wave, .after= dupl) |> 
+  relocate(zone, .after =dupl)
 table(dftza$dupl) # 525 hhs. 
 dftza <- dftza |> filter(dupl==2) |> select(-dupl)
 frq(dftza$wave)
@@ -21,6 +22,24 @@ duplicates # 6 obs with same ids repeat within wave
 dftza <- dftza |> 
   group_by(hh_id_obs) |> 
   filter(n_distinct(wave)==2) # 522 panel hhs 
+frq(dftza$zone)
+table(dftza$zone, dftza$wave) # 13 differences
+table(dftza$wave, dftza$tracking_class) # 9 local 27 distant split off to the original location 
+checkdf <- dftza |> 
+  select(hh_id_obs, zone, tracking_class, wave)
+checkdf <- checkdf %>%
+  group_by(hh_id_obs) %>%
+  mutate(zone_diff = if_else(n_distinct(zone) > 1, 1, 0)) %>%
+  ungroup()
+frq(checkdf$zone_diff) 
+table(checkdf$tracking_class, checkdf$zone_diff) # 9 are from distant split offs
+checkdf <- checkdf %>%
+  arrange(desc(zone_diff), hh_id_obs)
+view(checkdf)
+frq(dftza$tracking_class) # 7 here different hh and 1 original 
+rm(checkdf)
+look_for(dftza)
+dftza <- dftza[,1:54]
 frq(dftza$rotation) # 25
 frq(dftza$intercrop_legume) #338
 dftza <- dftza |> 
@@ -29,6 +48,10 @@ dftza <- dftza |>
                      .default = 0L)
   )
 frq(dftza$legume_intens) # 353
+dftza <- dftza |> 
+  mutate(other_income=wage_income+enterprise_income,
+         ln_other_income=log1p(other_income))
+var_label(dftza$ln_other_income) <- "Natural log of annual other income"
 # run rainfall_tza.R here
 dftza <- dftza |> 
   mutate(wavem=case_when(wave=="wave4" ~ 4,
@@ -54,7 +77,12 @@ dftza <- dftza |>
 frq(dftza$credit)
 var_label(dftza$credit) <- "= 1 if received credit"
 dftza <- dftza |> 
-  mutate(maize_share=plot_area_GPS/farm_size)
+  mutate(maize_share=plot_area_GPS/farm_size,
+         year = case_when(
+           wave=="wave4" ~ 2014,
+           wave=="wave5" ~ 2020,
+           .default = NA_real_
+         ))
 dftza <- left_join(dftza, rainfalltza, by=c("lat_modified"="lat", "lon_modified"="lon", "wavem"="wave"))
 var_label(dftza$seasonal_rainfall) <- "Total rainfall during the production season"
 var_label(dftza$average_rainfall) <- "Average rainfall observed since 1990"
@@ -95,6 +123,7 @@ dfspatial5 <- dfspatial5 |>
   select(hh_id_obs, adopted_neighbors_10km, wavem )
 dfn <- rbind(dfspatial4, dfspatial5)
 dftza <- left_join(dftza, dfn, by=c("hh_id_obs", "wavem"))
+dftza$zone <- as.factor(dftza$zone)
 rm(dfspatial4, dfspatial5, dfn, within10km_adopted, dist_matrix)
 write_dta(dftza, "data/est/dftza.dta", version = 15)
 saveRDS(dftza, file = "data/est/dftza.rds")

@@ -50,6 +50,8 @@ global xlist i.primary_education_manager age_manager hh_size hh_dependency_ratio
 	i.organic_fertilizer i.inorganic_fertilizer  ///
 	soil_fertility_index twi rainfall_diff average_rainfall i.iv_maize
 global ivlist adopted_neighbors_10km 
+
+**# Legume intensification and gender
 xtset hh_id_obs year
 xtlogit legume_intens i.female_manager $xlist $ivlist i.year, fe
 estimates store fixed
@@ -58,12 +60,12 @@ estimates store random
 hausman fixed random
 drop _est_fixed _est_random
 * fixed effects is more appropriate
-xtlogit legume_intens i.female_manager $xlist $ivlist i.year, fe vce(bootstrap , rep(50))
-outreg2 using "outputs\results\determinants_mlw", excel replace sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Fixed effects logit") addnote(Bootstrapped (for FE and pooled) and clustered standard errors (for CRE probit) in paranthesis; Hausman test indicates that fixed-effects is appropriate)
-xtprobit legume_intens i.female_manager $xlist $ivlist mean_* i.year adopted_neighbors_10km_mean i.region, re vce(cluster hh_id_obs)
-outreg2 using "outputs\results\determinants_mlw", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("CRE probit")
-probit legume_intens i.female_manager $xlist $ivlist i.year i.region, vce(bootstrap , rep(50))
-outreg2 using "outputs\results\determinants_mlw", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Pooled Probit")
+xtlogit legume_intens i.female_manager $xlist $ivlist i.year i.region, fe vce(bootstrap , rep(50))
+outreg2 using "outputs\results\determinants_mlw", excel replace sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Fixed effects logit") addnote(Bootstrapped standard errors in paranthesis; Hausman test indicates that fixed-effects is appropriate)
+xtlogit legume_intens i.female_manager $xlist $ivlist i.year i.region, re vce(bootstrap , rep(50))
+outreg2 using "outputs\results\determinants_mlw", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Random effects logit")
+logit legume_intens i.female_manager $xlist $ivlist i.year i.region, vce(bootstrap , rep(50))
+outreg2 using "outputs\results\determinants_mlw", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Pooled Logit")
 
 **## Main estimation - 2SLS: HDDS, food consumption score, food insecurity
 * total consumption - missing for wave 4 and 5

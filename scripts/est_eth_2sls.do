@@ -62,20 +62,22 @@ global xlist i.primary_education_manager age_manager hh_size hh_dependency_ratio
 	i.organic_fertilizer i.inorganic_fertilizer  ///
 	soil_fertility_index twi rainfall_diff average_rainfall dist_market i.improved_maize
 global ivlist adopted_neighbors_10km 
+
+**## Legume intensification and gender
 xtset hh_id_obs year
 xtlogit legume_intens i.female_manager $xlist $ivlist i.year, fe
 estimates store fixed
 xtlogit legume_intens i.female_manager $xlist $ivlist i.year, re
 estimates store random
 hausman fixed random
-* for 63% of the sample the outcome within hh does not change, thus FE keeps only 366 obs and
+* for 63% of the sample the outcome within hh does not change, thus FE keeps only 364 obs and
 * random effects is more appropriate; nevertheless time-invariant unobserved hetrogeneity shall not be ignored. 
+xtlogit legume_intens i.female_manager $xlist $ivlist i.year i.region, fe vce(bootstrap , rep(50))
+outreg2 using "outputs\results\determinants_eth", excel replace sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Fixed effects Logit") addnote(Bootstrapped standard errors in paranthesis; Hausman test that indicates random-effects is appropriate)
 xtlogit legume_intens i.female_manager $xlist $ivlist i.year i.region, re vce(bootstrap , rep(50))
-outreg2 using "outputs\results\determinants_eth", excel replace sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Random effects Logit") addnote(Bootstrapped (for RE Logit and pooled Probit) and clustered standard errors (for CRE Probit) in paranthesis; Hausman test that indicates random-effects is appropriate)
-xtprobit legume_intens i.female_manager $xlist $ivlist mean_* i.year adopted_neighbors_10km_mean i.region, re vce(cluster hh_id_obs)
-outreg2 using "outputs\results\determinants_eth", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("CRE Probit")
-probit legume_intens i.female_manager $xlist $ivlist i.year i.region, vce(bootstrap , rep(50))
-outreg2 using "outputs\results\determinants_eth", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Pooled Probit")
+outreg2 using "outputs\results\determinants_eth", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Random effects Logit") addnote(Bootstrapped (for RE Logit and pooled Probit) and clustered standard errors (for CRE Probit) in paranthesis; Hausman test that indicates random-effects is appropriate)
+logit legume_intens i.female_manager $xlist $ivlist i.year i.region, vce(bootstrap , rep(50))
+outreg2 using "outputs\results\determinants_eth", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Pooled Logit")
 
 **## Main estimations - 2SLS: HDDS, total consumption, food consumption
 ** Estimating the Average Treatment Effect Using IV Wooldridge 2010 procedure 21.1 

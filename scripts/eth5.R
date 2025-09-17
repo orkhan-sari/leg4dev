@@ -246,6 +246,35 @@ table(plotdata5$female_manager, plotdata5$female) # comparing manager and decisi
 # 1    0  251 # Perfect match, managers are decision-makers. 
 plotdata5 <- plotdata5 |> select(-female)
 
+## DM on crop income ----
+sales <- read_dta("data/eth/ess5/sect11_ph_w5.dta") |> 
+  select(household_id, s11q07, s11q13_1, s11q13_2) |> 
+  filter(s11q07==1)
+sales <- semi_join(sales, maizehh, by=c("household_id"="hh_id_merge"))
+sales <- sales |> 
+  rename(s3q13=s11q13_1)
+sales <- left_join(sales, individual, by=c("household_id", "s3q13"))
+look_for(sales)
+sales$s3q13 <- NULL
+sales <- sales |> 
+  mutate(female=if_else(is.na(female),99,female)) # to indetify these missings that are likely only in post harvest data
+sales <- sales |> 
+  rename(s3q13=s11q13_2) # now second decision-maker
+sales <- left_join(sales,individual, by=c("household_id", "s3q13"))
+sales <- sales |> 
+  mutate(female.y=if_else(is.na(female.y),99,female.y))
+sales <- sales |> 
+  filter(!is.na(female.x)) |> 
+  mutate(female_dm=case_when(female.x==1 ~ 1,
+                             female.y==1 ~ 1,
+                             female.x==99 & female.y==99 ~ 99,
+                             .default = 0))
+frq(sales$female_dm)
+look_for(sales)
+sales <- sales[,c(1,6)]
+n_distinct(sales$household_id)
+sales <- collap(sales, female_dm ~ household_id, FUN = fmax)
+
 ## Asset ownership ----
 assets <- read_dta("data/eth/ess5/sect11_hh_w5.dta") |> 
   select(household_id, asset_cd, s11q00, s11q02_1, s11q02_2) |>
@@ -366,6 +395,10 @@ wave5 <- left_join(wave5, assets, by=join_by("household_id"))
 wave5 <- left_join(wave5, hhhp5, by=c("household_id"="hh_id_merge"))
 wave5 <- left_join(wave5, rotation5, by=join_by("household_id"))
 wave5 <- left_join(wave5, individual, by=join_by("household_id"))
+wave5 <- left_join(wave5, sales, by=join_by("household_id"))
+frq(wave5$female_dm) # 2 missing from hh questionarrie
+wave5$female_dm[is.na(wave5$female_dm)] <- 0
+var_label(wave5$female_dm) <- "female has some DMP on crop income"
 wave5 <- wave5 |> 
   mutate(female_edu=if_else(is.na(s2q03), 0, s2q03)) |> 
   select(-s2q03)

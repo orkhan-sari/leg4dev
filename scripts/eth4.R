@@ -210,9 +210,10 @@ individual <- read_dta("data/eth/ess4/sect1_hh_w4.dta") |>
 field <- semi_join(field, maizeplots, by="plot_id") # keep only main maize plots and look at the DM on those plots.
 field4 <- left_join(field, individual, by=c("household_id", "s3q13"))
 remove(field)
+look_for(field4) # 64 missing for female
 var_label(field4$female) <- "female primary dm concern. activities on maize plot" # also on crops to be planted
 field4 <- field4 |> select(household_id, parcel_id, field_id, plot_id, female)
-plotdata4 <- left_join(plotdata4,field4, by=c("household_id", "parcel_id", "field_id", "plot_id"))
+plotdata4 <- left_join(plotdata4, field4, by=c("household_id", "parcel_id", "field_id", "plot_id"))
 look_for(plotdata4)
 remove(field4)
 table(plotdata4$female_manager, plotdata4$female) # comparing manager and decision-maker. !there are missing values in manager!
@@ -221,6 +222,36 @@ table(plotdata4$female_manager, plotdata4$female) # comparing manager and decisi
 # 1    0  260 # Perfect match, managers are decision-makers. 
 # but 64 missing data on both 
 plotdata4 <- plotdata4 |> select(-female)
+
+
+## DM on crop income ----
+sales <- read_dta("data/eth/ess4/sect11_ph_w4.dta") |> 
+  select(household_id, s11q07, s11q13_1, s11q13_2) |> 
+  filter(s11q07==1)
+sales <- semi_join(sales, maizehh, by=c("household_id"="hh_id_merge"))
+sales <- sales |> 
+  rename(s3q13=s11q13_1)
+sales <- left_join(sales, individual, by=c("household_id", "s3q13"))
+look_for(sales)
+sales$s3q13 <- NULL
+sales <- sales |> 
+  mutate(female=if_else(is.na(female),99,female)) # to indetify these missings that are likely only in post harvest data
+sales <- sales |> 
+  rename(s3q13=s11q13_2) # now second decision-maker
+sales <- left_join(sales,individual, by=c("household_id", "s3q13"))
+sales <- sales |> 
+  mutate(female.y=if_else(is.na(female.y),99,female.y))
+sales <- sales |> 
+  filter(!is.na(female.x)) |> 
+  mutate(female_dm=case_when(female.x==1 ~ 1,
+                             female.y==1 ~ 1,
+                             female.x==99 & female.y==99 ~ 99,
+                             .default = 0))
+frq(sales$female_dm)
+look_for(sales)
+sales <- sales[,c(1,6)]
+n_distinct(sales$household_id)
+sales <- collap(sales, female_dm ~ household_id, FUN = fmax)
 
 ## Asset ownership ----
 assets <- read_dta("data/eth/ess4/sect11_hh_w4.dta") |>
@@ -396,6 +427,10 @@ wave4 <- left_join(wave4, assets, by=join_by("household_id"))
 wave4 <- left_join(wave4, hhhp4, by=c("household_id"="hh_id_merge"))
 wave4 <- left_join(wave4, rotation4, by=join_by("household_id"))
 wave4 <- left_join(wave4, individual, by=join_by("household_id"))
+wave4 <- left_join(wave4, sales, by=join_by("household_id"))
+frq(wave4$female_dm) # 28 missing from hh questionarrie
+wave4$female_dm[is.na(wave4$female_dm)] <- 0
+var_label(wave4$female_dm) <- "female has some DMP on crop income"
 wave4 <- wave4 |> 
   mutate(female_edu=if_else(is.na(s2q03), 0, s2q03)) |> 
   select(-s2q03)

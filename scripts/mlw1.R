@@ -30,9 +30,9 @@ hpdata <- hpdata|>
   mutate(yield_value_USD= yield_value_USD * (share_value_LEGUMES + share_value_MAIZE)) |> 
   select(hh_id_merge, hh_id_obs, ea_id_merge, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop,
          farm_size, manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, 
-         primary_education_manager, agro_ecological_zone, twi, improved, organic_fertilizer, 
-         inorganic_fertilizer, soil_fertility_index, elevation, plot_dist_household, ag_asset_index, plot_certificate, 
-         drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop, used_pesticides, yield_value_USD) |>
+         primary_education_manager, twi, improved, soil_fertility_index, elevation,
+         plot_dist_household, ag_asset_index, plot_certificate, drought_shock, rain_shock, flood_shock,
+         irrigated, nb_seasonal_crop, used_pesticides, yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
 hpdata <- hpdata |>
   group_by(hh_id_obs) |> 
@@ -135,8 +135,25 @@ var_label(plot1$count_plot) <- "number of main maize plots"
 var_label(plot1$iv_maize) <- "=1 if improved maize was cultivated plot section"
 
 ### ### ### ### ### ### ### ###
-# Ecological soil management ----
+# Soil management ----
 # NO DATA ON TILLAGE OR RESIDUE RETENTION
+soilman <-  read_dta("data/mlw/ag_mod_d_10.dta") |>   # plot level 
+  select(case_id, ag_d00, ag_d01, ag_d36, ag_d38) |> 
+  mutate(plot_id = paste(case_id, ag_d00, sep = "-"))
+soilman <- semi_join(soilman, maizeplots, by="plot_id")
+look_for(soilman)
+soilman <- soilman |> 
+  mutate(inorganic_fertilizer= if_else(!is.na(ag_d38) & ag_d38== 1 , 1, 0),
+         organic_fertilizer= if_else(!is.na(ag_d36) & ag_d36== 1 , 1, 0)
+  )
+frq(soilman$organic_fertilizer)
+frq(soilman$inorganic_fertilizer)
+soilman <- soilman |> 
+  select(plot_id, inorganic_fertilizer, organic_fertilizer)
+plot1 <- left_join(plot1, soilman, by="plot_id")
+remove(soilman)
+var_label(plot1$organic_fertilizer) <- "organic fertilizer applied to maize plot"
+var_label(plot1$inorganic_fertilizer) <- "inorganic fertilizer applied to maize plot"
 
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
@@ -264,47 +281,53 @@ plot1 <- plot1 |> select(-female)
 
 ## Collapse / aggregate ----
 mlw1 <- plot1 |> 
-  select(-hh_id_merge, -plot_id_merge, -plot_id_obs, -parcel_id_merge, -parcel_id_obs, -age_manager_row)
+  select(-hh_id_merge, -plot_id_merge, -plot_id_obs, -parcel_id_merge, -parcel_id_obs, -age_manager_row, -nb_seasonal_crop)
 look_for(mlw1)
-mlw1basics <- mlw1 |> 
-  select(hhid, hh_id_obs, ea_id_merge) |> 
-  distinct()
-n_distinct(mlw1basics$hh_id_obs) # 1009 observations
-wave1mean <- collap(mlw1,
-                   farm_size + age_manager + elevation + plot_dist_household + ag_asset_index + count_plot + 
-                     soil_fertility_index + crop_count + twi  ~ hhid,
-                   FUN = fmean,
-                   na.rm = TRUE)
-wave1sum <- collap(mlw1,
-                   plot_area_GPS + nb_seasonal_crop + yield_value_USD  ~ hhid,
-                   FUN = fsum,
-                   na.rm = TRUE)
-aggregated_vars <- c("farm_size", "age_manager", "elevation", "plot_dist_household", "soil_fertility_index", "crop_count",
-                     "ag_asset_index", "count_plot", "plot_area_GPS", "nb_seasonal_crop", "twi", "yield_value_USD")
-mlw1 <- mlw1 %>% select(-all_of(aggregated_vars))
+n_distinct(mlw1$hh_id_obs) # 1009 hh_id_obs 1361 obs
+n_distinct(mlw1$hhid)
 look_for(mlw1)
 mlw1 <- mlw1 |> 
-  select(1, 4:6, 11:23)
-look_for(mlw1)
-# For all remaining binary variables, I will select the max. Meaning, for example,
-# at least one plot is managed by female, at least one maize plot manager has primary education, 
-# at least one plot is being intercropped and etc. 
+  group_by(hh_id_obs) |> 
+  mutate(plot_area=sum(plot_area_GPS),
+         yield_value_USD=sum(yield_value_USD)) |> 
+  ungroup() |> 
+  relocate(plot_area, .after = plot_area_GPS)
+# control if hh used any organic or inorganic fertilizer in intercrop field or any other field. 
 mlw1 <- mlw1 |> 
-  mutate(across(c(female_manager, formal_education_manager, primary_education_manager,
-                  inorganic_fertilizer, plot_certificate, irrigated),
-                as.numeric))
-wave1max <- collap(mlw1,
-                   ~ hhid, 
-                   FUN = fmax,
-                   na.rm = TRUE)
-mlw1 <- left_join(mlw1basics, wave1mean, by=join_by("hhid"))
-mlw1 <- left_join(mlw1, wave1sum, by=join_by("hhid"))
-mlw1 <- left_join(mlw1, wave1max, by=join_by("hhid"))
+  group_by(hh_id_obs) |> 
+  mutate(iv_maize = max(iv_maize, na.rm = TRUE),
+         inorganic_fertilizer = max(inorganic_fertilizer),
+         organic_fertilizer = max(organic_fertilizer))|> 
+  ungroup()
+mlw1 <- mlw1 |> 
+  group_by(hh_id_obs)  |> 
+  mutate(
+    # household-level indicator: does any plot have rotation or intercrop?
+    any_practice = any(rotation == 1 | intercrop == 1)
+  ) %>%
+  filter(
+    # if any practice in hh, keep only plots with practice
+    (any_practice & (rotation == 1 | intercrop == 1)) |
+      # if no practice, keep only the largest plot
+      (!any_practice & plot_area_GPS == max(plot_area_GPS, na.rm = TRUE))
+  ) %>%
+  ungroup() %>%
+  select(-any_practice)
+look_for(mlw1) 
+n_distinct(mlw1$hh_id_obs) # still 1008 hh but 1116 obs
+mlw1 <- mlw1 |> 
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 
+  relocate(dupl, .after= hh_id_obs)
+mlw1 <- mlw1 |> group_by(hh_id_obs) |> slice_max(order_by = plot_area_GPS, n = 1, with_ties = FALSE) |> ungroup()
+var_label(mlw1$plot_area) <- "Area (in hectares) of all maize plots"
+mlw1$plot_area_GPS <- NULL
+mlw1$dupl <- NULL
+look_for(mlw1)
 mlw1 <- left_join(mlw1, hdds1, by=c("hhid"="hh_id_merge"))
 mlw1 <- left_join(mlw1, individual, by=c("hhid"="case_id"))
 mlw1 <- mlw1 |> 
   mutate(female_edu=if_else(is.na(female_edu), 0, female_edu))
-remove(mlw1basics, wave1max, wave1sum, wave1mean, aggregated_vars, hdds1, plot1, individual)
+remove(hdds1, plot1, individual)
 mlw1 <- mlw1 |> mutate(wave="wave1")
 
 ## Cleaning missing data ----
@@ -409,8 +432,6 @@ mlw1 <- mlw1 |>
   rename(wage_income=income)
 var_label(mlw1$wage_income) <- "income from main and temporary off-farm work"
 var_label(mlw1$subsistence_ag) <- "HH did not sell any crop harvest"
-var_label(mlw1$plot_area_GPS) <- "Area (ha) of maize plots"
-var_label(mlw1$nb_seasonal_crop) <- "Number of seasonal crops grown on maize plots"
 var_label(mlw1$female_edu) <- "HH has an educated adult female"
 remove(wage)
 
@@ -478,18 +499,18 @@ credit <- read_dta("data/mlw/hh_mod_s2_10.dta") |>
   select(case_id, hh_s12, hh_s19a, hh_s19b)
 frq(credit$hh_s19a) # do not know any lender; this is what we can capture
 credit <- credit |> 
-  mutate(no_credit_access=case_when(
-    hh_s19a==7 | hh_s19b==7 ~ 1,
-    !is.na(hh_s19a) | !is.na(hh_s19b) ~ 0,
-    .default = NA_integer_)) # HH does not know any lender
+  mutate(credit_constrained=case_when(
+    hh_s19a %in% c(2,5,7) ~ 1,
+    !is.na(hh_s19a) ~ 0,
+    .default = NA_integer_)) # only looking at the main reasons
 credit <- credit |> 
-  filter(!is.na(no_credit_access)) |> 
-  select(case_id, no_credit_access)
+  filter(!is.na(credit_constrained)) |> 
+  select(case_id, credit_constrained)
 mlw1 <- left_join(mlw1, credit, by=c("hhid"="case_id"))
-mlw1$no_credit_access[is.na(mlw1$no_credit_access)] <- 0
-frq(mlw1$no_credit_access)
+mlw1$credit_constrained[is.na(mlw1$credit_constrained)] <- 0
+frq(mlw1$credit_constrained)
 remove(credit)
-var_label(mlw1$no_credit_access) <- "HH does not know any lender"
+var_label(mlw1$credit_constrained) <- "becuase no collateral or no access to lender"
 
 ## TLU ----
 ## page 10: https://appec-h.com/wp-content/uploads/2023/02/Livestock-production-systems.pdf

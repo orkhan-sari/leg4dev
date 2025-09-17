@@ -11,6 +11,8 @@ dfeth <- dfeth |>
 table(dfeth$dupl) # 522 panel hhs
 dfeth <- dfeth |> filter(dupl==2) |> select(-dupl)
 look_for(dfeth)
+frq(dfeth$female_dm) # 1 obs on gender info is missing
+dfeth$female_dm[dfeth$female_dm==99] <- NA_real_
 dfeth$wave <- as.factor(dfeth$wave)
 dfeth <- dfeth |> 
   relocate(wave, .after= hh_id_obs)
@@ -31,6 +33,29 @@ dfeth <- dfeth |>
                                              .default = primary_education_manager)
          )
 look_for(dfeth)
+frq(dfeth$saq01)
+dfeth <- dfeth |>
+  mutate(region=case_when(
+    saq01 %in% c(2, 3) ~ 1, # north
+    saq01 %in% c(4, 13, 15) ~ 2, # central
+    saq01 %in% c(6, 12) ~ 3, # west
+    saq01 == 7 ~ 4, # snnp
+    .default = NA_real_))
+frq(dfeth$region)  
+dfeth$region <- factor(dfeth$region, levels = c(1,2,3,4), labels = c("North", "Central", "West", "SNNP"))
+frq(dfeth$plot_dist_household) # 532 missing from wave5
+table(dfeth$wave, dfeth$plot_dist_household)
+dfeth <- dfeth |> 
+  group_by(hh_id_obs) |> 
+  mutate(
+    dis_plot1 = max(plot_dist_household, na.rm = TRUE),       # max within hh_id_obs
+    dis_plot = if_else(is.na(plot_dist_household), dis_plot1, plot_dist_household),
+    ln_dis_plot = log1p(dis_plot)
+  ) %>%
+  ungroup()
+dfeth$dis_plot <- NULL
+dfeth$dis_plot1 <- NULL
+
 #### Consumption ##
 dfeth <- dfeth |> 
   mutate(def_totcons_aeq=if_else(wave=="wave5", 244.6/388.2 * nom_totcons_aeq, nom_totcons_aeq),
@@ -99,7 +124,12 @@ dfeth <- dfeth |>
   mutate(ln_wage_income = log(wage_income+1),
          b_enterprise_income=if_else(enterprise_income>0,1,0)
          )
-
+table(is.na(dfeth$average_rainfall), dfeth$wave) # 8 missing from wave4; replace with observed from wave5 to keep
+dfeth <- dfeth |> 
+  group_by(hh_id_obs) |> 
+  mutate(average_rainfall= if_else(is.na(average_rainfall),
+                                   mean(average_rainfall, na.rm = TRUE), average_rainfall)) |> 
+  ungroup()
 ## Adopting neighbors ----
 ## Adopters
 library(geosphere)

@@ -1,7 +1,7 @@
 # Run all scripts and clean further
 # Malawi ----
-source("scripts/mlw1.R") # 1009 obs
-source("scripts/mlw2.R") # 1252 obs
+source("scripts/mlw1.R") # 1008 obs
+source("scripts/mlw2.R") # 1245 obs
 source("scripts/mlw3.R") # 1707 obs
 source("scripts/mlw4.R") # 2085 obs
 setdiff(names(mlw1), names(mlw2))
@@ -19,7 +19,7 @@ dfmlw <-bind_rows(mlw1, mlw2)
 dfmlw <-bind_rows(dfmlw, mlw3)
 dfmlw <-bind_rows(dfmlw, mlw4)
 var_label(dfmlw) <- var_label(mlw3)
-remove(mlw1, mlw2, mlw3, mlw4)
+# remove(mlw1, mlw2, mlw3, mlw4)
 look_for(dfmlw)
 var_label(dfmlw$fcs) <- "Food Consumption Score"
 dfmlw <- dfmlw |> 
@@ -61,7 +61,7 @@ table(dfmlw$rotation, dfmlw$wave)
 table(dfmlw$iv_maize, dfmlw$wave)
 table(dfmlw$intercrop, dfmlw$wave)
 dfmlw <- dfmlw |> 
-  mutate(maize_share=plot_area_GPS/farm_size)
+  mutate(maize_share=plot_area/farm_size)
 dfmlw <- dfmlw |> 
   mutate(eco_soil_mng = if_else(
     if_any(c(zero_till, min_till), ~ .x == 1), # crop residue from mlw2 most likely incorrect; not considered
@@ -143,6 +143,48 @@ dfmlwfull <- dfmlwfull |>
   mutate(age_manager=case_when(hh_id_obs=="2003821" & wave=="wave3" ~ 36,
                                .default = age_manager)
   )
+dfmlwfull <- dfmlwfull |> 
+  mutate(flat_slope=case_when(slope=="Flat" ~ 1,
+                              is.na(slope) ~ NA_real_,
+                              .default = 0),
+         mod_slope=case_when(slope=="Slight slope" ~ 1,
+                             is.na(slope) ~ NA_real_,
+                             .default = 0))
+frq(dfmlwfull$flat_slope)
+frq(dfmlwfull$mod_slope)
+dfmlwfull <- dfmlwfull |> 
+  group_by(hh_id_obs) |> 
+  mutate(
+    dis_plot1 = max(plot_dist_household, na.rm = TRUE),       # max within hh_id_obs
+    dis_plot = if_else(is.na(plot_dist_household), dis_plot1, plot_dist_household),
+    ln_dis_plot = log1p(dis_plot)
+  ) %>%
+  ungroup()
+dfmlwfull$dis_plot1 <- NULL
+table(dfmlwfull$region, dfmlwfull$wave)
+dfmlwfull <- dfmlwfull |> 
+  group_by(hh_id_obs) %>%
+  mutate(moved = n_distinct(region, na.rm = TRUE) > 1) |> 
+  ungroup()
+frq(dfmlwfull$moved) # 2 observations
+movedhh <- dfmlwfull |> 
+  select(hh_id_obs, hh_a11, region, moved, wave) |> 
+  filter(moved=="TRUE")
+# for two hhs 2005161 and 2004821, the location was noted as to be the same dwelling but region code is different.
+# this is probably an error. 
+
+get_mode <- function(x) {
+  ux <- na.omit(unique(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+dfmlwfull <- dfmlwfull |> 
+  rename(regions=region) |> 
+  group_by(hh_id_obs) %>%
+  mutate(region = get_mode(regions)) %>%
+  ungroup()
+table(dfmlwfull$region, dfmlwfull$wave)
+
 
 ### Adopting neighbors ----
 ## Adopters
@@ -288,6 +330,35 @@ dfmlw3 |>
 look_for(dfmlw3)
 dfmlw3$wave <- as_factor(dfmlw3$wave)
 table(dfmlw3$wave, dfmlw3$slope)
+dfmlw3 <- dfmlw3 |> 
+  mutate(flat_slope=case_when(slope=="Flat" ~ 1,
+                              is.na(slope) ~ NA_real_,
+                              .default = 0),
+         mod_slope=case_when(slope=="Slight slope" ~ 1,
+                             is.na(slope) ~ NA_real_,
+                             .default = 0))
+frq(dfmlw3$flat_slope)
+frq(dfmlw3$mod_slope)
+dfmlw3 <- dfmlw3 |> 
+  group_by(hh_id_obs) |> 
+  mutate(
+    dis_plot1 = max(plot_dist_household, na.rm = TRUE),       # max within hh_id_obs
+    dis_plot = if_else(is.na(plot_dist_household), dis_plot1, plot_dist_household),
+    ln_dis_plot = log1p(dis_plot)
+  ) %>%
+  ungroup()
+dfmlw3$dis_plot1 <- NULL
+get_mode <- function(x) {
+  ux <- na.omit(unique(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+dfmlw3 <- dfmlw3 |> 
+  rename(regions=region) |> 
+  group_by(hh_id_obs) |> 
+  mutate(region = get_mode(regions)) |> 
+  ungroup()
+table(dfmlw3$region, dfmlw3$wave)
 
 ### Adopting neighbors ----
 ## Adopters

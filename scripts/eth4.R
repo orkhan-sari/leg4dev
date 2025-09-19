@@ -28,7 +28,7 @@ hpdata <- hpdata |>
   mutate(yield_value_USD= yield_value_USD * (share_value_LEGUMES + share_value_MAIZE)) |> 
   select(hh_id_merge, hh_id_obs, plot_id_merge, plot_id_obs, parcel_id_obs, parcel_id_merge, plot_area_GPS, main_crop, farm_size, 
          manager_id_merge, manager_id_obs, age_manager, female_manager, formal_education_manager, primary_education_manager,  
-         agro_ecological_zone, twi, improved, organic_fertilizer, inorganic_fertilizer, soil_fertility_index, elevation, dist_market, 
+         twi, improved, organic_fertilizer, inorganic_fertilizer, soil_fertility_index, dist_market, 
          plot_dist_household, ag_asset_index, plot_certificate, drought_shock, rain_shock, flood_shock, irrigated, nb_seasonal_crop,
          used_pesticides, yield_value_USD) |>
   mutate(plot_id=plot_id_merge)
@@ -121,8 +121,6 @@ rotation4 <- collap(cropdata4, rotation+count_plot~household_id, FUN=fmax)
 table(rotation4$rotation)  # 332 adopters 691 non-adopters.
 remove(maizedata, cropdata)
 comment(rotation4) <- "hh level rotation"
-var_label(rotation4$rotation) <- "If household rotated at least one maize field with legumes during the past 3y"
-var_label(rotation4$count_plot) <- "number of main maize plots"
 plotdata4 <- left_join(cropdata4, hpdata, by=c("plot_id")) |>
   select(-s3q03, -s3q34, -s4q02)
 
@@ -148,7 +146,7 @@ plotdata4$intercrop[is.na(plotdata4$intercrop)] <- 0
 frq(plotdata4$intercrop) # only 54 main maize plots are intercropped with legume
 rm(cropdata)
 
-# Ecological soil management ----
+# Soil management ----
 soilman <- read_dta("data/eth/ess4/sect3_pp_w4.dta") |> 
   select(household_id, holder_id, parcel_id, field_id, s3q35, s3q36, s3q41) |> 
   mutate(plot_id = paste(holder_id, parcel_id, field_id, sep = "-"))
@@ -177,6 +175,52 @@ remove(soilman)
 var_label(plotdata4$min_till) <- "minimum tillage: one-pass till"
 var_label(plotdata4$zero_till) <- "no till"
 var_label(plotdata4$crop_residue) <- "Cover the field surface with crop residue/leaves"
+
+### ### ### ### ### ### ### ###
+## Soil type ---- 
+### ### ### ### ### ### ### ###
+soil <- read_dta("data/eth/ess4/sect2_pp_w4.dta") |> 
+  mutate(parcel_id = paste(holder_id, parcel_id, sep = "-")) |> 
+  select("household_id", "parcel_id", "s2q16")
+soil <- semi_join(soil, maizeplots, by=c("parcel_id"="parcel_id_merge"))
+look_for(soil)
+frq(soil$s2q16)
+# Vertisol and Luvisol are generally considered much better for crop production. Overall luvisol often better.
+soil <- soil |> 
+  mutate(s2q16 = as.numeric(soil$s2q16),
+         soil_type=case_when(s2q16==4 ~ 2,
+                             s2q16==3 ~ 1,
+                             .default = 0))
+soil <- soil |> 
+  mutate(soil= factor(soil_type, levels = c(0,1,2), labels = c("Other", "Vertisol", "Luvisol")))
+frq(soil$soil_type)
+frq(soil$soil)
+soil <- soil |> 
+  select(household_id, parcel_id, soil)
+plotdata4 <- left_join(plotdata4, soil, by=c("household_id", "parcel_id_merge"="parcel_id"))
+var_label(eth4$soil) <- "HH dominant soil type"
+frq(plotdata4$soil)
+remove(soil)
+
+
+## Slope  ----
+slope <- read_dta("data/eth/ess4/sect3_pp_w4.dta") |> 
+  mutate(plot_id = paste(holder_id, parcel_id, field_id, sep = "-")) |> 
+  select("plot_id", "s3q12")
+slope <- semi_join(slope, maizeplots, by="plot_id")
+look_for(slope)
+frq(slope$s3q12)
+slope <- slope |> 
+  mutate(flat_slope=case_when(s3q12==1 ~ 1,
+                              .default=0)
+  )
+slope$s3q12 <- NULL
+frq(slope$flat_slope)
+n_distinct(slope$parcel_id)
+plotdata4 <- left_join(plotdata4, slope, by="plot_id")
+var_label(plotdata4$flat_slope) <- "=1 if slope is flat"
+remove(slope)
+
 
 ## improved maize  ----
 ## here we don't have the info at parcel level but only at hh level. all seeds were asked. We concentrate on maize. 
@@ -384,61 +428,134 @@ rm(fcs)
 plotdata4 <- plotdata4 |> 
   select(-s3q13, -s4q03,-s4q01b)
 look_for(plotdata4)
+var_label(plotdata4$rotation) <- "HH rotated at least one maize field with legumes during the past 3y"
+var_label(plotdata4$count_plot) <- "number of main maize plots"
 wave4 <- plotdata4 |> 
-  select(1, 10, 15:47)
+  select(1, 10, 6:8, 15:17, 20:24, 26:47)
 look_for(wave4)  
-wave4basics <- wave4 |> 
-  select(household_id, hh_id_obs) |> 
-  distinct()
-wave4mean <- collap(wave4,
-                    farm_size + age_manager + dist_market + elevation + plot_dist_household + ag_asset_index + 
-                    soil_fertility_index + crop_count + twi  ~ household_id,
-                    FUN = fmean,
-                    na.rm = TRUE)
-wave4sum <- collap(wave4,
-                   plot_area_GPS + nb_seasonal_crop + yield_value_USD  ~ household_id,
-                   FUN = fsum,
-                   na.rm = TRUE)
-aggregated_vars <- c("farm_size", "age_manager", "dist_market", "elevation", "plot_dist_household", "soil_fertility_index", "crop_count",
-                     "ag_asset_index", "plot_area_GPS", "nb_seasonal_crop", "twi", "yield_value_USD")
-wave4 <- wave4 %>% select(-all_of(aggregated_vars))
-look_for(wave4)
 wave4 <- wave4 |> 
-  select(1, 6:9, 11:23)
-look_for(wave4)
-# For all remaining binary variables, I will select the max. Meaning, for example,
-# at least one plot is managed by female, at least one maize plot manager has primary education, 
-# at least one plot is being intercropped and etc. 
-# fmax() fsum(), fmean(), etc. expects pure numeric vectors. 
-# If we feed it a labelled or factor column (even if it looks numeric), we may get nonsense max value, 
-# only one value being returned or etc. Thus:  
+  filter(!is.na(plot_area_GPS))
+n_distinct(wave4$hh_id_obs) # 946 hhs, 1448 obs
 wave4 <- wave4 |> 
-  mutate(across(c(female_manager, formal_education_manager, primary_education_manager, agro_ecological_zone,
-                  inorganic_fertilizer, plot_certificate, irrigated),
-                as.numeric))
-wave4max <- collap(wave4,
-                   ~ household_id, 
-                   FUN = fmax,
-                   na.rm = TRUE)
-wave4 <- left_join(wave4basics, wave4mean, by=join_by("household_id"))
-wave4 <- left_join(wave4, wave4sum, by=join_by("household_id"))
-wave4 <- left_join(wave4, wave4max, by=join_by("household_id"))
+  group_by(hh_id_obs) |> 
+  mutate(plot_area=sum(plot_area_GPS, na.rm = TRUE),
+         yield_value_USD=sum(yield_value_USD, na.rm = TRUE)) |> 
+  ungroup() |> 
+  relocate(plot_area, .after = plot_area_GPS)
+# control if hh used any organic or inorganic fertilizer in intercrop field or any other field.
+wave4 <- wave4 |> 
+  group_by(hh_id_obs) |> 
+  mutate(iv_maize = max(improved_maize),
+         inorganic_fertilizer = max(inorganic_fertilizer, na.rm = TRUE),
+         organic_fertilizer = max(organic_fertilizer, na.rm = TRUE),
+         intercrop_check=max(intercrop, na.rm = TRUE))|> 
+  ungroup()
+
+### aggregating the information at the household level for adopters and non-adopters seperately.----
+### 1. Select adopted plots If there are few intercropped fields select the biggest and 
+### adjust if rotation was practiced in any field of the hh
+### 2. Among the non-adopted plots select the biggest field. 
+n_distinct(wave4$plot_id) # 1448 distinct plots as obs count 
+table(wave4$intercrop, wave4$rotation) # 1000 non adopted plots
+wave4adoption <- wave4 |>
+  relocate(intercrop, .after = rotation) |> 
+  mutate(keep=if_else(intercrop==1 & rotation==1, 1, 0))
+# keep only adopting households; for non-adopters will select the biggest parcel and manager characteristics
+wave4adoption <- wave4adoption |> 
+  group_by(hh_id_obs) |> 
+  filter(intercrop != 0 | rotation != 0) |> 
+  ungroup()
+table(wave4adoption$intercrop, wave4adoption$rotation)
+# there are only 33 observations where both rotation and intercrop are observed.
+# first keep these plots and hhs, and drop if there is another plot where one practice is practiced
+wave4adoption <- wave4adoption |> 
+  group_by(hh_id_obs) |> 
+  mutate(keephh=max(keep)) |> 
+  ungroup()
+wave4adoption <- wave4adoption |>
+  filter((keep==0 & keephh==0) | (keep==1 & keephh==1)) 
+wave4adoption$keephh <- NULL
+wave4adoption <- wave4adoption |> 
+  group_by(hh_id_obs) |> 
+  filter(rotation==max(rotation, na.rm = TRUE )) |>  # there was only one parcel that had been rotated but not intercropped within hh
+  ungroup()
+wave4adoption <- wave4adoption |>
+  mutate(intercrop=intercrop_check) # for the indication of adoption
+n_distinct(wave4adoption$hh_id_obs) # 324 hhs
+# keep the biggest plot
+wave4adoption <- wave4adoption |> 
+  group_by(hh_id_obs) |> 
+  filter(plot_area_GPS == max(plot_area_GPS, na.rm = TRUE)) |> 
+  ungroup()
+n_distinct(wave4adoption$hh_id_obs) # one more household with two parcels same size
+wave4adoption <- wave4adoption |> 
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> 
+  relocate(dupl, .after=hh_id_obs) |>  ungroup()
+# missing rain_shock only diff 
+wave4adoption <- wave4adoption |>
+  group_by(hh_id_obs) |>  
+  filter(
+    (dupl > 1 & rain_shock==min(rain_shock, na.rm=TRUE)) |
+      # if hh has no duplicates → keep all rows
+      (dupl == 1)
+  ) |> 
+  ungroup()
+# one more here
+wave4adoption <- wave4adoption |> select(-dupl) |>
+  group_by(hh_id_obs) |> mutate(dupl=n()) |>  ungroup()
+n_distinct(wave4adoption$hh_id_obs) # 324 hhs
+
+# select the biggest plot among non-adopters
+wave4 <- wave4 |> 
+  filter(intercrop == 0 & rotation == 0) 
+wave4 <- wave4 |> 
+  group_by(hh_id_obs) |> 
+  filter(plot_area_GPS == max(plot_area_GPS, na.rm = TRUE)) |> 
+  ungroup()
+n_distinct(wave4$hh_id_obs) # 694 hh
+
+# Combine adopter and non-adopter hhs
+wave4 <- bind_rows(wave4, wave4adoption)
+n_distinct(wave4$hh_id_obs) # 946 hhs
+wave4 <- wave4 |> 
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 
+  relocate(dupl, .after= hh_id_obs) |> 
+  arrange(desc(dupl), hh_id_obs)
+# There are hhs, which have adopter plots and non-adopted plots. keep only adopted plots
+wave4 <- wave4 |> 
+  relocate(intercrop, .after = rotation) |> 
+  group_by(hh_id_obs) |> 
+  filter((dupl>1 & (intercrop==1 | rotation==1)) |
+           dupl==1)
+wave4 <- wave4 |> 
+  select(-dupl, -main_crop, -intercrop_check, -keep) |> 
+  arrange(hh_id_obs)
+look_for(wave4) 
+var_label(wave4$plot_area) <- "Area (in hectares) of all maize plots"
+labs <- var_label(plotdata4)
+common_names <- intersect(names(wave4), names(labs))
+var_label(wave4)[common_names] <- labs[common_names]
+look_for(wave4) 
+rm(labs, wave4adoption, common_names)
+wave4$plot_area_GPS <- NULL
+wave4 <- wave4 |> 
+  filter(plot_area!=0)
+wave4$improved_maize <- NULL
+look_for(wave4)
 wave4 <- left_join(wave4, assets, by=join_by("household_id"))
 wave4 <- left_join(wave4, hhhp4, by=c("household_id"="hh_id_merge"))
-wave4 <- left_join(wave4, rotation4, by=join_by("household_id"))
 wave4 <- left_join(wave4, individual, by=join_by("household_id"))
 wave4 <- left_join(wave4, sales, by=join_by("household_id"))
-frq(wave4$female_dm) # 28 missing from hh questionarrie
-wave4$female_dm[is.na(wave4$female_dm)] <- 0
+frq(wave4$female_dm) # 2 missing from hh questionarrie and 373 NA
 var_label(wave4$female_dm) <- "female has some DMP on crop income"
 wave4 <- wave4 |> 
   mutate(female_edu=if_else(is.na(s2q03), 0, s2q03)) |> 
   select(-s2q03)
 var_label(wave4$share_female_owned) <- "women's control over assets"
 var_label(wave4$female_edu) <- "HH has an adult female who can read and write"
-var_label(wave4$improved_maize) <- "HH has cultivated imporved maize in at least one field"
+var_label(wave4$iv_maize) <- "HH has cultivated improved maize in at least one field"
 var_label(wave4$intercrop) <- "HH has intercroped maize-legume"
-remove(wave4basics, wave4max, wave4sum,wave4mean,rotation4, assets, aggregated_vars, hhhp4, individual)
+remove(rotation4, assets, hhhp4, individual)
 
 ## Cleaning missing data ----
 look_for(wave4)
@@ -450,15 +567,13 @@ wave4 <- wave4 |>
   filter(!is.na(hh_size)) # household level data from HP - some HHs have agri data but no household level data4
 remove(hpdata, plotdata4)
 look_for(wave4)
-missing <- is.na(wave4$age_manager) # 1 missing
-wave4 <- subset(wave4, subset= !missing)
 wave4 <- wave4 |> mutate(wave="wave4")
 
 ### share_kg_sold----
 ### has many missing (276); the reason is because of many have reported share above 100% percent. 
 ### Also, some did not harvest any crops.
-### We will capture subsistence orientation, by looking at the question 22 in section 4 that asks: Do you intend to sell any 
-### of [CROP] to be harvested during the rainy season?
+### We will capture subsistence orientation, by looking at the question 22 in section 4 that asks: 
+### Do you intend to sell any of [CROP] to be harvested during the rainy season?
 sec4 <- read_dta("data/eth/ess4/sect4_pp_w4.dta") |> 
   select( household_id,holder_id, parcel_id, field_id, s4q22) |> 
   mutate(plot_id = paste(holder_id, parcel_id, field_id, sep = "-"))
@@ -557,7 +672,7 @@ extension <- extension |>
   select(household_id,extension_program, advisory_service, credit_unavailable, saq01)
 # The information is gathered at the holder level. For HH level data, we collapse and choose the max value. 
 extension <- collap(extension, extension_program +advisory_service + credit_unavailable + saq01 ~household_id, FUN=fmax)
-wave4 <- left_join(wave4,extension,by="household_id")
+wave4 <- left_join(wave4, extension,by="household_id")
 remove(extension)
 
 ## TLU ----
@@ -585,46 +700,6 @@ eth4 <- left_join(wave4,tlu,by="household_id")
 remove(tlu, wave4)
 eth4$tlu[is.na(eth4$tlu)] <- 0
 
-### ### ### ### ### ### ### ###
-## Soil type ---- 
-### ### ### ### ### ### ### ###
-soil <- read_dta("data/eth/ess4/sect2_pp_w4.dta") |> 
-  mutate(parcel_id = paste(holder_id, parcel_id, sep = "-")) |> 
-  select("household_id", "parcel_id", "s2q16")
-soil <- semi_join(soil, maizeplots, by=c("parcel_id"="parcel_id_merge"))
-look_for(soil)
-frq(soil$s2q16)
-# Vertisol and Luvisol are generally considered much better for crop production. Overall luvisol often better.
-soil <- soil |> 
-  mutate(s2q16 = as.numeric(soil$s2q16),
-         soil_type=case_when(s2q16==4 ~ 2,
-                             s2q16==3 ~ 1,
-                             .default = 0))
-mode_or_max <- function(x) {
-  x <- x[!is.na(x)]
-  if (length(x) == 0) return(NA)
-  
-  tab <- table(x)
-  most_common <- which(tab == max(tab))
-  
-  if (length(most_common) == 1) {
-    return(as.numeric(names(most_common)))
-  } else {
-    return(max(as.numeric(names(most_common))))
-  }
-} 
-soil <- collap(soil, soil_type ~ household_id, FUN =mode_or_max) # select dominant otherwise Luvisol. 
-soil <- soil |> 
-  mutate(soil= factor(soil_type, levels = c(0,1,2), labels = c("Other", "Vertisol", "Luvisol")))
-frq(soil$soil_type)
-frq(soil$soil)
-soil <- soil |> 
-  select(household_id, soil)
-eth4 <- left_join(eth4, soil, by="household_id")
-var_label(eth4$soil) <- "HH dominant soil type"
-frq(eth4$soil)
-remove(soil)
-
 ## Consumption ----
 cons <- read_dta("data/eth/ess4/cons_agg_w4.dta") |> 
   select(household_id, nom_foodcons_aeq, nom_totcons_aeq)
@@ -643,22 +718,6 @@ head <- head |>
 eth4 <- left_join(eth4, head, by="household_id")
 rm(head)
 
-## Slope 
-slope <- read_dta("data/eth/ess4/sect3_pp_w4.dta") |> 
-  mutate(parcel_id = paste(holder_id, parcel_id, sep = "-")) |> 
-  select("household_id", "parcel_id", "s3q12")
-slope <- semi_join(slope, maizeplots, by=c("parcel_id"="parcel_id_merge"))
-look_for(slope)
-frq(slope$s3q12)
-slope <- slope |> 
-  mutate(flat_slope=case_when(s3q12==1 ~ 1,
-                         .default=0)
-         )
-slope <- collap(slope, flat_slope ~ household_id, FUN =mode_or_max)
-frq(slope$flat_slope)
-eth4 <- left_join(eth4, slope, by="household_id")
-var_label(eth4$flat_slope) <- "=1 if slope is flat"
-remove(slope, maizeplots, mode_or_max)
 
 ## Other crops produced 
 crops <- read_dta("data/eth/ess4/sect4_pp_w4.dta") |>   #crop roster

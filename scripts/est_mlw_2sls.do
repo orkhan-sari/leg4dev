@@ -11,9 +11,9 @@ use "data\est\dfmlw3.dta", clear
 mdesc female_manager primary_education_manager age_manager hh_size hh_dependency_ratio ///
 	farm_size plot_certificate maize_share other_crops flat_slope mod_slope ln_dis_plot ///
 	hh_asset_index ln_other_income tlu subsistence_ag ///
-	extension_service credit_constrained fert_voucher bean_voucher eco_soil_mng organic_fertilizer inorganic_fertilizer  ///
+	extension_service credit_constrained fert_voucher bean_voucher eco_soil_mng  organic_fertilizer inorganic_fertilizer  ///
 	soil_fertility_index twi rainfall_diff average_rainfall adopted_neighbors_10km iv_maize
-global vars female_manager primary_education_manager age_manager farm_size ///
+global vars female_manager primary_education_manager age_manager ///
 	maize_share flat_slope ln_dis_plot subsistence_ag soil_fertility_index twi rainfall_diff average_rainfall 
 egen missing_flag = rowmiss($vars)
 drop if missing_flag > 0
@@ -21,7 +21,7 @@ egen n_obs = count(year), by(hh_id_obs)
 egen max_obs = max(n_obs)
 * assuming balanced panel should have max number of periods
 keep if n_obs == max_obs
-drop n_obs max_obs missing_flag // 859 hhs
+drop n_obs max_obs missing_flag // 867 hhs
 
 **## Estimating the Average Treatment Effect Using IV Wooldridge 2010 procedure 21.1 
 * planting dates for maize usually june july, and for legumes end july and august
@@ -41,7 +41,7 @@ estimates store random
 hausman fixed random
 drop _est_fixed _est_random
 * fixed effects is more appropriate
-* FE,  337 groups (1,011 obs)  omitted because of all positive or all negative outcomes.
+* FE,  340 groups (1,020 obs)  omitted because of all positive or all negative outcomes.
 
 **# Legume intensification and gender
 xtlogit legume_intens $xlist $ivlist, fe vce(bootstrap , rep(50))
@@ -51,7 +51,7 @@ outreg2 using "outputs\results\determinants_mlw", excel append sideway bdec(2) c
 logit legume_intens $xlist $ivlist, vce(bootstrap , rep(50))
 outreg2 using "outputs\results\determinants_mlw", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Pooled Logit")
 
-**## Main estimation - 2SLS: HDDS, food consumption score, food insecurity
+**## Main estimation - 2SLS: HDDS, food consumption score
 * total consumption - missing for wave 4 and 5
 ** Estimating the Average Treatment Effect Using IV Wooldridge 2010 procedure 21.1 
 local temp female_manager primary_education_manager age_manager hh_size hh_dependency_ratio ///

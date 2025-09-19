@@ -1,7 +1,7 @@
 # Run all scripts and clean further
 # Malawi ----
 source("scripts/mlw1.R") # 1008 obs
-source("scripts/mlw2.R") # 1245 obs
+source("scripts/mlw2.R") # 1242 obs
 source("scripts/mlw3.R") # 1707 obs
 source("scripts/mlw4.R") # 2085 obs
 setdiff(names(mlw1), names(mlw2))

@@ -164,6 +164,43 @@ var_label(plot4$organic_fertilizer) <- "organic fertilizer applied to maize plot
 var_label(plot4$inorganic_fertilizer) <- "inorganic fertilizer applied to maize plot"
 
 ### ### ### ### ### ### ### ###
+## Soil type ---- 
+modd <- read_dta("data/mlw/ag_mod_d_19.dta") |> 
+  select(y4_hhid, gardenid, plotid, ag_d01, ag_d21) |>
+  mutate(plot_id = paste(y4_hhid, gardenid, plotid, sep = "-")) |> 
+  rename(id_code=ag_d01)
+modd <- semi_join(modd, maizeplots, by="plot_id")
+look_for(modd)
+frq(modd$ag_d21)
+modd <- modd |> 
+  mutate(ag_d21 = as.numeric(modd$ag_d21),
+         soil_type=case_when(ag_d21==3 ~ 2,
+                             ag_d21==1 ~ 1,
+                             .default = 0)
+  )
+modd <- modd |> 
+  mutate(soil= factor(soil_type, levels = c(0,1,2), labels = c("Other or mix", "Sandy", "Clay"))) |> 
+  select(plot_id, soil)
+plot4 <- left_join(plot4, modd, by="plot_id")
+var_label(plot4$soil) <- "HH dominant soil type"
+
+## Slop ----
+modd <-  read_dta("data/mlw/ag_mod_d_19.dta") |> 
+  select(y4_hhid, gardenid, plotid, ag_d26) |>
+  mutate(plot_id = paste(y4_hhid, gardenid, plotid, sep = "-"))
+modd <- semi_join(modd, maizeplots, by="plot_id")
+frq(modd$ag_d26) # do mode max again, if there is a steep slope that will be captured this way too. 
+modd <- modd |>
+  mutate(ag_d26 = as.numeric(modd$ag_d26))
+modd <- modd |> 
+  mutate(slope= factor(ag_d26, levels = c(1,2,3,4), labels = c("Flat", "Slight slope", "Moderate slope", "Steep"))) |> 
+  select(plot_id, slope)
+frq(modd$slope)
+plot4 <- left_join(plot4, modd, by="plot_id")
+var_label(plot4$slope) <- "Dominant slope"
+remove(modd)
+
+### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
 ## DM at plot level ----
@@ -180,7 +217,7 @@ var_label(modd$female) <- "female primary dm concern. activities on maize plots"
 modd <- modd |> select(plot_id, female,hh_b05a )
 plot4 <- left_join(plot4, modd, by="plot_id")
 plot4 <- plot4 |> rename(age_manager_row=hh_b05a)
-remove(modd)
+remove(modd, maizeplots)
 
 ## DM on crop income ----
 sales <- read_dta("data/mlw/ag_mod_i_19.dta") |> 
@@ -294,7 +331,7 @@ fs <- fs |>
   select(-hh_h01, -hh_h04)
 fs <- semi_join(fs, maizehh, by=c("y4_hhid" = "hh_id_merge"))
 hdds4 <- left_join(hdds4, fs, by=c("hh_id_merge" = "y4_hhid"))
-
+rm(fs)
 
 ### ### ### ### ### ### ### ###
 # Final data  ----
@@ -312,43 +349,186 @@ plot4 <- plot4 |> select(-female)
 mlw4 <- plot4 |> 
   select(-ag_d14, -hh_id_merge,-plot_id_merge, -plot_id_obs, -parcel_id_merge, -parcel_id_obs, -age_manager_row,-nb_seasonal_crop)
 look_for(mlw4)
+mlw4$improved <- NULL # missing in wave2
 n_distinct(mlw4$hh_id_obs) # 2085 observations
 mlw4 <- mlw4 |> 
   group_by(hh_id_obs) |> 
-  mutate(plot_area=sum(plot_area_GPS),
-         yield_value_USD=sum(yield_value_USD)) |> 
+  mutate(plot_area=sum(plot_area_GPS, na.rm = TRUE),
+         yield_value_USD=sum(yield_value_USD, na.rm = TRUE)) |> 
   ungroup() |> 
   relocate(plot_area, .after = plot_area_GPS)
 # control if hh used any organic or inorganic fertilizer in intercrop field or any other field.
 mlw4 <- mlw4 |> 
   group_by(hh_id_obs) |> 
   mutate(iv_maize = max(iv_maize),
-         inorganic_fertilizer = max(inorganic_fertilizer),
-         organic_fertilizer = max(organic_fertilizer))|> 
+         inorganic_fertilizer = max(inorganic_fertilizer, na.rm = TRUE),
+         organic_fertilizer = max(organic_fertilizer, na.rm = TRUE),
+         rotation_check=max(rotation, na.rm = TRUE))|> 
   ungroup()
+
+### aggregating the information at the household level for adopters and non-adopters seperately.----
+### 1. Select adopted plots If there are few intercropped fields select the biggest and 
+### adjust if rotation was practiced in any field of the hh
+### 2. Among the non-adopted plots select the biggest field. 
+n_distinct(mlw4$plot_id) # 3199 but 3223 obs so duplicate ids
+table(mlw4$intercrop, mlw4$rotation) # 1305 non adopted plots
+mlw4adoption <- mlw4 |> 
+  relocate(hh_id_obs, .after = hhid) |> 
+  mutate(keep=if_else(intercrop==1 & rotation==1, 1, 0))
+# keep only adopting households; for non-adopters will select the biggest parcel and manager characteristics
+mlw4adoption <- mlw4adoption |> 
+  group_by(hh_id_obs) |> 
+  filter(intercrop != 0 | rotation != 0) |> 
+  ungroup()
+table(mlw4adoption$intercrop, mlw4adoption$rotation)
+# there are only 827 observations where both rotation and intercrop are observed.
+# first keep these plots and hhs
+mlw4adoption <- mlw4adoption |> 
+  group_by(hh_id_obs) |> 
+  mutate(keephh=max(keep)) |> 
+  ungroup()
+mlw4adoption <- mlw4adoption |>
+  filter((keep==0 & keephh==0) | (keep==1 & keephh==1)) 
+mlw4adoption$keephh <- NULL
+comment(mlw4adoption) <- "only adopter hhs and adopted plots"
+mlw4adoption <- mlw4adoption |> 
+  group_by(hh_id_obs) |> 
+  filter(intercrop==max(intercrop, na.rm = TRUE )) |>  
+  # there were only 24 plots that had been rotated but not intercropped
+  ungroup()
+mlw4adoption <- mlw4adoption |>
+  mutate(rotation=rotation_check) # for the indication of adoption
+# keep the biggest plot
+mlw4adoption <- mlw4adoption |> 
+  group_by(hh_id_obs) |> 
+  filter(plot_area_GPS == max(plot_area_GPS, na.rm = TRUE)) |> 
+  ungroup()
+n_distinct(mlw4adoption$hh_id_obs) # 1387 hhs, still some duplicate plots
+mlw4adoption <- mlw4adoption %>%
+  distinct(across(-plot_id), .keep_all = TRUE)
+# still 7 duplicates remaining
+mlw4adoption <- mlw4adoption |> 
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> 
+  relocate(dupl, .after=hhid) |>  ungroup()
+# differences are because of some minor difference in plot distance or soil type. select random here. 
+mlw4adoption <- mlw4adoption |>
+  group_by(hh_id_obs) |>  
+  filter(
+    (dupl > 1 & plot_dist_household==min(plot_dist_household, na.rm=TRUE)) |
+      # if hh has no duplicates → keep all rows
+      (dupl == 1)
+  ) |> 
+  ungroup()
+# one more here
+n_distinct(mlw4adoption$hh_id_obs)
+mlw4adoption <- mlw4adoption |> select(-dupl, -keep) |>distinct(hh_id_obs, .keep_all = TRUE)
+# select the biggest plot among non-adopters
+mlw4 <- mlw4 |> 
+  filter(intercrop == 0 & rotation == 0) 
 mlw4 <- mlw4 |> 
   group_by(hh_id_obs) |> 
-  mutate(
-    # household-level indicator: does any plot have rotation or intercrop?
-    any_practice = any(rotation == 1 | intercrop == 1)
-    ) %>%
-  filter(
-    # if any practice in hh, keep only plots with practice
-    (any_practice & (rotation == 1 | intercrop == 1)) |
-      # if no practice, keep only the largest plot
-      (!any_practice & plot_area_GPS == max(plot_area_GPS, na.rm = TRUE))
-  ) %>%
-  ungroup() %>%
-  select(-any_practice)
-n_distinct(mlw4$hh_id_obs) #2085 hh but 2631 obs
+  filter(plot_area_GPS == max(plot_area_GPS, na.rm = TRUE)) |> 
+  ungroup()
+n_distinct(mlw4$hh_id_obs) # 1000 hh
+mlw4 <- mlw4 %>%
+  distinct(across(-plot_id), .keep_all = TRUE)
 mlw4 <- mlw4 |> 
   group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 
   relocate(dupl, .after= hh_id_obs)
-# Select largest plot among those with similar adoption patterns
-mlw4 <- mlw4 |> group_by(hh_id_obs) |> slice_max(order_by = plot_area_GPS, n = 1, with_ties = FALSE) |> ungroup()
+# investigating this duplicates we see that these are the same size
 look_for(mlw4)
-mlw4$dupl <- NULL
+# there many missing for plot_dist
+mlw4 <- mlw4 |> # selecting nearest plot, differences are often meager
+  mutate(plot_dist_household= if_else(is.na(plot_dist_household), 9999, plot_dist_household)) |> 
+  group_by(hh_id_obs) |>  
+  filter(
+    (dupl > 1 &  plot_dist_household==min(plot_dist_household, na.rm=TRUE)) |
+      # if hh has no duplicates → keep all rows
+      (dupl == 1)
+  ) |> 
+  ungroup()
+mlw4 <- mlw4 |> select(-dupl) |>
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> 
+  relocate(dupl, .after=hhid) |>  ungroup() 
+n_distinct(mlw4$hh_id_obs)
+# now slope
+mlw4 <- mlw4 |>
+  mutate(slopen=as.numeric(slope)) |> 
+  group_by(hh_id_obs) |>  
+  filter(
+    (dupl > 1 & slopen==max(slopen, na.rm=TRUE)) |
+      # if hh has no duplicates → keep all rows
+      (dupl == 1)
+  ) |> 
+  ungroup() |> 
+  select(-slopen)
+mlw4 <- mlw4 |> select(-dupl) |>
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> 
+  relocate(dupl, .after=hhid) |>  ungroup() 
+n_distinct(mlw4$hh_id_obs)
+# now soil
+mlw4 <- mlw4 |>
+  mutate(soiln=as.numeric(soil)) |> 
+  group_by(hh_id_obs) |>  
+  filter(
+    (dupl > 1 & soiln==max(soiln, na.rm=TRUE)) |
+      # if hh has no duplicates → keep all rows
+      (dupl == 1)
+  ) |> 
+  ungroup() |> 
+  select(-soiln)
+mlw4 <- mlw4 |> select(-dupl) |>
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> 
+  relocate(dupl, .after=hhid) |>  ungroup() 
+# now female manager
+mlw4 <- mlw4 |>
+  mutate(soiln=as.numeric(female_manager)) |> 
+  group_by(hh_id_obs) |>  
+  filter(
+    (dupl > 1 & soiln==max(soiln, na.rm=TRUE)) |
+      # if hh has no duplicates → keep all rows
+      (dupl == 1)
+  ) |> 
+  ungroup() |> 
+  select(-soiln)
+mlw4 <- mlw4 |> select(-dupl) |>
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> 
+  relocate(dupl, .after=hhid) |>  ungroup() 
+# now older manager
+mlw4 <- mlw4 |>
+  group_by(hh_id_obs) |>  
+  filter(
+    (dupl > 1 & age_manager==max(age_manager, na.rm=TRUE)) |
+      # if hh has no duplicates → keep all rows
+      (dupl == 1)
+  ) |> 
+  ungroup()
+mlw4 <- mlw4 |> select(-dupl) |>
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> 
+  relocate(dupl, .after=hhid) |>  ungroup() 
+# no difference in remaining 
+mlw4 <- mlw4 |> select(-dupl) |> distinct(hh_id_obs, .keep_all = TRUE) 
+# Combine adopter and non-adopter hhs
+mlw4 <- bind_rows(mlw4, mlw4adoption)
+n_distinct(mlw4$hh_id_obs) # 2085 hhs
+mlw4 <- mlw4 |> 
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 
+  relocate(dupl, .after= hh_id_obs) |> 
+  arrange(desc(dupl), hh_id_obs)
+# There are hhs, which have adopter plots and non-adopted plots. keep only adopted plots
+mlw4 <- mlw4 |> 
+  group_by(hh_id_obs) |> 
+  filter((dupl>1 & (intercrop==1 | rotation==1)) |
+           dupl==1)
+mlw4 <- mlw4 |> 
+  select(-dupl, -main_crop, -rotation_check) |> 
+  arrange(hh_id_obs)
 var_label(mlw4$plot_area) <- "Area (in hectares) of all maize plots"
+labs <- var_label(plot4)
+common_names <- intersect(names(mlw4), names(labs))
+var_label(mlw4)[common_names] <- labs[common_names]
+look_for(mlw4) 
+rm(labs, mlw4adoption, common_names)
 mlw4$plot_area_GPS <- NULL
 look_for(mlw4)
 mlw4 <- left_join(mlw4, hdds4, by=c("hhid"="hh_id_merge"))
@@ -568,59 +748,6 @@ mlw4$tlu[is.na(mlw4$tlu)] <- 0
 remove(tlu)
 
 ## Land tenure - not collected ----
-
-### ### ### ### ### ### ### ###
-## Soil type ---- 
-modd <- read_dta("data/mlw/ag_mod_d_19.dta") |> 
-  select(y4_hhid, gardenid, plotid, ag_d01, ag_d21) |>
-  mutate(plot_id = paste(y4_hhid, gardenid, plotid, sep = "-")) |> 
-  rename(id_code=ag_d01)
-modd <- semi_join(modd, maizeplots, by="plot_id")
-look_for(modd)
-frq(modd$ag_d21)
-modd <- modd |> 
-  mutate(ag_d21 = as.numeric(modd$ag_d21),
-         soil_type=case_when(ag_d21==3 ~ 2,
-                             ag_d21==1 ~ 1,
-                             .default = 0)
-         )
-mode_or_max <- function(x) {
-  x <- x[!is.na(x)]
-  if (length(x) == 0) return(NA)
-  
-  tab <- table(x)
-  most_common <- which(tab == max(tab))
-  
-  if (length(most_common) == 1) {
-    return(as.numeric(names(most_common)))
-  } else {
-    return(max(as.numeric(names(most_common))))
-  }
-} 
-modd <- collap(modd, soil_type ~ y4_hhid, FUN =mode_or_max) # select dominant otherwise clay 
-modd <- modd |> 
-  mutate(soil= factor(soil_type, levels = c(0,1,2), labels = c("Other or mix", "Sandy", "Clay"))) |> 
-  select(y4_hhid, soil)
-mlw4 <- left_join(mlw4, modd, by=c("hhid"="y4_hhid"))
-var_label(mlw4$soil) <- "HH dominant soil type"
-remove(modd)
-
-## Slop ----
-modd <-  read_dta("data/mlw/ag_mod_d_19.dta") |> 
-  select(y4_hhid, gardenid, plotid, ag_d26) |>
-  mutate(plot_id = paste(y4_hhid, gardenid, plotid, sep = "-"))
-modd <- semi_join(modd, maizeplots, by="plot_id")
-frq(modd$ag_d26) # do mode max again, if there is a steep slope that will be captured this way too. 
-modd <- modd |>
-  mutate(ag_d26 = as.numeric(modd$ag_d26))
-modd <- collap(modd, ag_d26 ~ y4_hhid, FUN =mode_or_max)
-modd <- modd |> 
-  mutate(slope= factor(ag_d26, levels = c(1,2,3,4), labels = c("Flat", "Slight slope", "Moderate slope", "Steep"))) |> 
-  select(y4_hhid, slope)
-frq(modd$slope)
-mlw4 <- left_join(mlw4, modd, by=c("hhid"="y4_hhid"))
-var_label(mlw4$slope) <- "Dominant slope"
-remove(modd, maizeplots, mode_or_max)
 
 ## Input coupon ---- 
 coupon <- read_dta("data/mlw/ag_mod_e2_19.dta") |> 

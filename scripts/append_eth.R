@@ -8,11 +8,10 @@ setdiff(names(eth5), names(eth4))
 dfeth <-rbind(eth4, eth5) 
 dfeth <- dfeth |> 
   group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup()
-table(dfeth$dupl) # 522 panel hhs
+table(dfeth$dupl) # 508 panel hhs
 dfeth <- dfeth |> filter(dupl==2) |> select(-dupl)
 look_for(dfeth)
-frq(dfeth$female_dm) # 1 obs on gender info is missing
-dfeth$female_dm[dfeth$female_dm==99] <- NA_real_
+frq(dfeth$female_dm) # many missign cann't be used
 dfeth$wave <- as.factor(dfeth$wave)
 dfeth <- dfeth |> 
   relocate(wave, .after= hh_id_obs)
@@ -43,7 +42,7 @@ dfeth <- dfeth |>
     .default = NA_real_))
 frq(dfeth$region)  
 dfeth$region <- factor(dfeth$region, levels = c(1,2,3,4), labels = c("North", "Central", "West", "SNNP"))
-frq(dfeth$plot_dist_household) # 532 missing from wave5
+frq(dfeth$plot_dist_household) # 512 missing from wave5
 table(dfeth$wave, dfeth$plot_dist_household)
 dfeth <- dfeth |> 
   group_by(hh_id_obs) |> 
@@ -74,14 +73,14 @@ dfeth <- dfeth |>
          tot_other_income = if_else(tot_other_income<0, 0, tot_other_income),
          ln_other_income = log(tot_other_income+1),
          )
-table(dfeth$rotation, dfeth$intercrop) # only 19 hhs had intercropped but not rotated
+table(dfeth$rotation, dfeth$intercrop) # only 21 hhs had intercropped but not rotated
 dfeth <- dfeth |> 
   mutate(legume_intens=
            case_when(rotation=="rotation" | intercrop==1 ~ 1L,
                      .default = 0L)
          )
 table(dfeth$rotation, dfeth$wave) # 174 and 201 adopters
-table(dfeth$improved_maize, dfeth$wave) # 201 and 269 adopters 
+table(dfeth$iv_maize, dfeth$wave) # 201 and 269 adopters 
 dfeth <- dfeth |>
   mutate(weather_shock= if_else(flood_shock | rain_shock | drought_shock ==1, 1, 0, missing = 0)) |> # 0 assumed for missing! 
   relocate(weather_shock, .after = flood_shock)
@@ -89,7 +88,7 @@ table(dfeth$weather_shock, dfeth$wave, useNA = "ifany")
 dfeth$improved <- NULL
 library(knitr)
 dfeth |> 
-  count(wave, improved_maize, rotation) |> 
+  count(wave, iv_maize, rotation) |> 
   pivot_wider(names_from = rotation, values_from = n, values_fill = 0) |> 
   kable()
 dfeth <- dfeth |> 
@@ -97,7 +96,7 @@ dfeth <- dfeth |>
     if_any(c(zero_till, min_till, crop_residue), ~ .x == 1), 
     1L, 0L)
     )
-table(dfeth$rotation, dfeth$improved_maize)
+table(dfeth$rotation, dfeth$iv_maize)
 remove(eth4, eth5)
 dfeth <- dfeth |> 
   mutate(maize_share=plot_area_GPS/farm_size)

@@ -180,7 +180,7 @@ modd <- modd |>
   mutate(soil= factor(soil_type, levels = c(0,1,2), labels = c("Other or mix", "Sandy", "Clay"))) |> 
   select(plot_id, soil)
 plot3 <- left_join(plot3, modd, by="plot_id")
-var_label(mlw3$soil) <- "HH dominant soil type"
+var_label(plot3$soil) <- "HH dominant soil type"
 
 ## Slop ----
 modd <-  read_dta("data/mlw/ag_mod_d_16.dta") |> 
@@ -196,7 +196,7 @@ modd <- modd |>
   select(plot_id, slope)
 frq(modd$slope)
 plot3 <- left_join(plot3, modd, by="plot_id")
-var_label(mlw3$slope) <- "Dominant slope"
+var_label(plot3$slope) <- "Dominant slope"
 remove(modd)
 
 
@@ -339,6 +339,7 @@ fs <- fs |>
   select(-hh_h01, -hh_h04)
 fs <- semi_join(fs, maizehh, by=c("y3_hhid" = "hh_id_merge"))
 hdds3 <- left_join(hdds3, fs, by=c("hh_id_merge" = "y3_hhid"))
+rm(fs)
 
 ### ### ### ### ### ### ### ###
 # Final data  ----
@@ -497,11 +498,13 @@ mlw3 <- mlw3 |>
 mlw3 <- mlw3 |> 
   group_by(hh_id_obs) |> 
   filter((dupl>1 & (intercrop==1 | rotation==1)) |
-           dupl==1)
+           dupl==1) |> ungroup()
 mlw3 <- mlw3 |> 
   select(-dupl, -main_crop, -rotation_check) |> 
   arrange(hh_id_obs)
 var_label(mlw3$plot_area) <- "Area (in hectares) of all maize plots"
+var_label(mlw3$organic_fertilizer) <- "organig fertilizer applied to at least one maize plot"
+var_label(mlw3$inorganic_fertilizer) <- "inorganig fertilizer applied to at least one maize plot"
 look_for(mlw3)
 labs <- var_label(plot3)
 common_names <- intersect(names(mlw3), names(labs))

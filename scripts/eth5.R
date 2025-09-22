@@ -205,7 +205,6 @@ var_label(plotdata5$min_till) <- "minimum tillage: one-pass till"
 var_label(plotdata5$zero_till) <- "no till"
 var_label(plotdata5$crop_residue) <- "Cover the field surface with crop residue/leaves"
 
-
 ## Soil type ---- 
 soil <- read_dta("data/eth/ess5/sect2_pp_w5.dta") |> 
   mutate(parcel_id = paste(holder_id, parcel_id, sep = "-")) |> 
@@ -504,12 +503,14 @@ wave5 <- wave5 |>
   relocate(intercrop, .after = rotation) |> 
   group_by(hh_id_obs) |> 
   filter((dupl>1 & (intercrop==1 | rotation==1)) |
-           dupl==1)
+           dupl==1)|> ungroup()
 wave5 <- wave5 |> 
   select(-dupl, -main_crop, -intercrop_check, -keep) |> 
   arrange(hh_id_obs)
 look_for(wave5) 
 var_label(wave5$plot_area) <- "Area (in hectares) of all maize plots"
+var_label(wave5$organic_fertilizer) <- "organig fertilizer applied to at least one maize plot"
+var_label(wave5$inorganic_fertilizer) <- "inorganig fertilizer applied to at least one maize plot"
 labs <- var_label(plotdata5)
 common_names <- intersect(names(wave5), names(labs))
 var_label(wave5)[common_names] <- labs[common_names]
@@ -533,7 +534,7 @@ var_label(wave5$share_female_owned) <- "women's control over assets"
 var_label(wave5$female_edu) <- "HH has an adult female who can read and write"
 var_label(wave5$iv_maize) <- "HH has cultivated improved maize in at least one field"
 var_label(wave5$intercrop) <- "HH has intercroped maize-legume"
-remove(rotation5, assets, hhhp5, individual)
+remove(rotation5, assets, hhhp5, individual, sales)
 
 ## Cleaning missing data ----
 look_for(wave5)
@@ -606,7 +607,7 @@ look_for(wave5)
 rural <- read_dta("data/eth/ess5/sect_cover_hh_w5.dta") |> 
   filter(saq14==1) # keep rural hhs.
 wave5 <- semi_join(wave5, rural, by="household_id") # indeed all are rural farmers. 
-remove(rural)
+remove(rural, maizeplots)
 
 ### ### ### ### ### ### ### ###
 # Other variables   ----

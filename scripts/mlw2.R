@@ -241,7 +241,7 @@ sales <- semi_join(sales, maizeplots, by="plot_id")
 # Unfortunately, there are many missing values for the question on
 # Who in the household makes the decision concerning the use of the [CROP]? 
 # Also we find many missing on crop income in next waves, because many did not sell and thus did not make any decisions 
-
+rm(maizeplots)
 
 ## Asset ownership ---- 
 ## no data available on owners
@@ -493,12 +493,14 @@ mlw2 <- mlw2 |>
 mlw2 <- mlw2 |> 
   group_by(hh_id_obs) |> 
   filter((dupl>1 & (intercrop==1 | rotation==1)) |
-           dupl==1)
+           dupl==1) |> ungroup()
 mlw2 <- mlw2 |> 
   select(-dupl, -main_crop, -rotation_check, -keep) |> 
   arrange(hh_id_obs)
 look_for(mlw2) 
 var_label(mlw2$plot_area) <- "Area (in hectares) of all maize plots"
+var_label(mlw2$organic_fertilizer) <- "organig fertilizer applied to at least one maize plot"
+var_label(mlw2$inorganic_fertilizer) <- "inorganig fertilizer applied to at least one maize plot"
 labs <- var_label(plot2)
 common_names <- intersect(names(mlw2), names(labs))
 var_label(mlw2)[common_names] <- labs[common_names]

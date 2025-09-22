@@ -428,7 +428,7 @@ mlw1 <- mlw1 |>
 mlw1 <- mlw1 |> 
   group_by(hh_id_obs) |> 
   filter((dupl>1 & (intercrop==1 | rotation==1)) |
-           dupl==1)
+           dupl==1) |> ungroup()
 # 1008 observations
 mlw1 <- mlw1 |> 
   select(-dupl, -main_crop, -rotation_check, -keep) |> 
@@ -439,7 +439,7 @@ labs <- var_label(plot1)
 common_names <- intersect(names(mlw1), names(labs))
 var_label(mlw1)[common_names] <- labs[common_names]
 look_for(mlw1) 
-rm(labs)
+rm(labs, common_names)
 mlw1 <- mlw1 |> 
   filter(plot_area!=0)
 mlw1$plot_area_GPS <- NULL

@@ -519,11 +519,13 @@ mlw4 <- mlw4 |>
 mlw4 <- mlw4 |> 
   group_by(hh_id_obs) |> 
   filter((dupl>1 & (intercrop==1 | rotation==1)) |
-           dupl==1)
+           dupl==1)|> ungroup()
 mlw4 <- mlw4 |> 
   select(-dupl, -main_crop, -rotation_check) |> 
   arrange(hh_id_obs)
 var_label(mlw4$plot_area) <- "Area (in hectares) of all maize plots"
+var_label(mlw4$organic_fertilizer) <- "organig fertilizer applied to at least one maize plot"
+var_label(mlw4$inorganic_fertilizer) <- "inorganig fertilizer applied to at least one maize plot"
 labs <- var_label(plot4)
 common_names <- intersect(names(mlw4), names(labs))
 var_label(mlw4)[common_names] <- labs[common_names]

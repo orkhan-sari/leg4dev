@@ -11,8 +11,9 @@ use "data\est\dfmlw3.dta", clear
 mdesc female_manager primary_education_manager age_manager hh_size hh_dependency_ratio ///
 	farm_size plot_certificate maize_share other_crops flat_slope mod_slope ln_dis_plot ///
 	hh_asset_index ln_other_income tlu subsistence_ag ///
-	extension_service credit_constrained fert_voucher bean_voucher eco_soil_mng  organic_fertilizer inorganic_fertilizer  ///
-	soil_fertility_index twi rainfall_diff average_rainfall adopted_neighbors_10km iv_maize
+	extension_service credit_constrained fert_voucher bean_voucher eco_soil_mng ///
+	iv_maize organic_fertilizer inorganic_fertilizer  ///
+	soil_fertility_index twi rainfall_diff average_rainfall adopted_neighbors_10km 
 global vars female_manager primary_education_manager age_manager ///
 	maize_share flat_slope ln_dis_plot subsistence_ag soil_fertility_index twi rainfall_diff average_rainfall 
 egen missing_flag = rowmiss($vars)

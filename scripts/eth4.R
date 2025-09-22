@@ -198,7 +198,7 @@ frq(soil$soil)
 soil <- soil |> 
   select(household_id, parcel_id, soil)
 plotdata4 <- left_join(plotdata4, soil, by=c("household_id", "parcel_id_merge"="parcel_id"))
-var_label(eth4$soil) <- "HH dominant soil type"
+var_label(plotdata4$soil) <- "HH dominant soil type"
 frq(plotdata4$soil)
 remove(soil)
 
@@ -500,7 +500,6 @@ wave4adoption <- wave4adoption |>
       (dupl == 1)
   ) |> 
   ungroup()
-# one more here
 wave4adoption <- wave4adoption |> select(-dupl) |>
   group_by(hh_id_obs) |> mutate(dupl=n()) |>  ungroup()
 n_distinct(wave4adoption$hh_id_obs) # 324 hhs
@@ -526,12 +525,14 @@ wave4 <- wave4 |>
   relocate(intercrop, .after = rotation) |> 
   group_by(hh_id_obs) |> 
   filter((dupl>1 & (intercrop==1 | rotation==1)) |
-           dupl==1)
+           dupl==1)|> ungroup()
 wave4 <- wave4 |> 
   select(-dupl, -main_crop, -intercrop_check, -keep) |> 
   arrange(hh_id_obs)
 look_for(wave4) 
 var_label(wave4$plot_area) <- "Area (in hectares) of all maize plots"
+var_label(wave4$organic_fertilizer) <- "organig fertilizer applied to at least one maize plot"
+var_label(wave4$inorganic_fertilizer) <- "inorganig fertilizer applied to at least one maize plot"
 labs <- var_label(plotdata4)
 common_names <- intersect(names(wave4), names(labs))
 var_label(wave4)[common_names] <- labs[common_names]
@@ -555,7 +556,7 @@ var_label(wave4$share_female_owned) <- "women's control over assets"
 var_label(wave4$female_edu) <- "HH has an adult female who can read and write"
 var_label(wave4$iv_maize) <- "HH has cultivated improved maize in at least one field"
 var_label(wave4$intercrop) <- "HH has intercroped maize-legume"
-remove(rotation4, assets, hhhp4, individual)
+remove(rotation4, assets, hhhp4, individual, sales)
 
 ## Cleaning missing data ----
 look_for(wave4)
@@ -596,7 +597,7 @@ look_for(wave4)
 rural <- read_dta("data/eth/ess4/sect_cover_hh_w4.dta") |> 
   filter(saq14==1) # keep rural hhs.
 wave4 <- semi_join(wave4, rural, by="household_id") # indeed all are rural farmers. 
-remove(rural)
+remove(rural, maizeplots)
 
 ### ### ### ### ### ### ### ###
 # Other variables   ----

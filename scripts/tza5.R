@@ -80,7 +80,7 @@ intercropdata <- intercropdata |>
   ungroup()
 look_for(intercropdata)
 
-intercropdata <- collap(intercropdata, intercrop_legume ~ plot_id, FUN = fmax)
+intercropdata <- collap(intercropdata, intercrop_legume + count_plot ~ plot_id, FUN = fmax)
 frq(intercropdata$intercrop_legume)  # 354 maize plots out of 1541 are intercropped with legumes.
 
 # in HP data, keep only plots from the long panel (extended refresh sample not included) 
@@ -164,6 +164,89 @@ seed <- seed |>
 plot5 <- left_join(plot5, seed, by="plot_id")
 frq(plot5$improved_maize)
 remove(seed)
+
+### ### ### ### ### ### ### ###
+# Soil management ----
+# crop residue short season
+plots <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_4b.dta") |> 
+  select(y5_hhid, plot_id, cropid) |> 
+  filter(!is.na(cropid)) |> 
+  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-"))
+look_for(plots)
+plots <- plots |> 
+  distinct(y5_hhid, cropid, .keep_all = TRUE)
+soilman <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_5b.dta") |> # crop level no plot key 
+  select(y5_hhid, ag5b_33, cropid)
+look_for(soilman)
+frq(soilman$ag5b_33)
+soilman <- soilman |>
+  filter(cropid %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47)) # keep only maize and legume
+soilman <- soilman |>
+  filter(!is.na(ag5b_33)) |> 
+  mutate(crop_residue=if_else(ag5b_33==2, 1, 0)) |> 
+  select(-ag5b_33)
+soilman <- left_join(soilman, plots, by=c("y5_hhid", "cropid"))
+soilman <- soilman |> 
+  group_by(plot_id) |> 
+  summarise(crop_residue_short=max(crop_residue)) |> 
+  ungroup()
+plot5 <- left_join(plot5, soilman, by="plot_id")
+frq(plot5$crop_residue_short)
+plot5$crop_residue_short[is.na(plot5$crop_residue_short)] <- 0
+var_label(plot5$crop_residue_short) <- "Residues from short rainy season were left in the field"
+
+# residue long season
+plots <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_4a.dta") |> 
+  select(y5_hhid, plot_id, cropid) |> 
+  filter(!is.na(cropid)) |> 
+  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-"))
+# for long season we concentrate on maize and legumes to possible be able ot link to the fields of interest as there is no direct key
+plots <- plots |>
+  filter(cropid %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47))
+plots <- plots |> 
+  distinct(y5_hhid, cropid, .keep_all = TRUE)
+soilman <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_5a.dta") |> # crop level no plot key 
+  select(y5_hhid, ag5a_33, cropid)
+soilman <- soilman |>
+  filter(cropid %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47))
+look_for(soilman)
+soilman <- soilman |>
+  filter(!is.na(ag5a_33)) |> 
+  mutate(crop_residue=if_else(ag5a_33==2, 1, 0)
+  )
+soilman <- left_join(soilman, plots, by=c("y5_hhid", "cropid"))
+soilman <- soilman |> 
+  group_by(plot_id) |> 
+  summarise(crop_residue_long=max(crop_residue)) |> 
+  ungroup()
+plot5 <- left_join(plot5, soilman, by="plot_id")
+frq(plot5$crop_residue_long)
+plot5$crop_residue_long[is.na(plot5$crop_residue_long)] <- 0
+var_label(plot5$crop_residue_long) <- "Residues from the latest long season were left in the field"
+rm(soilman, plots)
+
+## Soil Type ----
+soil_type <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_3a.dta") |>  
+  select(y5_hhid, plot_id, ag3a_10, ag3a_11, ag3a_12) |>
+  rename(soil_type = ag3a_10) |>  
+  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-"))
+soil_type <- semi_join(soil_type, maizeplots, by = "plot_id")
+look_for(soil_type)  # No missing values in soil_type
+soil_type |>
+  count(y5_hhid) |>
+  filter(n > 1)
+frq(soil_type$soil_type) # not clear what other types would be. this is always a problem
+frq(soil_type$ag3a_11) # very subjective of course
+frq(soil_type$ag3a_12)
+# loam is more dominant, sandy is less fertile, clay is suitable for some crops like rice. let's take loam as main.
+soil_type <- soil_type |> 
+  mutate(soil_type=as.numeric(soil_type),
+         soil=if_else(soil_type==2,1,0)) |> 
+  select(plot_id, soil)
+n_distinct(soil_type$plot_id)
+plot5 <- left_join(plot5, soil_type, by="plot_id")
+var_label(plot5$soil) <-  "loam soil type"
+remove(soil_type)
 
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
@@ -295,49 +378,125 @@ look_for(plot5)
 
 ## Collapse / aggregate ----
 tza5 <- plot5 |> 
-  select(-plot_id_merge, -plot_id,  -respondent_id_obs, -respondent_id_merge,-age_manager_row)
+  select(-plot_id_merge, -respondent_id_obs, -respondent_id_merge,-age_manager_row)
 look_for(tza5)
-tza5basics <- tza5 |> 
-  select(hhid, hh_id_obs) |> 
-  distinct()
-wave5mean <- collap(tza5,
-                    farm_size + age_manager + plot_dist_household + ag_asset_index + 
-                      soil_fertility_index  ~ hhid,
-                    FUN = fmean,
-                    na.rm = TRUE)
-wave5sum <- collap(tza5,
-                   plot_area_GPS + nb_seasonal_crop +yield_value_LCU + yield_value_USD  ~ hhid,
-                   FUN = fsum,
-                   na.rm = TRUE)
-aggregated_vars <- c("farm_size", "age_manager", "plot_dist_household", "soil_fertility_index",
-                     "ag_asset_index", "plot_area_GPS", "nb_seasonal_crop", 
-                     "yield_value_LCU", "yield_value_USD")
-tza5 <- tza5 %>% select(-all_of(aggregated_vars))
-look_for(tza5)
+tza5 <- tza5 |> select(10:11, 1:9, 13, 15:36)
+n_distinct(tza5$hh_id_obs) # 1189 hhs, 1541 obs
 tza5 <- tza5 |> 
-  select(5, 1:4, 11:22)
-# ---------------------------------------------------------------------------- #
+  group_by(hh_id_obs) |> 
+  mutate(plot_area=sum(plot_area_GPS, na.rm = TRUE),
+         yield_value_USD=sum(yield_value_USD, na.rm = TRUE),
+         yield_value_LCU=sum(yield_value_LCU, na.rm = TRUE)) |> 
+  ungroup() |> 
+  relocate(plot_area, .after = plot_area_GPS)
+# control if hh used any organic or inorganic fertilizer in intercrop field or any other field.
+table(tza5$rotation, tza5$intercrop_legume) # intercroppping more common than rotation
+tza5 <- tza5 |> 
+  rename(intercrop=intercrop_legume) |> 
+  group_by(hh_id_obs) |> 
+  mutate(iv_maize = max(improved_maize),
+         inorganic_fertilizer = max(inorganic_fertilizer, na.rm = TRUE),
+         organic_fertilizer = max(organic_fertilizer, na.rm = TRUE),
+         rotation_check=max(rotation, na.rm = TRUE))|> 
+  ungroup()
+### aggregating the information at the household level for adopters and non-adopters seperately.----
+### 1. Select adopted plots If there are few intercropped fields select the biggest and 
+### adjust if rotation was practiced in any field of the hh
+### 2. Among the non-adopted plots select the biggest field. 
+n_distinct(tza5$plot_id) # 1541 distinct plots as obs count 
+table(tza5$intercrop, tza5$rotation) # 1165 non adopted plots
+tza5adoption <- tza5 |>
+  relocate(intercrop, .after = rotation) |> 
+  mutate(keep=if_else(intercrop==1 & rotation==1, 1, 0))
+# keep only adopting households; for non-adopters will select the biggest parcel and manager characteristics
+tza5adoption <- tza5adoption |> 
+  group_by(hh_id_obs) |> 
+  filter(intercrop != 0 | rotation != 0) |> 
+  ungroup()
+table(tza5adoption$intercrop, tza5adoption$rotation)
+# there are only 33 observations where both rotation and intercrop are observed.
+# first keep these plots and hhs, and drop if there is another plot where one practice is practiced
+tza5adoption <- tza5adoption |> 
+  group_by(hh_id_obs) |> 
+  mutate(keephh=max(keep)) |> 
+  ungroup()
+tza5adoption <- tza5adoption |>
+  filter((keep==0 & keephh==0) | (keep==1 & keephh==1)) 
+tza5adoption$keephh <- NULL
+tza5adoption <- tza5adoption |> 
+  group_by(hh_id_obs) |> 
+  filter(intercrop==max(intercrop, na.rm = TRUE )) |>  # there were two parcels that had been rotated but not intercropped within hh
+  ungroup()
+tza5adoption <- tza5adoption |>
+  mutate(rotation=rotation_check) # for the indication of adoption
+n_distinct(tza5adoption$hh_id_obs) # 338 hhs
+# keep the biggest plot
+tza5adoption <- tza5adoption |> 
+  group_by(hh_id_obs) |> 
+  filter(plot_area_GPS == max(plot_area_GPS, na.rm = TRUE)) |> 
+  ungroup()
 
-look_for(tza5)
-# For all remaining binary variables, I will select the max. Meaning, for example,
-# at least one plot is managed by female, at least one maize plot manager has primary education, 
-# at least one plot is being intercropped and etc. 
+# select the biggest plot among non-adopters
 tza5 <- tza5 |> 
-  mutate(across(c(female_manager, formal_education_manager, primary_education_manager,
-                  inorganic_fertilizer, plot_certificate, irrigated),
-                as.numeric))
-wave5max <- collap(tza5,
-                   ~ hhid, 
-                   FUN = fmax,
-                   na.rm = TRUE)
-tza5 <- left_join(tza5basics, wave5mean, by=join_by("hhid"))
-tza5 <- left_join(tza5, wave5sum, by=join_by("hhid"))
-tza5 <- left_join(tza5, wave5max, by=join_by("hhid"))
+  filter(intercrop == 0 & rotation == 0) 
+tza5 <- tza5 |> 
+  group_by(hh_id_obs) |> 
+  filter(plot_area_GPS == max(plot_area_GPS, na.rm = TRUE)) |> 
+  ungroup()
+n_distinct(tza5$hh_id_obs) # 927 hh 930 obs
+tza5 <- tza5 |> 
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 
+  relocate(dupl, .after= hh_id_obs)
+# trying complete cases to see if any hh will be dropped at the end. if this results in dropping a hh,
+# approach is changed later
+tza5 <- tza5 |> # seelcting neares plot, differences are often meager
+  group_by(hh_id_obs) |>  
+  filter(
+    (dupl > 1 & crop_residue_long==max(crop_residue_long, na.rm=TRUE)) |
+      # if hh has no duplicates → keep all rows
+      (dupl == 1)
+  ) |> 
+  ungroup()
+tza5 <- tza5 |> select(-dupl) |>
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> 
+  relocate(dupl, .after=hhid) |>  ungroup() 
+# no difference in the remaining one duplicate 
+tza5 <- tza5 |> select(-dupl) |> distinct(hh_id_obs, .keep_all = TRUE) 
+# Combine adopter and non-adopter hhs
+tza5 <- bind_rows(tza5, tza5adoption)
+n_distinct(tza5$hh_id_obs) # 1189 hhs and 1265 obs
+tza5 <- tza5 |> 
+  group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 
+  relocate(dupl, .after= hh_id_obs) |> 
+  arrange(desc(dupl), hh_id_obs)
+# There are hhs, which have adopter plots and non-adopted plots. keep only adopted plots
+tza5 <- tza5 |> 
+  group_by(hh_id_obs) |> 
+  filter((dupl>1 & (intercrop==1 | rotation==1)) |
+           dupl==1) |> ungroup()
+tza5 <- tza5 |> 
+  select(-dupl, -rotation_check, -keep) |> 
+  arrange(hh_id_obs)
+look_for(tza5) 
+var_label(tza5$plot_area) <- "Area (in hectares) of all maize plots"
+labs <- var_label(plot5)
+common_names <- intersect(names(tza5), names(labs))
+var_label(tza5)[common_names] <- labs[common_names]
+look_for(tza5) 
+rm(labs, tza5adoption, common_names)
+tza5$plot_area_GPS <- NULL
+tza5$improved_maize <- NULL
+look_for(tza5)
+var_label(tza5$rotation) <- "HH rotated at least one maize field with legumes during the previous short season"
+var_label(tza5$count_plot) <- "number of main maize plots"
+var_label(tza5$iv_maize) <- "HH has cultivated improved maize in at least one field"
+var_label(tza5$organic_fertilizer) <- "organig fertilizer applied to at least one maize plot"
+var_label(tza5$inorganic_fertilizer) <- "inorganig fertilizer applied to at least one maize plot"
 tza5 <- left_join(tza5, hdds5, by=c("hhid"="hh_id_merge"))
 tza5<- left_join(tza5, individual, by=c("hhid"="y5_hhid"))
 tza5 <- tza5 |> 
   mutate(female_edu=if_else(is.na(female_edu), 0, female_edu))
-remove(tza5basics, wave5max, wave5sum, wave5mean, aggregated_vars, hdds5, plot5, individual)
+remove(hdds5, plot5, individual)
 tza5 <- tza5 |> mutate(wave="wave5")
 
 ## Cleaning missing data ----
@@ -396,7 +555,7 @@ plot_road_dist |>
   filter(n > 1)
 plot_road_dist<- plot_road_dist |>
   group_by(y5_hhid) |>
-  summarise(plot_road_dist_mean = mean(plot_road_distance, na.rm = TRUE))
+  summarise(plot_road_dist_mean = mean(plot_road_distance, na.rm = TRUE)) |> ungroup()
 tza5 <- left_join(tza5, plot_road_dist, by = c("hhid" = "y5_hhid"))
 
 # ───── Plot-to-market distance ─────
@@ -531,65 +690,6 @@ tza5$enterprise_income[is.na(tza5$enterprise_income)] <- 0
 var_label(tza5$enterprise_income) <- "annual enterprise income"
 rm(enterprise)
 
-### ### ### ### ### ### ### ###
-## Ecological soil management ----
-# crop residue short season
-plots <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_4b.dta") |> 
-  select(y5_hhid, plot_id, cropid) |> 
-  filter(!is.na(cropid)) |> 
-  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-"))
-look_for(plots)
-plots <- plots |> 
-  distinct(y5_hhid, cropid, .keep_all = TRUE)
-soilman <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_5b.dta") |> # crop level no plot key 
-  select(y5_hhid, ag5b_33, cropid)
-look_for(soilman)
-frq(soilman$ag5b_33)
-soilman <- soilman |>
-  filter(cropid %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47)) # keep only maize and legume
-soilman <- soilman |>
-  filter(!is.na(ag5b_33)) |> 
-  mutate(crop_residue=if_else(ag5b_33==2, 1, 0)) |> 
-  select(-ag5b_33)
-soilman <- left_join(soilman, plots, by=c("y5_hhid", "cropid"))
-soilman <- soilman |> 
-  group_by(y5_hhid) |> 
-  summarise(crop_residue_short=max(crop_residue)) |> 
-  ungroup()
-tza5 <- left_join(tza5, soilman, by=c("hhid" = "y5_hhid"))
-frq(tza5$crop_residue_short)
-tza5$crop_residue_short[is.na(tza5$crop_residue_short)] <- 0
-var_label(tza5$crop_residue_short) <- "Residues from short rainy season were left in the field"
-
-# residue long season
-plots <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_4a.dta") |> 
-  select(y5_hhid, plot_id, cropid) |> 
-  filter(!is.na(cropid)) |> 
-  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-"))
-# for long season we concentrate on maize and legumes to possible be able ot link to the fields of interest as there is no direct key
-plots <- plots |>
-  filter(cropid %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47))
-plots <- plots |> 
-  distinct(y5_hhid, cropid, .keep_all = TRUE)
-soilman <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_5a.dta") |> # crop level no plot key 
-  select(y5_hhid, ag5a_33, cropid)
-soilman <- soilman |>
-  filter(cropid %in% c(11, 31, 32, 33, 34, 35, 36, 37, 43, 47))
-look_for(soilman)
-soilman <- soilman |>
-  filter(!is.na(ag5a_33)) |> 
-  mutate(crop_residue=if_else(ag5a_33==2, 1, 0)
-  )
-soilman <- left_join(soilman, plots, by=c("y5_hhid", "cropid"))
-soilman <- soilman |> 
-  group_by(y5_hhid) |> 
-  summarise(crop_residue_long=max(crop_residue)) |> 
-  ungroup()
-tza5 <- left_join(tza5, soilman, by=c("hhid" = "y5_hhid"))
-frq(tza5$crop_residue_long)
-tza5$crop_residue_long[is.na(tza5$crop_residue_long)] <- 0
-var_label(tza5$crop_residue_long) <- "Residues from the latest long season were left in the field"
-
 ##  Extension, advisory, credit----
 extension <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_12a.dta") |>
   select(y5_hhid, sourceid, ag12a_01_1:ag12a_01_8, ag12a_02) |>
@@ -715,29 +815,6 @@ tenure <- collap(tenure, tenure_security ~ y5_hhid, FUN = fmax)
 tza5 <- left_join(tza5, tenure, by = c("hhid" = "y5_hhid"))
 
 remove(tenure, tenure_diff_security)
-
-## Soil Type ----
-
-soil_type <- read_dta("data/tza/tza_wave5_2020_21/ag_sec_3a.dta") |>  
-  select(y5_hhid, plot_id, ag3a_10, ag3a_11, ag3a_12) |>
-  rename(soil_type = ag3a_10) |>  
-  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-"))
-soil_type <- semi_join(soil_type, maizeplots, by = "plot_id")
-look_for(soil_type)  # No missing values in soil_type
-soil_type |>
-  count(y5_hhid) |>
-  filter(n > 1)
-frq(soil_type$soil_type) # not clear what other types would be. this is always a problem
-frq(soil_type$ag3a_11) # very subjective of course
-frq(soil_type$ag3a_12)
-# loam is more dominant, sandy is less fertile, clay is suitable for some crops like rice. let's take loam as main.
-soil_type <- soil_type |> 
-  mutate(soil_type=as.numeric(soil_type),
-         soil=if_else(soil_type==2,1,0))
-soil_type <- collap(soil_type, soil ~ y5_hhid, FUN = fmax, na.rm= TRUE)
-tza5 <- left_join(tza5, soil_type, by=c("hhid"="y5_hhid"))
-var_label(tza5$soil) <-  "loam soil type"
-remove(soil_type)
 
 ## Input coupon ---- 
 ## In wave 5, if they received voucher for inputs. Instead their was a question why they used input,

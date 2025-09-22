@@ -11,7 +11,7 @@ dfeth <- dfeth |>
 table(dfeth$dupl) # 508 panel hhs
 dfeth <- dfeth |> filter(dupl==2) |> select(-dupl)
 look_for(dfeth)
-frq(dfeth$female_dm) # many missign cann't be used
+frq(dfeth$female_dm) # many missing cann't be used
 dfeth$wave <- as.factor(dfeth$wave)
 dfeth <- dfeth |> 
   relocate(wave, .after= hh_id_obs)
@@ -42,8 +42,8 @@ dfeth <- dfeth |>
     .default = NA_real_))
 frq(dfeth$region)  
 dfeth$region <- factor(dfeth$region, levels = c(1,2,3,4), labels = c("North", "Central", "West", "SNNP"))
-frq(dfeth$plot_dist_household) # 512 missing from wave5
-table(dfeth$wave, dfeth$plot_dist_household)
+frq(dfeth$plot_dist_household) 
+table(dfeth$wave, dfeth$plot_dist_household) # missing from wave5
 dfeth <- dfeth |> 
   group_by(hh_id_obs) |> 
   mutate(
@@ -58,11 +58,13 @@ dfeth$dis_plot1 <- NULL
 #### Consumption ##
 dfeth <- dfeth |> 
   mutate(def_totcons_aeq=if_else(wave=="wave5", 244.6/388.2 * nom_totcons_aeq, nom_totcons_aeq),
-         def_foodcons_aeq=if_else(wave=="wave5", 244.6/388.2 * nom_foodcons_aeq, nom_foodcons_aeq)) |> 
+         def_foodcons_aeq=if_else(wave=="wave5", 244.6/388.2 * nom_foodcons_aeq, nom_foodcons_aeq),
+         ln_food_cons_aeq= log1p(def_foodcons_aeq),
+         ln_tot_cons_aeq= log1p(def_totcons_aeq)) |> 
   relocate(def_totcons_aeq, .after = nom_totcons_aeq)
-
 # 2020 costs deflated to 2017 values using cpi https://data.worldbank.org/indicator/FP.CPI.TOTL?locations=ET
 # Main dependent variable is totcons_USD here but the above is developed to check robustness later in the analyses. 
+
 dfeth |> group_by(hh_id_obs) |> select(hh_id_obs, wave, nom_totcons_aeq, def_totcons_aeq) |>
   arrange(hh_id_obs) |> print(n=12)
 dfeth |> group_by(hh_id_obs) |> select(hh_id_obs, wave, nom_foodcons_aeq, def_foodcons_aeq) |>
@@ -70,8 +72,8 @@ dfeth |> group_by(hh_id_obs) |> select(hh_id_obs, wave, nom_foodcons_aeq, def_fo
 dfeth <- dfeth |> 
   mutate(rotation=
            factor(rotation, levels = c(0,1), labels = c("norotation", "rotation")),
-         tot_other_income = if_else(tot_other_income<0, 0, tot_other_income),
-         ln_other_income = log(tot_other_income+1),
+         tot_other_income = if_else(tot_other_income<0, 0, tot_other_income), # some negatives corrected
+         ln_other_income = log1p(tot_other_income),
          )
 table(dfeth$rotation, dfeth$intercrop) # only 21 hhs had intercropped but not rotated
 dfeth <- dfeth |> 
@@ -79,8 +81,8 @@ dfeth <- dfeth |>
            case_when(rotation=="rotation" | intercrop==1 ~ 1L,
                      .default = 0L)
          )
-table(dfeth$rotation, dfeth$wave) # 174 and 201 adopters
-table(dfeth$iv_maize, dfeth$wave) # 201 and 269 adopters 
+table(dfeth$rotation, dfeth$wave) # 171 + 200 adopters
+table(dfeth$iv_maize, dfeth$wave) # 198 + 265 adopters 
 dfeth <- dfeth |>
   mutate(weather_shock= if_else(flood_shock | rain_shock | drought_shock ==1, 1, 0, missing = 0)) |> # 0 assumed for missing! 
   relocate(weather_shock, .after = flood_shock)
@@ -99,7 +101,7 @@ dfeth <- dfeth |>
 table(dfeth$rotation, dfeth$iv_maize)
 remove(eth4, eth5)
 dfeth <- dfeth |> 
-  mutate(maize_share=plot_area_GPS/farm_size)
+  mutate(maize_share=plot_area/farm_size)
 var_label(dfeth$maize_share) <- "proportion of area dedicated to maize plots"
 dfeth <- dfeth |> 
   mutate(year= if_else(wave=="wave4", 2018, 2021))
@@ -120,7 +122,7 @@ var_label(dfeth$sd_rainfall) <- "Standard deviation of mean annual rainfall sinc
 var_label(dfeth$rainfall_diff) <- "Season's deviation from expected annual rainfall"
 look_for(dfeth)
 dfeth <- dfeth |> 
-  mutate(ln_wage_income = log(wage_income+1),
+  mutate(ln_wage_income = log1p(wage_income),
          b_enterprise_income=if_else(enterprise_income>0,1,0)
          )
 table(is.na(dfeth$average_rainfall), dfeth$wave) # 8 missing from wave4; replace with observed from wave5 to keep
@@ -129,6 +131,7 @@ dfeth <- dfeth |>
   mutate(average_rainfall= if_else(is.na(average_rainfall),
                                    mean(average_rainfall, na.rm = TRUE), average_rainfall)) |> 
   ungroup()
+
 ## Adopting neighbors ----
 ## Adopters
 library(geosphere)

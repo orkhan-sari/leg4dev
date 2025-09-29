@@ -253,7 +253,7 @@ sales <- collap(sales, female_dm ~ y3_hhid, FUN = fmax)
 sales <- sales |> 
   mutate(female_dm= factor(female_dm, levels = c(1,2,3), labels = c("Female", "Joint", "Male")))
 frq(sales$female_dm)
-rm(individual, sales)
+rm(individual)
 # Again many missing values
 
 ## Asset ownership ---- 
@@ -512,6 +512,8 @@ var_label(mlw3)[common_names] <- labs[common_names]
 look_for(mlw3) 
 rm(labs, mlw3adoption, common_names)
 mlw3$plot_area_GPS <- NULL
+mlw3 <- left_join(mlw3, sales, by=c("hhid"="y3_hhid"))
+var_label(mlw3$female_dm) <- "Who kept/decided what to do with crop income?"
 mlw3 <- left_join(mlw3, hdds3, by=c("hhid"="hh_id_merge"))
 mlw3 <- left_join(mlw3, individual, by=c("hhid"="y3_hhid"))
 mlw3 <- mlw3 |> 

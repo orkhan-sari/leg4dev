@@ -252,7 +252,8 @@ individual <- read_dta("data/eth/ess4/sect1_hh_w4.dta") |>
   select(household_id, individual_id, female) |>
   rename(s3q13=individual_id)
 field <- semi_join(field, maizeplots, by="plot_id") # keep only main maize plots and look at the DM on those plots.
-field4 <- left_join(field, individual, by=c("household_id", "s3q13"))
+# s3q13 Who in the household makes primary decisions concerning crops to be planted, input use, and the timing of cropping on plot?
+field4 <- left_join(field, individual, by=c("household_id", "s3q13")) # s3q13
 remove(field)
 look_for(field4) # 64 missing for female
 var_label(field4$female) <- "female primary dm concern. activities on maize plot" # also on crops to be planted
@@ -284,18 +285,25 @@ sales <- sales |>
   rename(s3q13=s11q13_2) # now second decision-maker
 sales <- left_join(sales,individual, by=c("household_id", "s3q13"))
 sales <- sales |> 
-  mutate(female.y=if_else(is.na(female.y),99,female.y))
-sales <- sales |> 
-  filter(!is.na(female.x)) |> 
-  mutate(female_dm=case_when(female.x==1 ~ 1,
-                             female.y==1 ~ 1,
-                             female.x==99 & female.y==99 ~ 99,
-                             .default = 0))
+  mutate(female_dm=case_when(female.x==1 & female.y==1 ~ 3, #female
+                             female.x==1 & is.na(female.y) ~ 3, #female
+                             is.na(female.x) & female.y==1 ~ 3, #female
+                             female.x==0 & female.y==1 ~ 2,
+                             female.x==1 & female.y==0 ~ 2, # joint
+                             female.x==0 & female.y==0 ~ 1, # male
+                             is.na(female.x) & female.y==0 ~ 1, # male
+                             female.x==0 & is.na(female.y) ~1, 
+                             .default = 99)
+  )
 frq(sales$female_dm)
 look_for(sales)
 sales <- sales[,c(1,6)]
+dim(sales)
 n_distinct(sales$household_id)
 sales <- collap(sales, female_dm ~ household_id, FUN = fmax)
+sales <- sales |> 
+  mutate(female_dm= factor(female_dm, levels = c(1,2,3), labels = c("Female", "Joint", "Male")))
+frq(sales$female_dm)
 
 ## Asset ownership ----
 assets <- read_dta("data/eth/ess4/sect11_hh_w4.dta") |>
@@ -548,7 +556,7 @@ wave4 <- left_join(wave4, hhhp4, by=c("household_id"="hh_id_merge"))
 wave4 <- left_join(wave4, individual, by=join_by("household_id"))
 wave4 <- left_join(wave4, sales, by=join_by("household_id"))
 frq(wave4$female_dm) # 2 missing from hh questionarrie and 373 NA
-var_label(wave4$female_dm) <- "female has some DMP on crop income"
+var_label(wave4$female_dm) <- "Who kept/decided what to do with crop income?"
 wave4 <- wave4 |> 
   mutate(female_edu=if_else(is.na(s2q03), 0, s2q03)) |> 
   select(-s2q03)

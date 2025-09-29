@@ -265,13 +265,51 @@ individual <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11
   rename(id_code = indidy4) # Rename 'indidy4' to 'id_code' in the 'individual' dataset
 modd <- left_join(modd, individual, by=c("y4_hhid", "id_code"))
 summary(modd)
-remove(individual)
 var_label(modd$female) <- "female primary dm concern. crops selection" # on crops to be planted
 
 modd <- modd |> select(plot_id, female, hh_b04 )  
 plot4 <- left_join(plot4, modd, by="plot_id")
 plot4 <- plot4 |> rename(age_manager_row=hh_b04)
 remove(modd)
+
+## DM on crop income ----
+sales <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_5a.dta") |> 
+  select(y4_hhid, ag5a_10_1, ag5a_10_2) |> 
+  filter(ag5a_10_1==1)
+look_for(sales)
+sales <- semi_join(sales, maizehh, by=c("y4_hhid"="hh_id_merge"))
+sales <- sales |> 
+  rename(id_code=ag5a_10_1)
+individual <- individual |> 
+  select(y4_hhid, id_code, female)
+sales <- left_join(sales,individual, by=c("y4_hhid", "id_code"))
+look_for(sales)
+sales$id_code <- NULL
+sales <- sales |> 
+  rename(id_code=ag5a_10_2) # now second decision-maker
+sales <- left_join(sales,individual, by=c("y4_hhid", "id_code"))
+look_for(sales)
+sales <- sales |> 
+  mutate(female_dm=case_when(female.x==1 & female.y==1 ~ 3, #female
+                             female.x==1 & is.na(female.y) ~ 3, #female
+                             is.na(female.x) & female.y==1 ~ 3, #female
+                             female.x==0 & female.y==1 ~ 2,
+                             female.x==1 & female.y==0 ~ 2, # joint
+                             female.x==0 & female.y==0 ~ 1, # male
+                             is.na(female.x) & female.y==0 ~ 1, # male
+                             female.x==0 & is.na(female.y) ~1, 
+                             .default = 99)
+  )
+frq(sales$female_dm)
+look_for(sales)
+sales <- sales[,c(1,5)]
+n_distinct(sales$y4_hhid)
+sales <- collap(sales, female_dm ~ y4_hhid, FUN = fmax)
+sales <- sales |> 
+  mutate(female_dm= factor(female_dm, levels = c(1,2,3), labels = c("Female", "Joint", "Male")))
+frq(sales$female_dm)
+rm(individual)
+
 
 ## Asset ownership ---- 
 ## no data available on owners - there is a section on household assets, but no info on ownership.
@@ -362,7 +400,7 @@ plot4 <- left_join(plot4, hpdata, by = "plot_id")
 look_for(plot4)
 remove(hpdata)
 plot4 <- plot4 |> rename(hhid=hh_id_merge)
-table(plot4$female_manager, plot4$female) # mninor differences
+table(plot4$female_manager, plot4$female) # minor differences
 mismatched_rows <- plot4 |> filter(female_manager != female)
 View(mismatched_rows) 
 
@@ -502,6 +540,9 @@ var_label(tza4$count_plot) <- "number of main maize plots"
 var_label(tza4$iv_maize) <- "HH has cultivated improved maize in at least one field"
 var_label(tza4$organic_fertilizer) <- "organig fertilizer applied to at least one maize plot"
 var_label(tza4$inorganic_fertilizer) <- "inorganig fertilizer applied to at least one maize plot"
+tza4<- left_join(tza4, sales, by=c("hhid"="y4_hhid"))
+frq(tza4$female_dm) 
+var_label(tza4$female_dm) <- "Who kept/decided what to do with crop income?"
 tza4 <- left_join(tza4, hdds4, by=c("hhid"="hh_id_merge"))
 tza4<- left_join(tza4, individual, by=c("hhid"="y4_hhid"))
 tza4 <- tza4 |> 

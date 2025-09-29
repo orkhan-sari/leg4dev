@@ -253,7 +253,7 @@ sales <- collap(sales, female_dm ~ y4_hhid, FUN = fmax)
 sales <- sales |> 
   mutate(female_dm= factor(female_dm, levels = c(1,2,3), labels = c("Female", "Joint", "Male")))
 frq(sales$female_dm)
-rm(individual, sales)
+rm(individual)
 
 ## Asset ownership ---- 
 ## no data available on owners
@@ -533,6 +533,8 @@ look_for(mlw4)
 rm(labs, mlw4adoption, common_names)
 mlw4$plot_area_GPS <- NULL
 look_for(mlw4)
+mlw4 <- left_join(mlw4, sales, by=c("hhid"="y4_hhid"))
+var_label(mlw4$female_dm) <- "Who kept/decided what to do with crop income?"
 mlw4 <- left_join(mlw4, hdds4, by=c("hhid"="hh_id_merge"))
 mlw4 <- left_join(mlw4, individual, by=c("hhid"="y4_hhid"))
 mlw4 <- mlw4 |> 

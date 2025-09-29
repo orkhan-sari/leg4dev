@@ -39,12 +39,12 @@ view(checkdf)
 frq(dftza$tracking_class) # 7 here different hh and 1 original 
 rm(checkdf)
 look_for(dftza)
-dftza <- dftza[,1:54]
+dftza <- dftza[,1:57]
 frq(dftza$rotation) # 25
-frq(dftza$intercrop_legume) #338
+frq(dftza$intercrop) #338
 dftza <- dftza |> 
   mutate(legume_intens=
-           case_when(rotation==1 | intercrop_legume==1 ~ 1L,
+           case_when(rotation==1 | intercrop==1 ~ 1L,
                      .default = 0L)
   )
 frq(dftza$legume_intens) # 353
@@ -77,7 +77,7 @@ dftza <- dftza |>
 frq(dftza$credit)
 var_label(dftza$credit) <- "= 1 if received credit"
 dftza <- dftza |> 
-  mutate(maize_share=plot_area_GPS/farm_size,
+  mutate(maize_share=plot_area/farm_size,
          year = case_when(
            wave=="wave4" ~ 2014,
            wave=="wave5" ~ 2020,

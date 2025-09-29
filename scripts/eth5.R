@@ -300,18 +300,25 @@ sales <- sales |>
   rename(s3q13=s11q13_2) # now second decision-maker
 sales <- left_join(sales,individual, by=c("household_id", "s3q13"))
 sales <- sales |> 
-  mutate(female.y=if_else(is.na(female.y),99,female.y))
-sales <- sales |> 
-  filter(!is.na(female.x)) |> 
-  mutate(female_dm=case_when(female.x==1 ~ 1,
-                             female.y==1 ~ 1,
-                             female.x==99 & female.y==99 ~ 99,
-                             .default = 0))
+  mutate(female_dm=case_when(female.x==1 & female.y==1 ~ 3, #female
+                             female.x==1 & is.na(female.y) ~ 3, #female
+                             is.na(female.x) & female.y==1 ~ 3, #female
+                             female.x==0 & female.y==1 ~ 2,
+                             female.x==1 & female.y==0 ~ 2, # joint
+                             female.x==0 & female.y==0 ~ 1, # male
+                             is.na(female.x) & female.y==0 ~ 1, # male
+                             female.x==0 & is.na(female.y) ~1, 
+                             .default = 99)
+  )
 frq(sales$female_dm)
 look_for(sales)
 sales <- sales[,c(1,6)]
+dim(sales)
 n_distinct(sales$household_id)
 sales <- collap(sales, female_dm ~ household_id, FUN = fmax)
+sales <- sales |> 
+  mutate(female_dm= factor(female_dm, levels = c(1,2,3), labels = c("Female", "Joint", "Male")))
+frq(sales$female_dm)
 
 ## Asset ownership ----
 assets <- read_dta("data/eth/ess5/sect11_hh_w5.dta") |> 
@@ -526,7 +533,7 @@ wave5 <- left_join(wave5, hhhp5, by=c("household_id"="hh_id_merge"))
 wave5 <- left_join(wave5, individual, by=join_by("household_id"))
 wave5 <- left_join(wave5, sales, by=join_by("household_id"))
 frq(wave5$female_dm) # 2 missing from hh questionarrie - 169NA
-var_label(wave5$female_dm) <- "female has some DMP on crop income"
+var_label(wave5$female_dm) <- "Who kept/decided what to do with crop income?"
 wave5 <- wave5 |> 
   mutate(female_edu=if_else(is.na(s2q03), 0, s2q03)) |> 
   select(-s2q03)

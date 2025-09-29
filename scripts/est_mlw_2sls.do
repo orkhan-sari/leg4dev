@@ -12,7 +12,7 @@ mdesc female_manager primary_education_manager age_manager hh_size hh_dependency
 	farm_size plot_certificate maize_share other_crops flat_slope mod_slope ln_dis_plot ///
 	hh_asset_index ln_other_income tlu subsistence_ag ///
 	extension_service credit_constrained fert_voucher bean_voucher eco_soil_mng ///
-	iv_maize organic_fertilizer inorganic_fertilizer  ///
+	iv_maize organic_fertilizer inorganic_fertilizer ///
 	soil_fertility_index twi rainfall_diff average_rainfall adopted_neighbors_10km 
 global vars female_manager primary_education_manager age_manager ///
 	maize_share flat_slope ln_dis_plot subsistence_ag soil_fertility_index twi rainfall_diff average_rainfall 
@@ -25,7 +25,6 @@ keep if n_obs == max_obs
 drop n_obs max_obs missing_flag // 867 hhs
 
 **## Estimating the Average Treatment Effect Using IV Wooldridge 2010 procedure 21.1 
-* planting dates for maize usually june july, and for legumes end july and august
 global xlist i.female_manager i.primary_education_manager age_manager hh_size hh_dependency_ratio ///
 	farm_size maize_share other_crops i.flat_slope i.mod_slope ln_dis_plot ///
 	hh_asset_index ln_other_income tlu i.subsistence_ag ///
@@ -81,28 +80,28 @@ global intlist i.legume_intens i.female_manager i.primary_education_manager age_
 	i.region i.year
 xtpoisson HDDS i.legume_intens#i.female_manager $intlist , fe vce(robust)
 eststo female: margins, dydx(legume_intens) at(female_manager=(0 1)) post 
-marginsplot, title("") horizontal plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) xline(0, lwidth(thick)) xtitle("Effects on linear prediction", margin(0 0 0 2)) ytitle("") ylabel( 0 "Male" 1 "Female") title("HDDS")  name(figgender, replace)
+marginsplot, title("") horizontal plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(midblue )) xline(0, lwidth(medthick)) xtitle("Effects on linear prediction", margin(0 0 0 2)) ytitle("") ylabel( 0 "Male" 1 "Female") title("HDDS") name(figgender, replace)
 * the effect is statistically signifficant for female managers
 
 qui xtpoisson HDDS i.legume_intens#i.inorganic_fertilizer $intlist , fe vce(robust)
 eststo female: margins, dydx(legume_intens) at(inorganic_fertilizer=(0 1)) post 
-marginsplot, title("") horizontal plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) xline(0, lwidth(thick)) xtitle("Effects on linear prediction", margin(0 0 0 2)) ytitle("") ylabel( 0 "No fertilizer" 1 "Fertilizer") title("HDDS")  name(figfert, replace)
+marginsplot, title("") horizontal plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(midblue )) xline(0, lwidth(medthick)) xtitle("Effects on linear prediction", margin(0 0 0 2)) ytitle("") ylabel( 0 "No fertilizer" 1 "Fertilizer") title("HDDS")  name(figfert, replace)
 
 qui xtpoisson HDDS i.legume_intens#c.hh_asset_index $intlist , fe vce(robust)
-eststo asset: margins, dydx(legume_intens) at(hh_asset_index =(-0.60(0.5)5)) post
-marginsplot, title("")  plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) yline(0, lwidth(thick)) xtitle("Asset index (PCA)", margin(0 0 0 2)) ytitle("") name(fig1, replace)
+eststo asset: margins, dydx(legume_intens) at(hh_asset_index =(-0.65(0.5)5)) post
+marginsplot, title("")  plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(midblue )) yline(0, lwidth(medthick)) xtitle("Asset index (PCA)", margin(0 0 0 2)) ytitle("") addplot(histogram hh_asset_index, percent fcolor(gs0%35) lcolor(gs0%15) lpattern(solid) yaxis(2) yscale(alt axis(2)) xlabel(-0.70(0.5)5)) legend(off) name(fig1, replace)
 
 qui xtpoisson HDDS i.legume_intens#c.rainfall_diff $intlist , fe vce(robust)
 eststo market: margins, dydx(legume_intens) at(rainfall_diff=(-285(35)305)) post 
-marginsplot, title("")  plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) yline(0, lwidth(thick)) xtitle("Rainfall deviation from historic average (mm)", margin(0 0 0 2)) xlabel(-250(75)300)  ytitle("") name(fig2, replace)
+marginsplot, title("")  plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(midblue )) yline(0, lwidth(medthick)) xtitle("Rainfall deviation from historic average (mm)", margin(0 0 0 2)) xlabel(-250(75)300) addplot(histogram rainfall_diff, percent fcolor(gs0%35) lcolor(gs0%15) lpattern(solid) yaxis(2) yscale(alt axis(2)) xlabel(-250(75)300) ) legend(off) ytitle("") name(fig2, replace)
 
 qui xtpoisson HDDS i.legume_intens#c.ln_other_income $intlist , fe vce(robust)
 eststo market: margins, dydx(legume_intens) at(ln_other_income=(0(1)15)) post 
-marginsplot, title("") plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) yline(0, lwidth(thick)) xtitle("Income from off-farm work (natural logarithm)", size(small) margin(0 0 0 2) ) name(fig3, replace)
+marginsplot, title("") plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(midblue )) yline(0, lwidth(medthick)) xtitle("Income from off-farm work (natural logarithm)", size(small) margin(0 0 0 2)) xlabel(0(1)15)  addplot(histogram ln_other_income, percent fcolor(gs0%35) lcolor(gs0%15) lpattern(solid) yaxis(2) yscale(alt axis(2)) xlabel(0(1)15) ) legend(off)  name(fig3, replace)
 
 qui xtpoisson HDDS i.legume_intens#c.other_crops $intlist , fe vce(robust)
-eststo market: margins, dydx(legume_intens) at(other_crops=(0(1) 9)) post 
-marginsplot, title("") plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) yline(0, lwidth(thick) ) xtitle("Number of other crops produced", size(small) margin(0 0 0 2) ) name(fig4, replace)
+eststo market: margins, dydx(legume_intens) at(other_crops=(0(1) 22)) post 
+marginsplot, title("") plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(midblue  )) yline(0, lwidth(medthick) ) xtitle("Number of other crops produced", size(small) margin(0 0 0 2)) xlabel(0(2)22)  addplot(histogram other_crops, percent fcolor(gs0%35) lcolor(gs0%15) lpattern(solid) yaxis(2) yscale(alt axis(2)) xlabel(0(2)22) ) legend(off) name(fig4, replace)
 
 graph combine fig1 fig2 fig3 fig4, col(2) ///
 title("Average Marginal Effects of Legume Intensification") ///
@@ -112,12 +111,12 @@ graph export "C:\Users\490A\Nextcloud\Research\leg4dev\outputs\figures\mlw_hdds.
 **### FCS
 xtreg fcs i.legume_intens#i.female_manager $intlist, fe vce(robust)
 eststo female: margins, dydx(legume_intens) at(female_manager=(0 1)) post 
-marginsplot, title("") horizontal plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) xline(0, lwidth(thick)) xtitle("Effects on linear prediction", margin(0 0 0 2)) ytitle("") ylabel( 0 "Male" 1 "Female") title("FCS") name(figgender1, replace)
+marginsplot, title("") horizontal plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(ebblue)) xline(0, lwidth(medthick)) xtitle("Effects on linear prediction", margin(0 0 0 2)) ytitle("") ylabel( 0 "Male" 1 "Female") title("FCS") name(figgender1, replace)
 * no evidence of effect heterogeneity
 
 qui xtpoisson fcs i.legume_intens#i.inorganic_fertilizer $intlist , fe vce(robust)
 eststo female: margins, dydx(legume_intens) at(inorganic_fertilizer=(0 1)) post 
-marginsplot, title("") horizontal plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) xline(0, lwidth(thick)) xtitle("Effects on linear prediction", margin(0 0 0 2)) ytitle("") ylabel( 0 "No fertilizer" 1 "Fertilizer") title("FCS")  name(figfert1, replace)
+marginsplot, title("") horizontal plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(ebblue)) xline(0, lwidth(medthick)) xtitle("Effects on linear prediction", margin(0 0 0 2)) ytitle("") ylabel( 0 "No fertilizer" 1 "Fertilizer") title("FCS")  name(figfert1, replace)
 
 graph combine figgender figgender1 figfert figfert1, col(2) ///
 title("Average Marginal Effects of Legume Intensification") ///
@@ -126,20 +125,20 @@ graph export "C:\Users\490A\Nextcloud\Research\leg4dev\outputs\figures\mlw_gende
 
 qui xtreg fcs i.legume_intens#c.hh_asset_index $intlist , fe vce(robust)
 eststo asset: margins, dydx(legume_intens) at(hh_asset_index =(-0.70(0.5)5)) post
-marginsplot, title("")  plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) yline(0, lwidth(thick)) xtitle("Asset index (PCA)", margin(0 0 0 2)) ytitle("") name(fig1, replace)
+marginsplot, title("")  plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(midblue )) yline(0, lwidth(medthick)) xtitle("Asset index (PCA)", margin(0 0 0 2)) ytitle("") addplot(histogram hh_asset_index, percent fcolor(gs0%35) lcolor(gs0%15) lpattern(solid) yaxis(2) yscale(alt axis(2)) xlabel(-0.70(0.5)5)) legend(off) name(fig1, replace)
 
 qui xtreg fcs i.legume_intens#c.rainfall_diff $intlist , fe vce(robust)
 eststo market: margins, dydx(legume_intens) at(rainfall_diff=(-285(35)305)) post 
-marginsplot, title("")  plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) yline(0, lwidth(thick)) xtitle("Rainfall deviation from historic average (mm)", margin(0 0 0 2)) xlabel(-250(75)300)  ytitle("") name(fig2, replace)
+marginsplot, title("")  plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(midblue )) yline(0, lwidth(medthick)) xtitle("Rainfall deviation from historic average (mm)", margin(0 0 0 2)) xlabel(-250(75)300) addplot(histogram rainfall_diff, percent fcolor(gs0%35) lcolor(gs0%15) lpattern(solid) yaxis(2) yscale(alt axis(2)) xlabel(-250(75)300) ) legend(off) ytitle("") name(fig2, replace)
 * no evidence of effect heterogeneity
 
 qui xtreg fcs i.legume_intens#c.ln_other_income $intlist , fe vce(robust)
 eststo market: margins, dydx(legume_intens) at(ln_other_income=(0(1)15)) post 
-marginsplot, title("") plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) yline(0, lwidth(thick)) xtitle("Income from off-farm work (natural logarithm)", size(small) margin(0 0 0 2) ) name(fig3, replace)
+marginsplot, title("") plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(midblue )) yline(0, lwidth(medthick)) xtitle("Income from off-farm work (natural logarithm)", size(small) margin(0 0 0 2)) xlabel(0(1)15)  addplot(histogram ln_other_income, percent fcolor(gs0%35) lcolor(gs0%15) lpattern(solid) yaxis(2) yscale(alt axis(2)) xlabel(0(1)15) ) legend(off)  name(fig3, replace)
 
 qui xtreg fcs i.legume_intens#c.other_crops $intlist , fe vce(robust)
-eststo market: margins, dydx(legume_intens) at(other_crops=(0(1) 9)) post 
-marginsplot, title("") plotopts(msize(medium)) recast(scatter) ci(lwidth(thick) lpattern(dash) lcolor(ebblue)) yline(0, lwidth(thick) ) xtitle("Number of other crops produced", size(small) margin(0 0 0 2) ) name(fig4, replace)
+eststo market: margins, dydx(legume_intens) at(other_crops=(0(1) 22)) post 
+marginsplot, title("") plotopts(msize(medium)) recast(scatter) ci(lwidth(medium) lpattern(dash) lcolor(midblue )) yline(0, lwidth(medthick) ) xtitle("Number of other crops produced", size(small) margin(0 0 0 2)) xlabel(0(2)22) addplot(histogram other_crops, percent fcolor(gs0%35) lcolor(gs0%15) lpattern(solid) yaxis(2) yscale(alt axis(2)) xlabel(0(2)22) ) legend(off) name(fig4, replace)
 
 graph combine fig1 fig2 fig3 fig4, col(2) ///
 title("Average Marginal Effects of Legume Intensification") ///

@@ -171,7 +171,8 @@ movedhh <- dfmlwfull |>
   select(hh_id_obs, hh_a11, region, moved, wave) |> 
   filter(moved=="TRUE")
 # for two hhs 2005161 and 2004821, the location was noted as to be the same dwelling but region code is different.
-# this is probably an error. 
+# this is probably an error.
+rm(movedhh) 
 
 get_mode <- function(x) {
   ux <- na.omit(unique(x))
@@ -418,6 +419,5 @@ rm(dfspatialmlw2, dfspatialmlw3, dfspatialmlw4, dfn, dfnmlw, within10km_adopted,
 # dir.create("data/est") # create the folder for estimation STATA datasets
 write_dta(dfmlw3, "data/est/dfmlw3.dta", version = 15) # HH that grown maize as a main crop in all 3 rounds
 saveRDS(dfmlw3, file = "data/est/dfmlw3.rds")
-
 
 

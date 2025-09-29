@@ -231,13 +231,44 @@ var_label(modd$female) <- "female primary dm concern. activities on maize plots"
 modd <- modd |> select(plot_id, female,hh_b05a )
 plot2 <- left_join(plot2, modd, by="plot_id")
 plot2 <- plot2 |> rename(age_manager_row=hh_b05a)
-remove(modd, individual)
+remove(modd)
 
 ## DM on crop income ----
-sales <- read_dta("data/mlw/ag_mod_g_13.dta") |>
-  select(y2_hhid, ag_g00, ag_g0a, ag_g14a, ag_g14b) |> 
-  mutate(plot_id = paste(y2_hhid, ag_g00, sep = "-"))
-sales <- semi_join(sales, maizeplots, by="plot_id")
+sales <- read_dta("data/mlw/ag_mod_i_13.dta") |> 
+  select(y2_hhid, ag_i14a, ag_i14b) |> 
+  filter(!is.na(ag_i14a))
+sales <- semi_join(sales, maizehh, by=c("y2_hhid"="hh_id_merge"))
+sales <- sales |> 
+  rename(id_code=ag_i14a)
+individual$hh_b05a <- NULL # drop age
+individual$hh_b03 <- NULL
+sales <- left_join(sales,individual, by=c("y2_hhid", "id_code"))
+look_for(sales)
+sales$id_code <- NULL
+sales <- sales |> 
+  rename(id_code=ag_i14b) # now second decision-maker
+sales <- left_join(sales,individual, by=c("y2_hhid", "id_code"))
+sales <- sales |> 
+  mutate(female_dm=case_when(female.x==1 & female.y==1 ~ 3, #female
+                             female.x==1 & is.na(female.y) ~ 3, #female
+                             is.na(female.x) & female.y==1 ~ 3, #female
+                             female.x==0 & female.y==1 ~ 2,
+                             female.x==1 & female.y==0 ~ 2, # joint
+                             female.x==0 & female.y==0 ~ 1, # male
+                             is.na(female.x) & female.y==0 ~ 1, # male
+                             female.x==0 & is.na(female.y) ~1, 
+                             .default = 99)
+  )
+frq(sales$female_dm)
+look_for(sales)
+sales <- sales[,c(1,5)]
+dim(sales)
+n_distinct(sales$y2_hhid)
+sales <- collap(sales, female_dm ~ y2_hhid, FUN = fmax)
+sales <- sales |> 
+  mutate(female_dm= factor(female_dm, levels = c(1,2,3), labels = c("Female", "Joint", "Male")))
+frq(sales$female_dm)
+rm(individual)
 # Unfortunately, there are many missing values for the question on
 # Who in the household makes the decision concerning the use of the [CROP]? 
 # Also we find many missing on crop income in next waves, because many did not sell and thus did not make any decisions 
@@ -508,6 +539,8 @@ look_for(mlw2)
 rm(labs, mlw2adoption, common_names)
 mlw2$plot_area_GPS <- NULL
 look_for(mlw2)
+mlw2 <- left_join(mlw2, sales, by=c("hhid"="y2_hhid"))
+var_label(mlw2$female_dm) <- "Who kept/decided what to do with crop income?"
 mlw2 <- left_join(mlw2, hdds2, by=c("hhid"="hh_id_merge"))
 mlw2 <- left_join(mlw2, individual, by=c("hhid"="y2_hhid"))
 mlw2 <- mlw2 |> 

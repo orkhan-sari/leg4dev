@@ -26,16 +26,6 @@ gen check = 1 if dis_market_m != dist_market
 drop check dis_market_m
 
 **# Panel data switching regression with control function - Estimating the Average Treatment Effect Using IV Wooldridge 2010 procedure 21.1 
-local temp female_manager primary_education_manager age_manager hh_size hh_dependency_ratio ///
-	farm_size maize_share other_crops flat_slope ln_dis_plot dist_market ///
-	hh_asset_index ln_other_income tlu subsistence_ag ///
-	extension_program advisory_service credit_unavailable eco_soil_mng ///
-	iv_maize organic_fertilizer inorganic_fertilizer ///
-	soil_fertility_index twi rainfall_diff average_rainfall   
-foreach var of varlist `temp' {   
-qui egen mean_`var'=mean(`var'), by(hh_id_obs)
-}
-qui egen adopted_neighbors_10km_mean=mean(adopted_neighbors_10km), by(hh_id_obs)
 global xlist i.female_manager i.primary_education_manager age_manager hh_size hh_dependency_ratio ///
 	farm_size maize_share other_crops flat_slope ln_dis_plot dist_market ///
 	hh_asset_index ln_other_income tlu i.subsistence_ag ///
@@ -44,8 +34,6 @@ global xlist i.female_manager i.primary_education_manager age_manager hh_size hh
 	soil_fertility_index twi rainfall_diff average_rainfall ///
 	i.year i.region
 global ivlist adopted_neighbors_10km 
-
-**## Legume intensification and gender
 xtset hh_id_obs year
 xtlogit legume_intens $xlist $ivlist , fe
 estimates store fixed
@@ -54,7 +42,11 @@ estimates store random
 hausman fixed random
 * fixed prefered at 5% (but not 1%), but 306 groups (612 obs) omitted because of all positive or all negative outcomes.
 * for 63% of the sample the outcome within hh does not change, thus FE keeps only 362 obs (182 groups) and
-* nevertheless time-invariant unobserved hetrogeneity shall not be ignored. 
+* nevertheless time-invariant unobserved hetrogeneity shall not be ignored.
+
+
+
+**## Legume intensification and gender
 xtlogit legume_intens $xlist $ivlist, fe vce(bootstrap , rep(50))
 outreg2 using "outputs\results\determinants_eth", excel replace sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Fixed effects Logit") addnote(Bootstrapped standard errors in paranthesis; Hausman test that indicates random-effects is appropriate)
 xtlogit legume_intens $xlist $ivlist, re vce(bootstrap , rep(50))
@@ -64,6 +56,15 @@ outreg2 using "outputs\results\determinants_eth", excel append sideway bdec(2) c
 
 **## Main estimations - 2SLS: HDDS, total consumption, food consumption
 ** Estimating the Average Treatment Effect Using IV Wooldridge 2010 procedure 21.1 
+local temp female_manager primary_education_manager age_manager hh_size hh_dependency_ratio ///
+	farm_size maize_share other_crops flat_slope ln_dis_plot dist_market ///
+	hh_asset_index ln_other_income tlu subsistence_ag ///
+	extension_program advisory_service credit_unavailable eco_soil_mng ///
+	iv_maize organic_fertilizer inorganic_fertilizer ///
+	soil_fertility_index twi rainfall_diff average_rainfall adopted_neighbors_10km  
+foreach var of varlist `temp' {   
+qui egen mean_`var'=mean(`var'), by(hh_id_obs)
+}
 qui probit legume_intens $xlist $ivlist mean_* i.year adopted_neighbors_10km_mean i.region, vce(cluster hh_id_obs)
 predict ghat
 xtivreg HDDS $xlist (legume_intens=ghat), fe vce(cluster hh_id_obs)

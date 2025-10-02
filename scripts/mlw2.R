@@ -354,16 +354,20 @@ rm(fcs)
 
 # Food security
 fs <- read_dta("data/mlw/hh_mod_h_13.dta") |> 
-  select(y2_hhid, hh_h01, hh_h04)
+  select(y2_hhid, hh_h01, hh_h02a, hh_h02b, hh_h02c, hh_h02d, hh_h02e) |> 
+  filter(hh_h01==1) |> 
+  select(-hh_h01)
 look_for(fs)
 fs <- fs |> 
-  mutate(enough_food = if_else(hh_h01==1, 1, 0),
-         enough_food12 = if_else(hh_h04==1, 1, 0)
+  mutate(hh_h02d  = if_else(is.na(hh_h02d), 0, hh_h02d),
+         csi=(hh_h02a + hh_h02b + hh_h02c + hh_h02d *3 + hh_h02e * 2)
   ) |> 
-  select(-hh_h01, -hh_h04)
+  select(y2_hhid, csi)
 fs <- semi_join(fs, maizehh, by=c("y2_hhid" = "hh_id_merge"))
 hdds2 <- left_join(hdds2, fs, by=c("hh_id_merge" = "y2_hhid"))
-rm(fs)
+look_for(hdds2)
+hdds2$csi[is.na(hdds2$csi)] <- 0
+var_label(hdds2$csi) <- "comparative (reduced) coping strategy index "
 
 ### ### ### ### ### ### ### ###
 # Final data  ----

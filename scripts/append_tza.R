@@ -39,7 +39,7 @@ view(checkdf)
 frq(dftza$tracking_class) # 7 here different hh and 1 original 
 rm(checkdf)
 look_for(dftza)
-dftza <- dftza[,1:57]
+dftza <- dftza[,1:58]
 frq(dftza$rotation) # 25
 frq(dftza$intercrop) #338
 dftza <- dftza |> 

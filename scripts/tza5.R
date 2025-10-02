@@ -248,6 +248,24 @@ plot5 <- left_join(plot5, soil_type, by="plot_id")
 var_label(plot5$soil) <-  "loam soil type"
 remove(soil_type)
 
+## Slop ----
+slope <-  read_dta("data/tza/tza_wave5_2020_21/ag_sec_3a.dta") |> 
+  select(y5_hhid, plot_id, ag3a_17) |>
+  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-"))
+slope <- semi_join(slope, maizeplots, by="plot_id")
+frq(slope$ag3a_17)
+slope <- slope |> 
+  mutate(flat_slope=case_when(ag3a_17 %in% c(1,2) ~ 1,
+                              .default=0)
+  )
+frq(slope$flat_slope)
+n_distinct(slope$plot_id)
+look_for(slope)
+slope <- slope |> select(plot_id, flat_slope)
+plot5 <- left_join(plot5, slope, by="plot_id")
+var_label(plot5$flat_slope) <- "flat slope"
+remove(slope)
+
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
@@ -416,7 +434,7 @@ look_for(plot5)
 tza5 <- plot5 |> 
   select(-plot_id_merge, -respondent_id_obs, -respondent_id_merge,-age_manager_row)
 look_for(tza5)
-tza5 <- tza5 |> select(10:11, 1:9, 13, 15:36)
+tza5 <- tza5 |> select(11:12, 1:10, 14, 16:37)
 n_distinct(tza5$hh_id_obs) # 1189 hhs, 1541 obs
 tza5 <- tza5 |> 
   group_by(hh_id_obs) |> 
@@ -450,7 +468,6 @@ tza5adoption <- tza5adoption |>
   filter(intercrop != 0 | rotation != 0) |> 
   ungroup()
 table(tza5adoption$intercrop, tza5adoption$rotation)
-# there are only 33 observations where both rotation and intercrop are observed.
 # first keep these plots and hhs, and drop if there is another plot where one practice is practiced
 tza5adoption <- tza5adoption |> 
   group_by(hh_id_obs) |> 
@@ -927,39 +944,6 @@ tza5 <- left_join(tza5, plot_data, by=c("hhid"="y5_hhid"))
 frq(tza5$other_crops)
 var_label(tza5$other_crops) <- "number of other crops produced"
 rm(maizehh, plot_data)
-
-## Slop ----
-modd <-  read_dta("data/tza/tza_wave5_2020_21/ag_sec_3a.dta") |> 
-  select(y5_hhid, plot_id, ag3a_17) |>
-  mutate(plot_id = paste(y5_hhid, plot_id, sep = "-"))
-modd <- semi_join(modd, maizeplots, by="plot_id")
-frq(modd$ag3a_17) # do mode max again, if there is a steep slope that will be captured this way too. 
-modd <- modd |>
-  mutate(ag3a_17 = as.numeric(modd$ag3a_17))
-
-mode_or_max <- function(x) {
-  x <- x[!is.na(x)]
-  if (length(x) == 0) return(NA)
-  
-  tab <- table(x)
-  most_common <- which(tab == max(tab))
-  
-  if (length(most_common) == 1) {
-    return(as.numeric(names(most_common)))
-  } else {
-    return(max(as.numeric(names(most_common))))
-  }
-} 
-
-modd <- collap(modd, ag3a_17 ~ y5_hhid, FUN =mode_or_max) 
-modd <- modd |> 
-  mutate(flat_slope= case_when(ag3a_17 %in% c(1,2) ~ 1,
-                               .default = 0)) |> 
-  select(y5_hhid, flat_slope)
-frq(modd$flat_slope)
-tza5 <- left_join(tza5, modd, by=c("hhid"="y5_hhid"))
-var_label(tza5$flat_slope) <- "Dominant slope"
-remove(modd, maizeplots, mode_or_max)
 tza5$plot_dist_household <- NULL
 ### ### ### ### ### ### ### ### #### ##### #### ### ###
 # Auxiliary Check: How Many LR Legume-Growing Households Planted Maize in the SR

@@ -46,12 +46,14 @@ drop _est_fixed _est_random
 **# Legume intensification and gender
 xtlogit legume_intens $xlist $ivlist, fe vce(bootstrap , rep(50))
 outreg2 using "outputs\results\determinants_mlw", excel replace sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Fixed effects logit") addnote(Bootstrapped standard errors in paranthesis; Hausman test indicates that fixed-effects is appropriate)
+xtreg legume_intens $xlist $ivlist, fe vce(bootstrap , rep(50))
+outreg2 using "outputs\results\determinants_mlw", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Fixed effects LPM") addnote(Bootstrapped standard errors in paranthesis; Hausman test indicates that fixed-effects is appropriate)
 xtlogit legume_intens $xlist $ivlist, re vce(bootstrap , rep(50))
 outreg2 using "outputs\results\determinants_mlw", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Random effects logit")
 logit legume_intens $xlist $ivlist, vce(bootstrap , rep(50))
 outreg2 using "outputs\results\determinants_mlw", excel append sideway bdec(2) cdec(2) label symbol(***, **, *) alpha (.01, .05, .10) stats(coef se) cti("Pooled Logit")
 
-**## Main estimation - 2SLS: HDDS, food consumption score
+**## Main estimation - ivreg: HDDS, food consumption score
 * total consumption - missing for wave 4 and 5
 ** Estimating the Average Treatment Effect Using IV Wooldridge 2010 procedure 21.1 
 local temp female_manager primary_education_manager age_manager hh_size hh_dependency_ratio ///

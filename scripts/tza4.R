@@ -248,6 +248,25 @@ plot4 <- left_join(plot4, soil_type, by="plot_id")
 var_label(plot4$soil) <-  "loam soil type"
 remove(soil_type)
 
+## Slope ----
+slope <-  read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |> 
+  select(y4_hhid, plotnum, plotname, ag3a_17) |>
+  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-")) |> 
+  select(-plotnum, -plotname)
+slope <- semi_join(slope, maizeplots, by="plot_id")
+frq(slope$ag3a_17)
+slope <- slope |> 
+  mutate(flat_slope=case_when(ag3a_17 %in% c(1,2) ~ 1,
+                              .default=0)
+  )
+frq(slope$flat_slope)
+n_distinct(slope$plot_id)
+slope <- slope |> select(3,4)
+plot4 <- left_join(plot4, slope, by="plot_id")
+var_label(plot4$flat_slope) <- "flat slope"
+remove(slope)
+look_for(plot4)
+
 ### ### ### ### ### ### ### ###
 # Gender: measures of women's status ####
 ### ### ### ### ### ### ### ###
@@ -419,7 +438,7 @@ look_for(plot4)
 tza4 <- plot4 |> 
   select(-plot_id_merge, -respondent_id_obs, -respondent_id_merge,-age_manager_row)
 look_for(tza4)
-tza4 <- tza4 |> select(10:11, 1:9, 13, 15:36)
+tza4 <- tza4 |> select(11:12, 1:10, 14, 16:37)
 n_distinct(tza4$hh_id_obs) # 911 hhs, 1204 obs
 tza4 <- tza4 |> 
   group_by(hh_id_obs) |> 
@@ -453,7 +472,7 @@ tza4adoption <- tza4adoption |>
   filter(intercrop != 0 | rotation != 0) |> 
   ungroup()
 table(tza4adoption$intercrop, tza4adoption$rotation)
-# there are only 33 observations where both rotation and intercrop are observed.
+# there are only 14 observations where both rotation and intercrop are observed.
 # first keep these plots and hhs, and drop if there is another plot where one practice is practiced
 tza4adoption <- tza4adoption |> 
   group_by(hh_id_obs) |> 
@@ -950,40 +969,6 @@ tza4 <- left_join(tza4, plot_data, by=c("hhid"="y4_hhid"))
 frq(tza4$other_crops)
 var_label(tza4$other_crops) <- "number of other crops produced"
 rm(maizehh, plot_data)
-
-## Slop ----
-modd <-  read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_3a.dta") |> 
-  select(y4_hhid, plotnum, plotname, ag3a_17) |>
-  mutate(plot_id = paste(y4_hhid, plotnum, sep = "-"))
-modd <- semi_join(modd, maizeplots, by="plot_id")
-frq(modd$ag3a_17) # do mode max again, if there is a steep slope that will be captured this way too. 
-modd <- modd |>
-  mutate(ag3a_17 = as.numeric(modd$ag3a_17))
-
-mode_or_max <- function(x) {
-  x <- x[!is.na(x)]
-  if (length(x) == 0) return(NA)
-  
-  tab <- table(x)
-  most_common <- which(tab == max(tab))
-  
-  if (length(most_common) == 1) {
-    return(as.numeric(names(most_common)))
-  } else {
-    return(max(as.numeric(names(most_common))))
-  }
-} 
-
-modd <- collap(modd, ag3a_17 ~ y4_hhid, FUN =mode_or_max) 
-frq(modd$ag3a_17)
-modd <- modd |> 
-  mutate(flat_slope= case_when(ag3a_17 %in% c(1,2) ~ 1,
-                               .default = 0)) |> 
-  select(y4_hhid, flat_slope)
-frq(modd$flat_slope)
-tza4 <- left_join(tza4, modd, by=c("hhid"="y4_hhid"))
-var_label(tza4$flat_slope) <- "Dominant slope"
-remove(modd, maizeplots, mode_or_max)
 tza4$plot_dist_household <- NULL
 
 ### ### ### ### ### ### ### ### #### ##### #### ### ###

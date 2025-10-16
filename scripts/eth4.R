@@ -728,7 +728,7 @@ eth4 <- left_join(eth4, head, by="household_id")
 rm(head)
 
 
-## Other crops produced 
+## Other crops produced ----
 crops <- read_dta("data/eth/ess4/sect4_pp_w4.dta") |>   #crop roster
   select(household_id, s4q01b)
 crops <- semi_join(crops, maizehh, by= join_by("household_id"=="hh_id_merge"))
@@ -747,7 +747,55 @@ crops <- crops |>
   ungroup()
 eth4 <- left_join(eth4, crops, by="household_id")
 var_label(eth4$other_crops) <- "number of other crops produced"
-remove(maizehh, crops)
+remove(crops)
+
+## PSNP labour ----
+wage <- read_dta("data/eth/ess4/sect4_hh_w4.dta") |> 
+  filter(saq14==1) |> 
+  select(household_id, s4q45) 
+wage <- semi_join(wage, maizehh, by= join_by("household_id"=="hh_id_merge"))
+look_for(wage)
+wage <- wage |>
+  mutate(s4q45=as.numeric(s4q45)) |>
+  group_by(household_id) |> 
+  summarize(psnp_labour=min(s4q45)) |> 
+  ungroup() # 1 is yes
+frq(wage$psnp_labour)
+eth4 <- left_join(eth4, wage, by="household_id")
+frq(eth4$psnp_labour)
+eth4$psnp_labour[is.na(eth4$psnp_labour)] <- 2
+eth4 <- eth4 |> 
+  mutate(psnp_labour=if_else(psnp_labour==2, 0, 1))
+frq(eth4$psnp_labour)
+var_label(eth4$psnp_labour) <- "cash or food for work"
+rm(wage)
+
+## PSNP assistance----
+psnp <- read_dta("data/eth/ess4/sect14_hh_w4.dta") |> 
+  filter(saq14==1) |> 
+  filter(assistance_cd==1) |> 
+  select(household_id, s14q01)
+psnp <- semi_join(psnp, maizehh, by= join_by("household_id"=="hh_id_merge"))
+look_for(psnp)
+frq(psnp$s14q01)
+psnp <- psnp |> 
+  rename(psnp_assistance=s14q01)
+frq(psnp$psnp_assistance)
+eth4 <- left_join(eth4, psnp, by="household_id")
+frq(eth4$psnp_assistance)
+eth4$psnp_assistance[is.na(eth4$psnp_assistance)] <- 2
+eth4 <- eth4 |> 
+  mutate(psnp_assistance=if_else(psnp_assistance==2, 0, 1))
+var_label(eth4$psnp_assistance) <- "psnp assistance during past 12m"
+rm(psnp, maizehh)
+look_for(eth4)
+
+## Rainfall lsms ----
+rain <- read_dta("data/eth/ess4/ETH_HouseholdGeovariables_Y4.dta") |> 
+  select(household_id, anntot_avg)
+look_for(rain)
+eth4 <- left_join(eth4, rain, by="household_id")
+rm(rain)
 
 # Notes on missing data ----
 ## 95 hhs do not have agricultural assets but still have asset index. This is because, 

@@ -854,6 +854,12 @@ frq(mlw3$other_crops)
 var_label(mlw3$other_crops) <- "number of other crops produced"
 rm(maizehh, garden)
 
+## Rainfall lsms ----
+rain <- read_dta("data/mlw/HouseholdGeovariablesIHPSY3.dta") |> 
+  select(y3_hhid, anntot_avg)
+look_for(rain)
+mlw3 <- left_join(mlw3, rain, by=c("hhid"="y3_hhid"))
+rm(rain)
 ## Missing data and notes ----
 ## shocks missing for 16 hhs
 

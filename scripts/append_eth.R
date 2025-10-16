@@ -47,12 +47,10 @@ table(dfeth$wave, dfeth$plot_dist_household) # missing from wave5
 dfeth <- dfeth |> 
   group_by(hh_id_obs) |> 
   mutate(
-    dis_plot1 = max(plot_dist_household, na.rm = TRUE),       # max within hh_id_obs
-    dis_plot = if_else(is.na(plot_dist_household), dis_plot1, plot_dist_household),
-    ln_dis_plot = log1p(dis_plot)
-  ) %>%
+    dis_plot1 = min(plot_dist_household, na.rm = TRUE),       # max within hh_id_obs
+    plot_dist_household = if_else(is.na(plot_dist_household), dis_plot1, plot_dist_household)
+    ) |> 
   ungroup()
-dfeth$dis_plot <- NULL
 dfeth$dis_plot1 <- NULL
 
 #### Consumption ##

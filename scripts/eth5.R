@@ -737,7 +737,7 @@ head <- head |>
 eth5 <- left_join(eth5, head, by="household_id")
 rm(head)
 
-## Other crops produced 
+## Other crops produced ----
 crops <- read_dta("data/eth/ess5/sect4_pp_w5.dta") |>   #crop roster
   select(household_id, s4q01b)
 crops <- semi_join(crops, maizehh, by= join_by("household_id"=="hh_id_merge"))
@@ -756,11 +756,54 @@ crops <- crops |>
   ungroup()
 eth5 <- left_join(eth5, crops, by="household_id")
 var_label(eth5$other_crops) <- "number of other crops produced"
-remove(maizehh, crops)
+remove(crops)
 
+## PSNP labour ----
+wage <- read_dta("data/eth/ess5/sect4_hh_w5.dta") |> 
+  filter(saq14==1) |> 
+  select(household_id, s4q45) 
+wage <- semi_join(wage, maizehh, by= join_by("household_id"=="hh_id_merge"))
+look_for(wage)
+wage <- wage |>
+  mutate(s4q45=as.numeric(s4q45)) |>
+  group_by(household_id) |> 
+  summarize(psnp_labour=min(s4q45)) |> 
+  ungroup() # 1 is yes
+frq(wage$psnp_labour)
+eth5 <- left_join(eth5, wage, by="household_id")
+frq(eth5$psnp_labour)
+eth5$psnp_labour[is.na(eth5$psnp_labour)] <- 2
+eth5 <- eth5 |> 
+  mutate(psnp_labour=if_else(psnp_labour==2, 0, 1))
+rm(wage)
+var_label(eth5$psnp_labour) <- "cash or food for work"
 
+## PSNP assistance----
+psnp <- read_dta("data/eth/ess5/sect14_hh_w5.dta") |> 
+  filter(saq14==1) |>
+  filter(assistance_cd==1) |> 
+  select(household_id, s14q01)
+psnp <- semi_join(psnp, maizehh, by= join_by("household_id"=="hh_id_merge"))
+look_for(psnp)
+frq(psnp$s14q01)
+psnp <- psnp |> 
+  rename(psnp_assistance=s14q01)
+frq(psnp$psnp_assistance)
+eth5 <- left_join(eth5, psnp, by="household_id")
+frq(eth5$psnp_assistance)
+eth5$psnp_assistance[is.na(eth5$psnp_assistance)] <- 2
+eth5 <- eth5 |> 
+  mutate(psnp_labour=if_else(psnp_labour==2, 0, 1))
+var_label(eth4$psnp_assistance) <- "psnp assistance durin gpast 12m"
+rm(psnp, maizehh)
+look_for(eth4)
 
-
+## Rainfall lsms ----
+rain <- read_dta("data/eth/ess5/eth_householdgeovariables_y5.dta") |> 
+  select(household_id, anntot_avg)
+look_for(rain)
+eth5<- left_join(eth5, rain, by="household_id")
+rm(rain)
 
 
 

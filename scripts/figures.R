@@ -5,36 +5,37 @@ pacman::p_load(vcd,
                tidyverse, 
                modelsummary,
                estimatr,
+               gmodels,
                pandoc)
 # Tables =====
-# summary tables 
-tb1 <- dfmlw3 |> 
+# summary tables ----
+tb1 <- dfmlwfull |> 
   select("HDDS", "fcs", "female_manager", "primary_education_manager", "age_manager", "hh_size", "hh_dependency_ratio",
            "farm_size", "maize_share", "other_crops", "flat_slope", "mod_slope", "ln_dis_plot",
            "hh_asset_index", "ln_other_income", "tlu", "subsistence_ag",
            "extension_service", "credit_constrained", "fert_voucher", "bean_voucher", "eco_soil_mng",
-           "iv_maize", "organic_fertilizer", "inorganic_fertilizer", 
+           "iv_maize", "organic_fertilizer", "inorganic_fertilizer", "legume_intens",
            "soil_fertility_index", "twi", "rainfall_diff", "average_rainfall", "adopted_neighbors_10km", "year")
-tbl1  <-  datasummary_balance(~year , tb1, title = "Malawi",
+tbl1  <-  datasummary_balance(~year , tb1, title = "Malawi all rounds",
                               fmt = fmt_decimal(digits = 2),
                               output = "flextable")
 tb2 <- dfeth |> 
   select("HDDS", "female_manager", "primary_education_manager", "age_manager", "hh_size", "hh_dependency_ratio",
-         "farm_size", "maize_share", "other_crops", "flat_slope", "dist_market", "ln_dis_plot",
+         "farm_size", "maize_share", "other_crops", "flat_slope", "dist_market", "plot_dist_household",
          "hh_asset_index", "ln_other_income", "tlu", "subsistence_ag",
          "extension_program", "advisory_service", "credit_unavailable", "eco_soil_mng",
-         "iv_maize", "organic_fertilizer", "inorganic_fertilizer", 
+         "iv_maize", "organic_fertilizer", "inorganic_fertilizer", "legume_intens",
          "soil_fertility_index", "twi", "rainfall_diff", "average_rainfall", "adopted_neighbors_10km", "year")
 tbl2  <-  datasummary_balance(~year , tb2, title = "Ethiopia",
                               fmt = fmt_decimal(digits = 2),
                               output = "flextable")
 tb3 <- dftza |> 
   select("HDDS", "fcs", "female_manager", "primary_education_manager", "age_manager", "hh_size", "hh_dependency_ratio",
-         "farm_size", "plot_certificate", "maize_share", "other_crops", "flat_slope", "plot_hh_dist_mean",
+         "farm_size", "plot_certificate", "maize_share", "other_crops", "flat_slope", "plot_dist_household",
          "hh_asset_index", "ln_other_income", "tlu", "subsistence_ag",
          "extension_service", "credit", "crop_residue_short", "crop_residue_long" ,
-         "iv_maize", "organic_fertilizer", "inorganic_fertilizer", 
-         "rainfall_diff", "average_rainfall", "plot_market_dist_mean","adopted_neighbors_10km", "year")
+         "iv_maize", "organic_fertilizer", "inorganic_fertilizer", "legume_intens",
+         "rainfall_diff", "average_rainfall", "dist_market","adopted_neighbors_10km", "year")
 tbl3  <-  datasummary_balance(~year , tb3, title = "Tanzania",
                               fmt = fmt_decimal(digits = 2),
                               output = "flextable")
@@ -49,11 +50,45 @@ doc <- read_docx() %>%
   body_add_flextable(tbl3)
 
 print(doc, target = "outputs/results/summary_tables.docx")
+rm(tbl1, tbl2, tbl3)
+
+## selected variables----
+tb1 <- dfmlw3 |>
+  select("legume_intens", "HDDS", "fcs", "female_manager", "age_manager", "hh_size", "extension_service", "farm_size", 
+         "maize_share", "other_crops", "subsistence_ag", "iv_maize", "organic_fertilizer", "inorganic_fertilizer", "year" )
+tb2 <- dfeth |>
+  rename(extension_service=advisory_service) |> 
+  select("legume_intens", "HDDS", "female_manager", "age_manager", "hh_size", "extension_service", "farm_size", 
+         "maize_share", "other_crops", "subsistence_ag", "iv_maize", "organic_fertilizer", "inorganic_fertilizer", "year" )
+tb3 <- dftza |> 
+  select("legume_intens", "HDDS", "fcs", "female_manager", "age_manager", "hh_size", "extension_service", "farm_size", 
+         "maize_share", "other_crops", "subsistence_ag", "iv_maize", "organic_fertilizer", "inorganic_fertilizer", "year" )
+tb1$country <- "Malawi"
+tb2$country <- "Ethiopia"
+tb2$inorganic_fertilizer <- as.numeric(tb2$inorganic_fertilizer)
+tb3$country <- "Tanzania"
+dfs <-bind_rows(tb1, tb2)
+dfs <-bind_rows(dfs, tb3)
+look_for(dfs)
+dfs <- dfs |> 
+  mutate(country_year = factor(paste(country, year, sep = "-")))
+tblall <- datasummary_balance(
+  ~ country_year,
+  data = dfs,
+  title = "Descriptive statistics of the main variables",
+  fmt = fmt_decimal(digits = 2),
+  output = "flextable"
+)
+tblall
+doc <- read_docx() %>%
+  body_add_flextable(tblall)
+print(doc, target = "outputs/results/summary_tablesall.docx")
+rm(tblall, dfs, tb1, tb2, tb3)
 
 ### correlation between DM and legume intensification ----
 # chi2 test and Cramers V
 # Malawi
-table_mlw <- table(dfmlwfull$female_dm, dfmlwfull$legume_intens)
+table_mlw <- table(dfmlw3$female_dm, dfmlw3$legume_intens)
 chisq_result_mlw <- chisq.test(table_mlw)
 cramers_v_mlw <- assocstats(table_mlw)$cramer
 
@@ -89,17 +124,32 @@ results_table <- tibble::tibble(
   select(Country, Chi2_result, p_value, Cramers_V)
 
 results_table
-ft <- flextable::flextable(results_table)
+ft <- flextable::flextable(results_table) |> 
+  set_caption(caption = " DM & Legume int.")
+rm(table_eth, table_mlw, table_tza, kruskal_result_mlw, kruskal_result_tza, kruskal_result_tza1,
+   kruskal_result_mlw1, kruskal_result_eth, cramers_v_eth, cramers_v_mlw, cramers_v_tza,
+   chisq_result_eth, chisq_result_mlw, chisq_result_tza, format_p)
+
+# Contingency table - Malawi 
+sink("outputs/results/CrossTable_results.txt")
+CrossTable(dfmlw3$female_dm, dfmlw3$legume_intens,
+           prop.r = TRUE,   
+           prop.c = TRUE,    # Column proportions  
+           prop.t = FALSE,
+           prop.chisq= FALSE,
+           expected= FALSE,
+           chisq = TRUE)
+sink()
 
 ## correlation between DM and HDDS ----
 # Malawi
-kmlw <-dfmlwfull |> 
+kmlw <-dfmlw3 |> 
   select(female_dm, HDDS, fcs)
 kruskal_result_mlw <- kruskal.test(HDDS ~ female_dm, data = kmlw)
 kruskal_result_mlw1 <- kruskal.test(fcs ~ female_dm, data = kmlw)
 # Ethiopia
 keth <- dfeth |> 
-  select(female_dm, HDDS, fcs)
+  select(female_dm, HDDS)
 kruskal_result_eth <- kruskal.test(HDDS ~ female_dm, data = keth)
 
 # Tanzania
@@ -121,7 +171,8 @@ results_table1 <- tibble::tibble(
   ) |> 
   select(Country, Chi2_result, p_value, )
 results_table1
-ft1 <- flextable::flextable(results_table1)
+ft1 <- flextable::flextable(results_table1) |> 
+  set_caption(caption = " DM & HDDS")
 results_table2 <- tibble::tibble(
   Country   = c("Malawi", "Tanzania"),
   Chi2 = c(kruskal_result_mlw1$statistic,  kruskal_result_tza1$statistic ),
@@ -134,17 +185,18 @@ results_table2 <- tibble::tibble(
   ) |> 
   select(Country, Chi2_result, p_value, )
 results_table2
-ft2 <- flextable::flextable(results_table2)
+ft2 <- flextable::flextable(results_table2) |> 
+  set_caption(caption = "DM & FCS")
 doc <- read_docx() |> 
   body_add_flextable(ft) |> 
   body_add_par("", style = "Normal") |> 
   body_add_flextable(ft1) |> 
   body_add_flextable(ft2)
 print(doc, target = "outputs/results/chi2_results.docx")
-rm(kruskal_result_mlw, kruskal_result_tza, kruskal_result_tza1, kruskal_result_mlw1, kruskal_result_eth,
-   ktza, keth, kmlw, ft, ft1, ft2, doc)
+rm(ktza, keth, kmlw, ft, ft1, ft2, doc, 
+   results_table, results_table1, results_table2)
 
-# Figure -----
+# Figures -----
 pacman::p_load(tidyverse,
                forcats,
                ggthemes,
@@ -167,11 +219,9 @@ survey_data <- tribble(
 )
 
 ggplot(survey_data, aes(y = fct_rev(factor(Country)))) +
-  # 1. draw the duration bar:
   geom_rect(aes(xmin = StartYear, xmax = EndYear,
                 ymin = as.numeric(fct_rev(factor(Country))) - 0.2,
                 ymax = as.numeric(fct_rev(factor(Country))) + 0.2), fill = "#D4FF1D", color="blue") +
-  # 2. add wave label in the middle of the bar:
   geom_text(aes(x = (StartYear + EndYear)/2,  # centre of bar
                 label = Wave),
             color = "black", fontface = "bold", size = 6) +
@@ -187,65 +237,10 @@ ggplot(survey_data, aes(y = fct_rev(factor(Country)))) +
         legend.text = element_text(size = 16, color = "blue")
         )
 ggsave("outputs/figures/datatime.tiff",dpi=360, width = 40, height= 14, units = "cm")
-
-## Legume intensification ----
-df1 <- dfmlwfull |> 
-  select(legume_intens, year) 
-df1$country <-  "Malawi"
-df2 <- dfeth |> 
-  select(legume_intens, year)
-df2$country <- "Ethiopia"
-df3 <- dftza |> 
-  select(legume_intens, year,)
-df3$country <- "Tanzania"
-dffig <- bind_rows(df1, df2) 
-dffig <- bind_rows(dffig, df3)
-look_for(dffig)
-dffig$country <- as.factor(dffig$country)
-rm(df1, df2, df3)
-adoption_summary <- dffig |> 
-  group_by(year, country) |> 
-  summarise(
-    adoption_rate = mean(legume_intens, na.rm = TRUE)*100,
-    .groups = "drop"
-  )
-look_for(adoption_summary)
-
-ggplot(adoption_summary, aes(x = year, y = adoption_rate,
-                             color = country, group = country)) +
-  geom_segment(aes(xend = year, y = 1, yend = adoption_rate),
-               size = 3) +
-  geom_point(size = 10, alpha = 0.8) +
-  geom_text(aes(label = round(adoption_rate, 0)),
-            show.legend = FALSE,
-            hjust = 1.5,
-            size = 8) +
-  
-  scale_color_viridis_d(option="viridis") +
-  
-  scale_x_continuous(breaks = unique(adoption_summary$year)) + 
-  # or if year is already a factor:
-  # scale_x_discrete(limits = levels(adoption_summary$year)) 
-  
-  labs(x = "Year",
-       y = "Legume intensification (%)",
-       color = "Country") +
-  theme_calc() +
-  theme(
-    plot.title = element_text(face = "bold",  size = 14),
-    axis.text.y = element_text(face = "bold", size = 14),
-    axis.text.x = element_text(face = "bold", size = 14),
-    axis.title.x = element_text(face = "bold", size = 14),
-    axis.title.y = element_text(face = "bold", size = 14),
-    legend.title = element_blank(),  # title size
-    legend.text  = element_text(size = 14),
-    panel.grid.major.y = element_blank()
-  )
-ggsave("outputs/figures/adoptions.tiff",dpi=360, width = 36, height= 20, units = "cm")
-rm(dffig, adoption_summary)
+rm(survey_data)
 
 ## Rotation and intercropping in research countries -----
-df1 <- dfmlw |> 
+df1 <- dfmlw3 |> 
   select(rotation, intercrop, year) 
 df1$country <-  "Malawi"
 look_for(df1)
@@ -303,13 +298,13 @@ plots <- adoption_long |>
   })
 
 combined <- wrap_plots(plots, ncol = 3) +
-  plot_annotation(caption = "Note: In Malawi, rotation was captured differently across survey years: in 2010 and 2013, rotation was only recorded if legumes were cropped in the previous dry season, while in 2016 and 2019, data also captured planned legume 
-cultivation after the reference rainy season. In Tanzania, rotation indicates that legumes were grown on a maize plot during the short rainy season. In Ethiopia, rotation indicates that legumes were grown on a maize plot at least once during 
-the past three years.",
-                  theme = theme(plot.caption = element_text(hjust = 0, size=10),
+  plot_annotation(caption = "Note: In Malawi, rotation was captured differently across survey years: in 2013, rotation was only recorded if legumes were cropped in the last dry season, while in 2016 and 2019, data also captured 
+planned legume cultivation after the reference rainy season. In Tanzania, rotation indicates that legumes were grown on a maize plot during the short rainy season. In Ethiopia, rotation indicates
+that legumes were grown on a maize plot at least once during the past three years.",
+                  theme = theme(plot.caption = element_text(hjust = 0, size=12),
                                 plot.caption.position = "plot"))+
   plot_layout(guides = "collect", axes= "collect", axis_titles = "collect" ) & 
   theme(legend.position = "top")
 combined
 ggsave("outputs/figures/adoptions_sep.tiff",dpi=360, width = 40, height= 20, units = "cm")
-rm(dffig, adoption_summary)
+rm(dffig, adoption_summary, combined)

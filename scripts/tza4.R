@@ -572,8 +572,7 @@ tza4 <- tza4 |> mutate(wave="wave4")
 
 ## Cleaning missing data ----
 look_for(tza4)
-### share_kg_sold----
-# Subsistence orientation
+### Subsistence orientation----
 # Identify households with a subsistence orientation (did not sell any maize in 2014)
 subsistence_ag <- read_dta("data/tza/tza_wave4_2014_15/TZA_2014_NPS-R4_v03_M_STATA11/ag_sec_5a.dta") |> 
   select(hh_id_merge = y4_hhid, ag5a_01) |> 

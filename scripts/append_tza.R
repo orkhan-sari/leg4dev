@@ -7,7 +7,9 @@ setdiff(names(tza5), names(tza4))
 dftza <-bind_rows(tza4, tza5)
 var_label(dftza) <- var_label(tza4)
 look_for(dftza)
-dftza <- dftza |> 
+dftza <- dftza |>
+  rename(plot_dist_household=plot_hh_dist_mean,
+         dist_market=plot_market_dist_mean) |> 
   group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 
   relocate(dupl, .after= hh_id_obs) |> 
   relocate(wave, .after= dupl) |> 

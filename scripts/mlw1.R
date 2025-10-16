@@ -506,7 +506,7 @@ rm(mlw1adoption)
 ## Cleaning missing data ----
 look_for(mlw1)
 mlw1 <- mlw1 |> select(-manager_id_merge)
-### share_kg_sold----
+### Subsistence orientation----
 ### share_kg_sold in HP data has many missing; reason: set to missing if reported share above 100% percent or
 ##  if household does not harvest any crops.
 ##  We will capture subsistence orientation: HHs do not sell any crops. 
@@ -797,6 +797,15 @@ mlw1 <- left_join(mlw1, garden, by=c("hhid"="case_id"))
 frq(mlw1$other_crops)
 var_label(mlw1$other_crops) <- "number of other crops produced"
 rm(maizehh, garden)
+
+## Rainfall lsms ----
+rain <- read_dta("data/mlw/HouseholdGeovariables_IHS3_Rerelease_10.dta") |> 
+  select(case_id, anntot_avg)
+look_for(rain)
+mlw1 <- left_join(mlw1, rain, by=c("hhid"="case_id"))
+rm(rain)
+
+
 ## Missing data and notes ----
 ## Some do not have agricultural assets but still have asset index. This is because, pca (factor) analysis still includes those with 
 ## no asset and gives them a lower score.

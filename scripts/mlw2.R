@@ -555,7 +555,7 @@ mlw2 <- mlw2 |> mutate(wave="wave2")
 ## Cleaning missing data ----
 look_for(mlw2)
 mlw2 <- mlw2 |> select(-manager_id_merge)
-### share_kg_sold----
+### Subsistence orientation----
 ### share_kg_sold in HP data has many missing; reason: set to missing if reported share above 100% percent or
 ##  if household does not harvest any crops.
 ##  We will capture subsistence orientation: HHs do not sell any crops. 
@@ -837,6 +837,12 @@ frq(mlw2$other_crops)
 var_label(mlw2$other_crops) <- "number of other crops produced"
 rm(maizehh, garden)
 
+## Rainfall lsms ----
+rain <- read_dta("data/mlw/HouseholdGeovariables_IHPS_13.dta") |> 
+  select(y2_hhid, anntot_avg )
+look_for(rain)
+mlw2 <- left_join(mlw2, rain, by=c("hhid"="y2_hhid"))
+rm(rain)
 ## Missing data and notes ----
 ## shocks missing for 13 hhs. 
 

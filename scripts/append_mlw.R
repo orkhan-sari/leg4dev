@@ -75,7 +75,7 @@ dfmlw$improved <- NULL
 dfmlw <- dfmlw |> 
   group_by(hh_id_obs) |> mutate(dupl=n()) |> ungroup() |> 
   relocate(dupl, .after= hh_id_obs)
-table(dfmlw$dupl) # 654 panel hhs for all rounds
+table(dfmlw$dupl) # 651 panel hhs for all rounds
 
 ## mlw all rounds ====  
 ## Most likely won't be needed for estimations
@@ -155,10 +155,9 @@ frq(dfmlwfull$mod_slope)
 dfmlwfull <- dfmlwfull |> 
   group_by(hh_id_obs) |> 
   mutate(
-    dis_plot1 = max(plot_dist_household, na.rm = TRUE),       # max within hh_id_obs
-    dis_plot = if_else(is.na(plot_dist_household), dis_plot1, plot_dist_household),
-    ln_dis_plot = log1p(dis_plot)
-  ) %>%
+    dis_plot1 = min(plot_dist_household, na.rm = TRUE),       # max within hh_id_obs
+    plot_dist_household = if_else(is.na(plot_dist_household), dis_plot1, plot_dist_household)
+  ) |> 
   ungroup()
 dfmlwfull$dis_plot1 <- NULL
 table(dfmlwfull$region, dfmlwfull$wave)
@@ -343,12 +342,24 @@ frq(dfmlw3$mod_slope)
 dfmlw3 <- dfmlw3 |> 
   group_by(hh_id_obs) |> 
   mutate(
-    dis_plot1 = max(plot_dist_household, na.rm = TRUE),       # max within hh_id_obs
-    dis_plot = if_else(is.na(plot_dist_household), dis_plot1, plot_dist_household),
-    ln_dis_plot = log1p(dis_plot)
-  ) %>%
+    dis_plot1 = min(plot_dist_household, na.rm = TRUE),       # max within hh_id_obs
+    plot_dist_household = if_else(is.na(plot_dist_household), dis_plot1, plot_dist_household)
+  ) |> 
   ungroup()
-dfmlw3$dis_plot1 <- NULL
+dftest <- dfmlw3 |> select(hhid, plot_dist_household, dis_plot1, wave) # many 9999 s. probably an error.
+# I replace those with pooled sample means.
+dfmlw3 <- dfmlw3 |>
+  mutate(
+    plot_dist_household = if_else(
+      !is.na(plot_dist_household) &
+        is.finite(plot_dist_household) &
+        plot_dist_household > 9990,
+      mean(plot_dist_household[is.finite(plot_dist_household) & plot_dist_household < 9990], na.rm = TRUE),
+      plot_dist_household
+    )
+  )
+dftest <- dfmlw3 |> select(hhid, plot_dist_household)
+rm(dftest)
 get_mode <- function(x) {
   ux <- na.omit(unique(x))
   ux[which.max(tabulate(match(x, ux)))]

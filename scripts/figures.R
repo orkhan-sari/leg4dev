@@ -8,51 +8,7 @@ pacman::p_load(vcd,
                gmodels,
                pandoc)
 # Tables =====
-# summary tables ----
-tb1 <- dfmlwfull |> 
-  select("HDDS", "fcs", "female_manager", "primary_education_manager", "age_manager", "hh_size", "hh_dependency_ratio",
-           "farm_size", "maize_share", "other_crops", "flat_slope", "mod_slope", "ln_dis_plot",
-           "hh_asset_index", "ln_other_income", "tlu", "subsistence_ag",
-           "extension_service", "credit_constrained", "fert_voucher", "bean_voucher", "eco_soil_mng",
-           "iv_maize", "organic_fertilizer", "inorganic_fertilizer", "legume_intens",
-           "soil_fertility_index", "twi", "rainfall_diff", "average_rainfall", "adopted_neighbors_10km", "year")
-tbl1  <-  datasummary_balance(~year , tb1, title = "Malawi all rounds",
-                              fmt = fmt_decimal(digits = 2),
-                              output = "flextable")
-tb2 <- dfeth |> 
-  select("HDDS", "female_manager", "primary_education_manager", "age_manager", "hh_size", "hh_dependency_ratio",
-         "farm_size", "maize_share", "other_crops", "flat_slope", "dist_market", "plot_dist_household",
-         "hh_asset_index", "ln_other_income", "tlu", "subsistence_ag",
-         "extension_program", "advisory_service", "credit_unavailable", "eco_soil_mng",
-         "iv_maize", "organic_fertilizer", "inorganic_fertilizer", "legume_intens",
-         "soil_fertility_index", "twi", "rainfall_diff", "average_rainfall", "adopted_neighbors_10km", "year")
-tbl2  <-  datasummary_balance(~year , tb2, title = "Ethiopia",
-                              fmt = fmt_decimal(digits = 2),
-                              output = "flextable")
-tb3 <- dftza |> 
-  select("HDDS", "fcs", "female_manager", "primary_education_manager", "age_manager", "hh_size", "hh_dependency_ratio",
-         "farm_size", "plot_certificate", "maize_share", "other_crops", "flat_slope", "plot_dist_household",
-         "hh_asset_index", "ln_other_income", "tlu", "subsistence_ag",
-         "extension_service", "credit", "crop_residue_short", "crop_residue_long" ,
-         "iv_maize", "organic_fertilizer", "inorganic_fertilizer", "legume_intens",
-         "rainfall_diff", "average_rainfall", "dist_market","adopted_neighbors_10km", "year")
-tbl3  <-  datasummary_balance(~year , tb3, title = "Tanzania",
-                              fmt = fmt_decimal(digits = 2),
-                              output = "flextable")
-set_table_properties(tbl1, layout = "autofit")
-set_table_properties(tbl2, layout = "autofit")
-set_table_properties(tbl3, layout = "autofit")
-doc <- read_docx() %>%
-  body_add_flextable(tbl1) %>%
-  body_add_par(" ") |> 
-  body_add_flextable(tbl2) |> 
-  body_add_par(" ") |> 
-  body_add_flextable(tbl3)
-
-print(doc, target = "outputs/results/summary_tables.docx")
-rm(tbl1, tbl2, tbl3)
-
-## selected variables----
+## Table 1 - selected variables----
 tb1 <- dfmlw3 |>
   select("legume_intens", "HDDS", "fcs", "female_manager", "age_manager", "hh_size", "extension_service", "farm_size", 
          "maize_share", "other_crops", "subsistence_ag", "iv_maize", "organic_fertilizer", "inorganic_fertilizer", "year" )
@@ -85,7 +41,44 @@ doc <- read_docx() %>%
 print(doc, target = "outputs/results/summary_tablesall.docx")
 rm(tblall, dfs, tb1, tb2, tb3)
 
-### correlation between DM and legume intensification ----
+## Table A4-A6 - remaining variables ----
+tb1 <- dfmlw3 |> 
+  select("primary_education_manager", "hh_dependency_ratio", "flat_slope", "mod_slope", "plot_dist_household",
+         "hh_asset_index", "ln_other_income", "tlu", "credit_constrained", "fert_voucher", 
+         "bean_voucher", "eco_soil_mng", "soil_fertility_index", "twi", "anntot_avg", "adopted_neighbors_10km", "year") |> 
+  mutate(plot_dist_household=if_else(is.infinite(plot_dist_household), NA, plot_dist_household))
+tbl1  <-  datasummary_balance(~year , tb1, title = "Malawi",
+                              fmt = fmt_decimal(digits = 2),
+                              output = "flextable")
+tb2 <- dfeth |> 
+  select("primary_education_manager", "hh_dependency_ratio", "flat_slope", "dist_market", "plot_dist_household", 
+         "hh_asset_index", "ln_other_income", "tlu", "extension_program", "credit_unavailable", 
+         "eco_soil_mng", "soil_fertility_index", "twi", "anntot_avg", "adopted_neighbors_10km", "year") |> 
+  mutate(plot_dist_household=if_else(is.infinite(plot_dist_household), NA, plot_dist_household))
+tbl2  <-  datasummary_balance(~year , tb2, title = "Ethiopia",
+                              fmt = fmt_decimal(digits = 2),
+                              output = "flextable")
+tb3 <- dftza |> 
+  select("primary_education_manager", "hh_dependency_ratio", "flat_slope", "plot_dist_household",
+         "hh_asset_index", "ln_other_income", "tlu", "credit", "crop_residue_short", "crop_residue_long",
+         "average_rainfall", "dist_market","adopted_neighbors_10km", "year")
+tbl3  <-  datasummary_balance(~year , tb3, title = "Tanzania",
+                              fmt = fmt_decimal(digits = 2),
+                              output = "flextable")
+set_table_properties(tbl1, layout = "autofit")
+set_table_properties(tbl2, layout = "autofit")
+set_table_properties(tbl3, layout = "autofit")
+doc <- read_docx() %>%
+  body_add_flextable(tbl1) %>%
+  body_add_par(" ") |> 
+  body_add_flextable(tbl2) |> 
+  body_add_par(" ") |> 
+  body_add_flextable(tbl3)
+
+print(doc, target = "outputs/results/summary_tables.docx")
+rm(tbl1, tbl2, tbl3)
+
+## Table 2 - correlation between DM and legume intensification ----
 # chi2 test and Cramers V
 # Malawi
 table_mlw <- table(dfmlw3$female_dm, dfmlw3$legume_intens)
@@ -131,17 +124,17 @@ rm(table_eth, table_mlw, table_tza, kruskal_result_mlw, kruskal_result_tza, krus
    chisq_result_eth, chisq_result_mlw, chisq_result_tza, format_p)
 
 # Contingency table - Malawi 
-sink("outputs/results/CrossTable_results.txt")
+sink("outputs/results/CrossTable_results.xml")
 CrossTable(dfmlw3$female_dm, dfmlw3$legume_intens,
            prop.r = TRUE,   
-           prop.c = TRUE,    # Column proportions  
+           prop.c = TRUE, 
            prop.t = FALSE,
            prop.chisq= FALSE,
            expected= FALSE,
            chisq = TRUE)
 sink()
 
-## correlation between DM and HDDS ----
+### correlation between DM and HDDS ----
 # Malawi
 kmlw <-dfmlw3 |> 
   select(female_dm, HDDS, fcs)
@@ -197,6 +190,7 @@ rm(ktza, keth, kmlw, ft, ft1, ft2, doc,
    results_table, results_table1, results_table2)
 
 # Figures -----
+## Figure 1. Timeline of the employed LSMS datasets ----
 pacman::p_load(tidyverse,
                forcats,
                ggthemes,
@@ -239,7 +233,7 @@ ggplot(survey_data, aes(y = fct_rev(factor(Country)))) +
 ggsave("outputs/figures/datatime.tiff",dpi=360, width = 40, height= 14, units = "cm")
 rm(survey_data)
 
-## Rotation and intercropping in research countries -----
+## Figure 2 - Legume intercropping and rotation among maize farmers in research countries -----
 df1 <- dfmlw3 |> 
   select(rotation, intercrop, year) 
 df1$country <-  "Malawi"
